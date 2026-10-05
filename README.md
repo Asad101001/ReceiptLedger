@@ -104,38 +104,34 @@ Complete specifications and design artifacts are located under [`docs/specificat
 <div align="center">
 <table>
   <tr>
-    <td align="center" width="33%">
-      <img src="https://ui-avatars.com/api/?name=Aazmeer+Faridy&background=4F46E5&color=fff&size=100&bold=true&rounded=true" width="56" alt="Aazmeer Sarfaraz Faridy" /><br /><br />
-      <b>Aazmeer Sarfaraz Faridy</b><br />
-      <img src="https://img.shields.io/badge/Roll-B24110006002-4F46E5?style=flat-square" alt="B24110006002" />
-    </td>
-    <td align="center" width="33%">
-      <img src="https://ui-avatars.com/api/?name=Arish+Khan&background=0D9488&color=fff&size=100&bold=true&rounded=true" width="56" alt="Arish Ahmed Khan" /><br /><br />
-      <b>Arish Ahmed Khan</b><br />
-      <img src="https://img.shields.io/badge/Roll-B24110006026-0D9488?style=flat-square" alt="B24110006026" />
-    </td>
-    <td align="center" width="33%">
-      <img src="https://ui-avatars.com/api/?name=Iman+Hussain&background=0284C7&color=fff&size=100&bold=true&rounded=true" width="56" alt="Iman Hussain" /><br /><br />
-      <b>Iman Hussain</b><br />
-      <img src="https://img.shields.io/badge/Roll-B24110006054-0284C7?style=flat-square" alt="B24110006054" />
-    </td>
+    <td align="center" width="33%"><img src="https://ui-avatars.com/api/?name=Aazmeer+Faridy&background=4F46E5&color=fff&size=100&bold=true&rounded=true" width="56" alt="Aazmeer Sarfaraz Faridy" /></td>
+    <td align="center" width="33%"><img src="https://ui-avatars.com/api/?name=Arish+Khan&background=0D9488&color=fff&size=100&bold=true&rounded=true" width="56" alt="Arish Ahmed Khan" /></td>
+    <td align="center" width="33%"><img src="https://ui-avatars.com/api/?name=Iman+Hussain&background=0284C7&color=fff&size=100&bold=true&rounded=true" width="56" alt="Iman Hussain" /></td>
   </tr>
   <tr>
-    <td align="center" width="33%">
-      <img src="https://ui-avatars.com/api/?name=Muhammad+Asad&background=2563EB&color=fff&size=100&bold=true&rounded=true" width="56" alt="Muhammad Asad Khan" /><br /><br />
-      <b>Muhammad Asad Khan</b><br />
-      <img src="https://img.shields.io/badge/Roll-B24110006087-2563EB?style=flat-square" alt="B24110006087" />
-    </td>
-    <td align="center" width="33%">
-      <img src="https://ui-avatars.com/api/?name=Aun+Shamsi&background=7C3AED&color=fff&size=100&bold=true&rounded=true" width="56" alt="Syed Aun Shamsi" /><br /><br />
-      <b>Syed Aun Shamsi</b><br />
-      <img src="https://img.shields.io/badge/Roll-B24110006134-7C3AED?style=flat-square" alt="B24110006134" />
-    </td>
-    <td align="center" width="33%">
-      <img src="https://ui-avatars.com/api/?name=Zainab+Hashmi&background=DB2777&color=fff&size=100&bold=true&rounded=true" width="56" alt="Zainab Hashmi" /><br /><br />
-      <b>Zainab Hashmi</b><br />
-      <img src="https://img.shields.io/badge/Roll-B24110006162-DB2777?style=flat-square" alt="B24110006162" />
-    </td>
+    <td align="center"><b>Aazmeer Sarfaraz Faridy</b></td>
+    <td align="center"><b>Arish Ahmed Khan</b></td>
+    <td align="center"><b>Iman Hussain</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="https://img.shields.io/badge/Roll-B24110006002-4F46E5?style=flat-square" alt="B24110006002" /></td>
+    <td align="center"><img src="https://img.shields.io/badge/Roll-B24110006026-0D9488?style=flat-square" alt="B24110006026" /></td>
+    <td align="center"><img src="https://img.shields.io/badge/Roll-B24110006054-0284C7?style=flat-square" alt="B24110006054" /></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><img src="https://ui-avatars.com/api/?name=Muhammad+Asad&background=2563EB&color=fff&size=100&bold=true&rounded=true" width="56" alt="Muhammad Asad Khan" /></td>
+    <td align="center" width="33%"><img src="https://ui-avatars.com/api/?name=Aun+Shamsi&background=7C3AED&color=fff&size=100&bold=true&rounded=true" width="56" alt="Syed Aun Shamsi" /></td>
+    <td align="center" width="33%"><img src="https://ui-avatars.com/api/?name=Zainab+Hashmi&background=DB2777&color=fff&size=100&bold=true&rounded=true" width="56" alt="Zainab Hashmi" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Muhammad Asad Khan</b></td>
+    <td align="center"><b>Syed Aun Shamsi</b></td>
+    <td align="center"><b>Zainab Hashmi</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="https://img.shields.io/badge/Roll-B24110006087-2563EB?style=flat-square" alt="B24110006087" /></td>
+    <td align="center"><img src="https://img.shields.io/badge/Roll-B24110006134-7C3AED?style=flat-square" alt="B24110006134" /></td>
+    <td align="center"><img src="https://img.shields.io/badge/Roll-B24110006162-DB2777?style=flat-square" alt="B24110006162" /></td>
   </tr>
 </table>
 </div>
