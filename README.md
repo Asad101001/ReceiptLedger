@@ -101,11 +101,44 @@ Complete specifications and design artifacts are located under [`docs/specificat
 
 ## Project Team
 
-| Student Name | Seat / Roll ID | Student Name | Seat / Roll ID |
-|:---|:---:|:---|:---:|
-| **Aazmeer Sarfaraz Faridy** | [![B24110006002](https://img.shields.io/badge/Roll-B24110006002-1E293B?style=flat-square)](#) | **Muhammad Asad Khan** | [![B24110006087](https://img.shields.io/badge/Roll-B24110006087-1E293B?style=flat-square)](#) |
-| **Arish Ahmed Khan** | [![B24110006026](https://img.shields.io/badge/Roll-B24110006026-1E293B?style=flat-square)](#) | **Syed Aun Shamsi** | [![B24110006134](https://img.shields.io/badge/Roll-B24110006134-1E293B?style=flat-square)](#) |
-| **Iman Hussain** | [![B24110006054](https://img.shields.io/badge/Roll-B24110006054-1E293B?style=flat-square)](#) | **Zainab Hashmi** | [![B24110006162](https://img.shields.io/badge/Roll-B24110006162-1E293B?style=flat-square)](#) |
+<div align="center">
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="https://ui-avatars.com/api/?name=Aazmeer+Faridy&background=4F46E5&color=fff&size=100&bold=true&rounded=true" width="56" alt="Aazmeer Sarfaraz Faridy" /><br /><br />
+      <b>Aazmeer Sarfaraz Faridy</b><br />
+      <img src="https://img.shields.io/badge/Roll-B24110006002-4F46E5?style=flat-square" alt="B24110006002" />
+    </td>
+    <td align="center" width="33%">
+      <img src="https://ui-avatars.com/api/?name=Arish+Khan&background=0D9488&color=fff&size=100&bold=true&rounded=true" width="56" alt="Arish Ahmed Khan" /><br /><br />
+      <b>Arish Ahmed Khan</b><br />
+      <img src="https://img.shields.io/badge/Roll-B24110006026-0D9488?style=flat-square" alt="B24110006026" />
+    </td>
+    <td align="center" width="33%">
+      <img src="https://ui-avatars.com/api/?name=Iman+Hussain&background=0284C7&color=fff&size=100&bold=true&rounded=true" width="56" alt="Iman Hussain" /><br /><br />
+      <b>Iman Hussain</b><br />
+      <img src="https://img.shields.io/badge/Roll-B24110006054-0284C7?style=flat-square" alt="B24110006054" />
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <img src="https://ui-avatars.com/api/?name=Muhammad+Asad&background=2563EB&color=fff&size=100&bold=true&rounded=true" width="56" alt="Muhammad Asad Khan" /><br /><br />
+      <b>Muhammad Asad Khan</b><br />
+      <img src="https://img.shields.io/badge/Roll-B24110006087-2563EB?style=flat-square" alt="B24110006087" />
+    </td>
+    <td align="center" width="33%">
+      <img src="https://ui-avatars.com/api/?name=Aun+Shamsi&background=7C3AED&color=fff&size=100&bold=true&rounded=true" width="56" alt="Syed Aun Shamsi" /><br /><br />
+      <b>Syed Aun Shamsi</b><br />
+      <img src="https://img.shields.io/badge/Roll-B24110006134-7C3AED?style=flat-square" alt="B24110006134" />
+    </td>
+    <td align="center" width="33%">
+      <img src="https://ui-avatars.com/api/?name=Zainab+Hashmi&background=DB2777&color=fff&size=100&bold=true&rounded=true" width="56" alt="Zainab Hashmi" /><br /><br />
+      <b>Zainab Hashmi</b><br />
+      <img src="https://img.shields.io/badge/Roll-B24110006162-DB2777?style=flat-square" alt="B24110006162" />
+    </td>
+  </tr>
+</table>
+</div>
 
 ---
 
