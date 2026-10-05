@@ -83,34 +83,29 @@ flowchart LR
 * Generic corporate categorization outside common consumer and retail goods.
 * Training custom machine learning models from scratch.
 
----
+## Documentation
 
-## Technical Specifications
+Complete specifications and design artifacts are located under [`docs/specifications/`](docs/specifications/):
 
-Detailed design, architectural, and project management artifacts are maintained under [`docs/`](docs/):
-
-| Specification | Focus Area | Format |
-|:---|:---|:---:|
-| [Product Requirements Document (PRD)](docs/specifications/01_PRD.md) | Vision, target personas, user journeys, functional priority matrix | Markdown |
-| [Software Requirements Specification (SRS)](docs/specifications/02_SRS.md) | IEEE 830 standard requirements, API endpoints, NFR criteria | Markdown |
-| [Software Design Specification (SDS)](docs/specifications/03_SDS.md) | Subsystem architecture, sequence diagrams, failure mitigation | Markdown |
-| [Data Flow Diagrams (DFD)](docs/specifications/04_DFD.md) | Level 0 Context Model and Level 1 Functional Decomposition | Mermaid |
-| [Entity Relationship Diagram (ERD)](docs/specifications/05_ERD.md) | 3NF database schema, table specifications, Supabase DDL | Mermaid |
-| [Semantic Networks](docs/specifications/06_SEMANTIC_NETS.md) | Domain knowledge graphs, local item taxonomies, unit networks | Mermaid |
-| [3-Week Sprint Execution Plan](docs/specifications/07_SPRINT_PLAN_3WEEKS.md) | 3-week sprint timeline, backlog issues, exit criteria | Markdown |
+| Document | Summary |
+|:---|:---|
+| [**PRD**](docs/specifications/01_PRD.md) | Vision, target personas, and functional priority matrix |
+| [**SRS**](docs/specifications/02_SRS.md) | IEEE 830 functional/non-functional requirements and API schemas |
+| [**SDS**](docs/specifications/03_SDS.md) | Subsystem architecture, pipeline routing, and sequence flows |
+| [**DFD**](docs/specifications/04_DFD.md) | Level 0 Context Model and Level 1 Functional Decomposition |
+| [**ERD**](docs/specifications/05_ERD.md) | 3NF relational database schema and PostgreSQL/Supabase DDL |
+| [**Semantic Networks**](docs/specifications/06_SEMANTIC_NETS.md) | Domain knowledge graphs, local item taxonomies, and unit hierarchies |
+| [**3-Week Sprint Plan**](docs/specifications/07_SPRINT_PLAN_3WEEKS.md) | Compressed sprint timeline, backlog tickets, and exit criteria |
 
 ---
 
 ## Project Team
 
-| # | Student Name | Roll Number |
-|:---:|:---|:---:|
-| 01 | **Aazmeer Sarfaraz Faridy** | `B24110006002` |
-| 02 | **Arish Ahmed Khan** | `B24110006026` |
-| 03 | **Iman Hussain** | `B24110006054` |
-| 04 | **Muhammad Asad Khan** | `B24110006087` |
-| 05 | **Syed Aun Shamsi** | `B24110006134` |
-| 06 | **Zainab Hashmi** | `B24110006162` |
+| Student Name | Seat / Roll ID | Student Name | Seat / Roll ID |
+|:---|:---:|:---|:---:|
+| **Aazmeer Sarfaraz Faridy** | [![B24110006002](https://img.shields.io/badge/Roll-B24110006002-1E293B?style=flat-square)](#) | **Muhammad Asad Khan** | [![B24110006087](https://img.shields.io/badge/Roll-B24110006087-1E293B?style=flat-square)](#) |
+| **Arish Ahmed Khan** | [![B24110006026](https://img.shields.io/badge/Roll-B24110006026-1E293B?style=flat-square)](#) | **Syed Aun Shamsi** | [![B24110006134](https://img.shields.io/badge/Roll-B24110006134-1E293B?style=flat-square)](#) |
+| **Iman Hussain** | [![B24110006054](https://img.shields.io/badge/Roll-B24110006054-1E293B?style=flat-square)](#) | **Zainab Hashmi** | [![B24110006162](https://img.shields.io/badge/Roll-B24110006162-1E293B?style=flat-square)](#) |
 
 ---
 
