@@ -57,6 +57,22 @@ Managing personal and household expenses is often complicated by a mix of paper 
 
 ---
 
+## Technical Specifications & Artifacts
+
+All formal software engineering and project management specifications are organized under the [`docs/`](docs/) directory:
+
+| Document | Description | Format |
+|:---|:---|:---:|
+| [Product Requirements Document (PRD)](docs/specifications/01_PRD.md) | High-level vision, personas, journeys, and functional matrix | Markdown |
+| [Software Requirements Specification (SRS)](docs/specifications/02_SRS.md) | IEEE 830 standard requirements, API endpoints, and NFRs | Markdown |
+| [Software Design Specification (SDS)](docs/specifications/03_SDS.md) | Modular architecture, subsystem design, and sequence diagrams | Markdown |
+| [Data Flow Diagrams (DFD)](docs/specifications/04_DFD.md) | Level 0 Context Diagram and Level 1 Functional Decomposition | Mermaid |
+| [Entity Relationship Diagram (ERD)](docs/specifications/05_ERD.md) | Database relational schema and 3NF model (PostgreSQL / Supabase) | Mermaid |
+| [Semantic Networks](docs/specifications/06_SEMANTIC_NETS.md) | Domain knowledge graphs, local item taxonomies, and unit hierarchies | Mermaid |
+| [3-Week Sprint Execution Plan](docs/specifications/07_SPRINT_PLAN_3WEEKS.md) | Compressed 3-week sprint breakdown, epics, and exit criteria | Markdown |
+
+---
+
 ## Project Members
 
 | # | Student Name | Roll Number |
