@@ -10,6 +10,19 @@
 [![Lifecycle](https://img.shields.io/badge/Lifecycle-3--Week%20Sprints-F59E0B?style=flat-square)](docs/specifications/07_SPRINT_PLAN_3WEEKS.md)
 [![Tooling](https://img.shields.io/badge/Tooling-Jira%20%7C%20Slack-6366F1?style=flat-square&logo=jira&logoColor=white)](docs/project-management/ReceiptLedger_SoW_v3.pdf)
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Flutter-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter" />
+  <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python" />
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/OpenCV-5C3EE8?style=flat-square&logo=opencv&logoColor=white" alt="OpenCV" />
+  <img src="https://img.shields.io/badge/Google%20Cloud-4285F4?style=flat-square&logo=googlecloud&logoColor=white" alt="Google Cloud" />
+  <img src="https://img.shields.io/badge/Supabase-3ECF8E?style=flat-square&logo=supabase&logoColor=white" alt="Supabase" />
+  <img src="https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB" alt="React" />
+  <img src="https://img.shields.io/badge/Google%20Stitch-EA4335?style=flat-square&logo=google&logoColor=white" alt="Google Stitch" />
+  <img src="https://img.shields.io/badge/Jira-0052CC?style=flat-square&logo=jira&logoColor=white" alt="Jira" />
+  <img src="https://img.shields.io/badge/Slack-4A154B?style=flat-square&logo=slack&logoColor=white" alt="Slack" />
+</p>
+
 </div>
 
 ---
@@ -54,6 +67,7 @@ flowchart LR
 | Subsystem | Stack / Tool | Scope |
 |:---|:---:|:---|
 | ![Mobile](https://img.shields.io/badge/Mobile-Capture%20Client-0284C7?style=flat-square&logo=flutter&logoColor=white) | Flutter | Single and batch receipt photo capture with edge preview and perspective deskewing. |
+| ![Design](https://img.shields.io/badge/Design-UI%20Mockups-EA4335?style=flat-square&logo=google&logoColor=white) | Google Stitch | Interface wireframing, component mockups, and mobile UX design system. |
 | ![Printed OCR](https://img.shields.io/badge/OCR-Printed%20Path-4F46E5?style=flat-square&logo=googlecloud&logoColor=white) | Cloud Vision API / Tesseract | High-accuracy text and pricing extraction from structured retail register receipts. |
 | ![Handwritten OCR](https://img.shields.io/badge/OCR-Handwritten%20Path-7C3AED?style=flat-square&logo=python&logoColor=white) | EasyOCR + OpenCV | Character and numeric extraction tailored for informal small-shop receipts. |
 | ![Normalization](https://img.shields.io/badge/NLP-Normalization-D97706?style=flat-square) | Levenshtein Matcher | Mapping colloquial names and local units into canonical retail items. |
@@ -83,6 +97,8 @@ flowchart LR
 * Generic corporate categorization outside common consumer and retail goods.
 * Training custom machine learning models from scratch.
 
+---
+
 ## Documentation
 
 Complete specifications and design artifacts are located under [`docs/specifications/`](docs/specifications/):
@@ -104,34 +120,34 @@ Complete specifications and design artifacts are located under [`docs/specificat
 <div align="center">
 <table>
   <tr>
-    <td align="center" width="33%"><img src="https://ui-avatars.com/api/?name=Aazmeer+Faridy&background=4F46E5&color=fff&size=100&bold=true&rounded=true" width="56" alt="Aazmeer Sarfaraz Faridy" /></td>
-    <td align="center" width="33%"><img src="https://ui-avatars.com/api/?name=Arish+Khan&background=0D9488&color=fff&size=100&bold=true&rounded=true" width="56" alt="Arish Ahmed Khan" /></td>
-    <td align="center" width="33%"><img src="https://ui-avatars.com/api/?name=Iman+Hussain&background=0284C7&color=fff&size=100&bold=true&rounded=true" width="56" alt="Iman Hussain" /></td>
+    <td align="center" width="33%"><a href="https://github.com/Aazmeer30"><img src="https://ui-avatars.com/api/?name=Aazmeer+Faridy&background=4F46E5&color=fff&size=100&bold=true&rounded=true" width="56" alt="Aazmeer Sarfaraz Faridy" /></a></td>
+    <td align="center" width="33%"><a href="https://github.com/Arish026"><img src="https://ui-avatars.com/api/?name=Arish+Khan&background=0D9488&color=fff&size=100&bold=true&rounded=true" width="56" alt="Arish Ahmed Khan" /></a></td>
+    <td align="center" width="33%"><a href="https://github.com/Imanh728"><img src="https://ui-avatars.com/api/?name=Iman+Hussain&background=0284C7&color=fff&size=100&bold=true&rounded=true" width="56" alt="Iman Hussain" /></a></td>
   </tr>
   <tr>
-    <td align="center"><b>Aazmeer Sarfaraz Faridy</b></td>
-    <td align="center"><b>Arish Ahmed Khan</b></td>
-    <td align="center"><b>Iman Hussain</b></td>
+    <td align="center"><a href="https://github.com/Aazmeer30"><b>Aazmeer Sarfaraz Faridy</b></a></td>
+    <td align="center"><a href="https://github.com/Arish026"><b>Arish Ahmed Khan</b></a></td>
+    <td align="center"><a href="https://github.com/Imanh728"><b>Iman Hussain</b></a></td>
   </tr>
   <tr>
-    <td align="center"><img src="https://img.shields.io/badge/Roll-B24110006002-4F46E5?style=flat-square" alt="B24110006002" /></td>
-    <td align="center"><img src="https://img.shields.io/badge/Roll-B24110006026-0D9488?style=flat-square" alt="B24110006026" /></td>
-    <td align="center"><img src="https://img.shields.io/badge/Roll-B24110006054-0284C7?style=flat-square" alt="B24110006054" /></td>
+    <td align="center"><a href="https://github.com/Aazmeer30"><img src="https://img.shields.io/badge/Roll-B24110006002-4F46E5?style=flat-square" alt="B24110006002" /></a></td>
+    <td align="center"><a href="https://github.com/Arish026"><img src="https://img.shields.io/badge/Roll-B24110006026-0D9488?style=flat-square" alt="B24110006026" /></a></td>
+    <td align="center"><a href="https://github.com/Imanh728"><img src="https://img.shields.io/badge/Roll-B24110006054-0284C7?style=flat-square" alt="B24110006054" /></a></td>
   </tr>
   <tr>
-    <td align="center" width="33%"><img src="https://ui-avatars.com/api/?name=Muhammad+Asad&background=2563EB&color=fff&size=100&bold=true&rounded=true" width="56" alt="Muhammad Asad Khan" /></td>
-    <td align="center" width="33%"><img src="https://ui-avatars.com/api/?name=Aun+Shamsi&background=7C3AED&color=fff&size=100&bold=true&rounded=true" width="56" alt="Syed Aun Shamsi" /></td>
-    <td align="center" width="33%"><img src="https://ui-avatars.com/api/?name=Zainab+Hashmi&background=DB2777&color=fff&size=100&bold=true&rounded=true" width="56" alt="Zainab Hashmi" /></td>
+    <td align="center" width="33%"><a href="https://github.com/Asad101001"><img src="https://ui-avatars.com/api/?name=Muhammad+Asad&background=2563EB&color=fff&size=100&bold=true&rounded=true" width="56" alt="Muhammad Asad Khan" /></a></td>
+    <td align="center" width="33%"><a href="https://github.com/Aun2005"><img src="https://ui-avatars.com/api/?name=Aun+Shamsi&background=7C3AED&color=fff&size=100&bold=true&rounded=true" width="56" alt="Syed Aun Shamsi" /></a></td>
+    <td align="center" width="33%"><a href="https://github.com/zainab251251"><img src="https://ui-avatars.com/api/?name=Zainab+Hashmi&background=DB2777&color=fff&size=100&bold=true&rounded=true" width="56" alt="Zainab Hashmi" /></a></td>
   </tr>
   <tr>
-    <td align="center"><b>Muhammad Asad Khan</b></td>
-    <td align="center"><b>Syed Aun Shamsi</b></td>
-    <td align="center"><b>Zainab Hashmi</b></td>
+    <td align="center"><a href="https://github.com/Asad101001"><b>Muhammad Asad Khan</b></a></td>
+    <td align="center"><a href="https://github.com/Aun2005"><b>Syed Aun Shamsi</b></a></td>
+    <td align="center"><a href="https://github.com/zainab251251"><b>Zainab Hashmi</b></a></td>
   </tr>
   <tr>
-    <td align="center"><img src="https://img.shields.io/badge/Roll-B24110006087-2563EB?style=flat-square" alt="B24110006087" /></td>
-    <td align="center"><img src="https://img.shields.io/badge/Roll-B24110006134-7C3AED?style=flat-square" alt="B24110006134" /></td>
-    <td align="center"><img src="https://img.shields.io/badge/Roll-B24110006162-DB2777?style=flat-square" alt="B24110006162" /></td>
+    <td align="center"><a href="https://github.com/Asad101001"><img src="https://img.shields.io/badge/Roll-B24110006087-2563EB?style=flat-square" alt="B24110006087" /></a></td>
+    <td align="center"><a href="https://github.com/Aun2005"><img src="https://img.shields.io/badge/Roll-B24110006134-7C3AED?style=flat-square" alt="B24110006134" /></a></td>
+    <td align="center"><a href="https://github.com/zainab251251"><img src="https://img.shields.io/badge/Roll-B24110006162-DB2777?style=flat-square" alt="B24110006162" /></a></td>
   </tr>
 </table>
 </div>
