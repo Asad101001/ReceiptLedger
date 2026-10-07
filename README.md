@@ -99,6 +99,18 @@ flowchart LR
 
 ---
 
+## Repository Modules
+
+| Module | Purpose | Stack |
+|:---|:---|:---:|
+| [`backend/`](backend/) | Core OCR routing, OpenCV deskewing, normalization, and API gateway | FastAPI • OpenCV • EasyOCR |
+| [`mobile/`](mobile/) | Camera capture client, edge alignment preview, and image upload | Flutter • Dart • Google Stitch |
+| [`web/`](web/) | Analytics dashboard, monthly trend charts, and review queue | React • Vite • Chart.js |
+| [`docs/`](docs/) | Complete engineering specifications, IEEE 830 SRS, and course governance | Markdown • Mermaid |
+| [`data/`](data/) | Sample receipt collection repository and local item taxonomy dictionary | Dataset • JSON |
+
+---
+
 ## Documentation
 
 Complete specifications and design artifacts are located under [`docs/specifications/`](docs/specifications/):
@@ -113,6 +125,7 @@ Complete specifications and design artifacts are located under [`docs/specificat
 | [**Semantic Networks**](docs/specifications/06_SEMANTIC_NETS.md) | Domain knowledge graphs, local item taxonomies, and unit hierarchies |
 | [**3-Week Sprint Plan**](docs/specifications/07_SPRINT_PLAN_3WEEKS.md) | Compressed sprint timeline, backlog tickets, and exit criteria |
 | [**Environment Setup**](docs/specifications/08_ENVIRONMENT_SETUP.md) | Prerequisites, local virtualenv, Node, Flutter, and Docker setup |
+| [**Development Plan**](docs/specifications/09_DEVELOPMENT_PLAN.md) | In-depth engineering implementation roadmap and algorithmic specs |
 
 ---
 
