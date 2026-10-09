@@ -50,13 +50,13 @@ gantt
 
 | Issue Key | Subsystem | Story Description | Priority | Assignee |
 |:---|:---|:---|:---:|:---:|
-| `RL-101` | Infrastructure | Configure GitHub repository, branch protection, and Slack webhook alerts | High | *[Assigned by Lead]* |
-| `RL-102` | Infrastructure | Configure Jira Scrum board, backlog epics, and burndown chart | High | *[Assigned by Lead]* |
-| `RL-103` | Data Collection | Collect and label initial dataset of 50+ printed and handwritten receipts | High | *[Assigned by Lead]* |
-| `RL-104` | Mobile Client | Build mobile receipt camera capture screen with edge preview (Flutter) | High | *[Assigned by Lead]* |
-| `RL-105` | Ingestion API | Implement multipart image upload endpoint and OpenCV deskewing | High | *[Assigned by Lead]* |
-| `RL-106` | OCR Engine | Integrate Google Cloud Vision API for printed retail receipts | High | *[Assigned by Lead]* |
-| `RL-107` | OCR Engine | Implement local Tesseract 5 fallback for quota overflow protection | Medium | *[Assigned by Lead]* |
+| `RL-101` | Infrastructure | Configure GitHub repository, branch protection, and Slack webhook alerts | High | Muhammad Asad Khan |
+| `RL-102` | Infrastructure | Configure Jira Scrum board, backlog epics, and burndown chart | High | Arish Ahmed Khan |
+| `RL-103` | Data Collection | Collect and label initial dataset of 50+ printed and handwritten receipts | High | Zainab Hashmi |
+| `RL-104` | Mobile Client | Build mobile receipt camera capture screen & Google Stitch mockups | High | Aazmeer Sarfaraz Faridy |
+| `RL-105` | Ingestion API | Implement multipart image upload endpoint and OpenCV deskewing | High | Muhammad Asad Khan |
+| `RL-106` | OCR Engine | Integrate Google Cloud Vision API for printed retail receipts | High | Muhammad Asad Khan |
+| `RL-107` | OCR Engine | Implement local Tesseract 5 fallback for quota overflow protection | Medium | Muhammad Asad Khan |
 
 * **Sprint 1 Exit Criteria:**
   - Working repository, Jira board, and Slack integrations active.
@@ -72,13 +72,13 @@ gantt
 
 | Issue Key | Subsystem | Story Description | Priority | Assignee |
 |:---|:---|:---|:---:|:---:|
-| `RL-201` | OCR Engine | Implement EasyOCR pipeline with preprocessing for handwritten notes | High | *[Assigned by Lead]* |
-| `RL-202` | Normalization | Build local retail dictionary and Levenshtein fuzzy-matching engine | High | *[Assigned by Lead]* |
-| `RL-203` | Normalization | Implement regex parsers for item quantities, units, and line totals | High | *[Assigned by Lead]* |
-| `RL-204` | Categorization | Implement rule-based classification engine for spending taxonomy | High | *[Assigned by Lead]* |
-| `RL-205` | Deduplication | Implement 64-bit perceptual image hashing (pHash) comparator | Medium | *[Assigned by Lead]* |
-| `RL-206` | Deduplication | Implement textual metadata fingerprinting (`store + date + amount`) | Medium | *[Assigned by Lead]* |
-| `RL-207` | Persistence | Configure Supabase/PostgreSQL schema and database migrations | High | *[Assigned by Lead]* |
+| `RL-201` | OCR Engine | Implement EasyOCR pipeline with preprocessing for handwritten notes | High | Muhammad Asad Khan |
+| `RL-202` | Normalization | Build local retail dictionary and Levenshtein fuzzy-matching engine | High | Muhammad Asad Khan |
+| `RL-203` | Normalization | Implement regex parsers for item quantities, units, and line totals | High | Muhammad Asad Khan |
+| `RL-204` | Categorization | Implement rule-based classification engine for spending taxonomy | High | Muhammad Asad Khan |
+| `RL-205` | Deduplication | Implement 64-bit perceptual image hashing (pHash) comparator | Medium | Muhammad Asad Khan |
+| `RL-206` | Deduplication | Implement textual metadata fingerprinting (`store + date + amount`) | Medium | Muhammad Asad Khan |
+| `RL-207` | Persistence | Configure Supabase/PostgreSQL schema and database migrations | High | Muhammad Asad Khan |
 
 * **Sprint 2 Exit Criteria:**
   - Handwritten receipt OCR achieves $\ge 70\%$ word accuracy post-domain correction.
@@ -94,14 +94,14 @@ gantt
 
 | Issue Key | Subsystem | Story Description | Priority | Assignee |
 |:---|:---|:---|:---:|:---:|
-| `RL-301` | Dashboard UI | Build monthly spending summary card and delta vs. previous month | High | *[Assigned by Lead]* |
-| `RL-302` | Dashboard UI | Build category-wise breakdown chart (donut/bar) with drill-down | High | *[Assigned by Lead]* |
-| `RL-303` | Dashboard UI | Implement multi-month spending trend visualization | Medium | *[Assigned by Lead]* |
-| `RL-304` | Dashboard UI | Implement searchable receipt historical ledger with item view | Medium | *[Assigned by Lead]* |
-| `RL-305` | Review Queue | Build human-in-the-loop review queue for low-confidence scans | High | *[Assigned by Lead]* |
-| `RL-306` | Integration | Hardening and end-to-end integration (Mobile $\rightarrow$ Pipeline $\rightarrow$ DB $\rightarrow$ Web) | High | *[Assigned by Lead]* |
-| `RL-307` | Quality Assurance | Execute UAT testing against acceptance criteria defined in SoW | High | *[Assigned by Lead]* |
-| `RL-308` | Project Delivery | Final documentation packaging, demo recording, and submission readiness | High | *[Assigned by Lead]* |
+| `RL-301` | Dashboard UI | Build monthly spending summary card and delta vs. previous month | High | Iman Hussain |
+| `RL-302` | Dashboard UI | Build category-wise breakdown chart (donut/bar) with drill-down | High | Iman Hussain |
+| `RL-303` | Dashboard UI | Implement multi-month spending trend visualization | Medium | Iman Hussain |
+| `RL-304` | Dashboard UI | Implement searchable receipt historical ledger with item view | Medium | Iman Hussain |
+| `RL-305` | Review Queue | Build human-in-the-loop review queue for low-confidence scans | High | Iman Hussain |
+| `RL-306` | Integration | Hardening and end-to-end integration (Mobile $\rightarrow$ Pipeline $\rightarrow$ DB $\rightarrow$ Web) | High | Muhammad Asad Khan |
+| `RL-307` | Quality Assurance | Execute UAT testing against acceptance criteria defined in SoW | High | Syed Aun Shamsi |
+| `RL-308` | Project Delivery | Final documentation packaging, demo recording, and submission readiness | High | Arish Ahmed Khan |
 
 * **Sprint 3 Exit Criteria:**
   - Complete round-trip workflow verified: Photo taken $\rightarrow$ items digitized $\rightarrow$ visible in dashboard.

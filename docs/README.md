@@ -23,7 +23,8 @@ docs/
 ├── project-management/            # Approved SPM Governance Documents
 │   ├── ReceiptLedger_Project_Charter.pdf
 │   ├── ReceiptLedger_SoW.pdf
-│   └── ReceiptLedger_SoW_v3.pdf   # Latest approved baseline (6-sprint compressed)
+│   ├── ReceiptLedger_SoW_v3.pdf   # Latest approved baseline (6-sprint compressed)
+│   └── ReceiptLedger_Division_of_Work.pdf # Approved team work division
 │
 └── specifications/                # Complete Technical Specification Suite
     ├── 01_PRD.md                  # Product Requirements Document
@@ -34,7 +35,8 @@ docs/
     ├── 06_SEMANTIC_NETS.md        # Semantic Networks (Domain Taxonomies)
     ├── 07_SPRINT_PLAN_3WEEKS.md   # 3-Week Sprint Execution Plan
     ├── 08_ENVIRONMENT_SETUP.md    # Developer Workstation Setup Guide
-    └── 09_DEVELOPMENT_PLAN.md     # In-Depth Engineering Implementation Plan
+    ├── 09_DEVELOPMENT_PLAN.md     # In-Depth Engineering Implementation Plan
+    └── 10_DIVISION_OF_WORK.md     # Official Team Roles & Working Streams
 ```
 
 ---
@@ -52,3 +54,4 @@ docs/
 | [**3-Week Sprint Plan**](specifications/07_SPRINT_PLAN_3WEEKS.md) | 3-week delivery schedule, backlog user stories, exit criteria | Agile Scrum |
 | [**Environment Setup**](specifications/08_ENVIRONMENT_SETUP.md) | Prerequisites, local virtualenv, Node, Flutter, and Docker setup | Developer Guide |
 | [**Development Plan**](specifications/09_DEVELOPMENT_PLAN.md) | Deep technical implementation plan, algorithms, and day-by-day tasks | Engineering Plan |
+| [**Division of Work**](specifications/10_DIVISION_OF_WORK.md) | Official 6-role allocations, responsibilities, and pairing streams | Team Governance |
