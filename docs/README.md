@@ -55,3 +55,4 @@ docs/
 | [**Environment Setup**](specifications/08_ENVIRONMENT_SETUP.md) | Prerequisites, local virtualenv, Node, Flutter, and Docker setup | Developer Guide |
 | [**Development Plan**](specifications/09_DEVELOPMENT_PLAN.md) | Deep technical implementation plan, algorithms, and day-by-day tasks | Engineering Plan |
 | [**Division of Work**](specifications/10_DIVISION_OF_WORK.md) | Official 6-role allocations, responsibilities, and pairing streams | Team Governance |
+| [**Backend Operations Guide**](BACKEND_SETUP_AND_OPERATIONS_GUIDE.md) | Comprehensive cloud service setup, OCR matrix, local dev mode, and cURL reference | Operations & API Guide |
