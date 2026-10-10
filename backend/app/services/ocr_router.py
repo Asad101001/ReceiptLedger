@@ -39,12 +39,12 @@ _ocr_semaphore = asyncio.Semaphore(settings.max_concurrent_ocr)
 
 def classify_receipt_type(image: np.ndarray) -> ReceiptType:
     """
-    Heuristic classifier: combines connected component analysis (glyph density
-    and height variance coefficient) with edge analysis to distinguish
-    structured machine-printed receipts from informal handwritten slips.
+    Heuristic classifier: distinguishes structured machine-printed receipts
+    from informal handwritten slips using edge density and connected component
+    analysis. Now calibrated for CLAHE-enhanced grayscale (not binarized) images.
 
-    - Printed receipts: high density of uniform characters (low height CV, high glyph count).
-    - Handwritten slips: lower glyph count, cursive joins, higher variance in stroke heights.
+    Printed receipts: strong horizontal edge regularity, high uniform glyph density.
+    Handwritten slips: irregular stroke widths, lower edge periodicity.
     """
     import cv2
 
@@ -53,23 +53,51 @@ def classify_receipt_type(image: np.ndarray) -> ReceiptType:
     else:
         gray = image
 
-    # Otsu binarization to extract text components
+    # ── Feature 1: Edge density via Canny ─────────────────────────────────────
+    blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+    edges = cv2.Canny(blurred, 50, 150)
+    edge_density = np.count_nonzero(edges) / max(edges.size, 1)
+
+    # ── Feature 2: Glyph height variance (connected components) ───────────────
     _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(thresh)
-    valid_stats = [s for s in stats[1:] if 15 < s[cv2.CC_STAT_AREA] < 50000]
+    _, _, stats, _ = cv2.connectedComponentsWithStats(thresh)
+    valid_stats = [s for s in stats[1:] if 10 < s[cv2.CC_STAT_AREA] < 50000]
 
     if not valid_stats:
         return ReceiptType.PRINTED
 
     heights = [s[cv2.CC_STAT_HEIGHT] for s in valid_stats]
+    widths  = [s[cv2.CC_STAT_WIDTH]  for s in valid_stats]
     mean_h = float(np.mean(heights)) + 1e-5
-    std_h = float(np.std(heights))
-    cv_h = std_h / mean_h
+    std_h  = float(np.std(heights))
+    cv_h   = std_h / mean_h
 
-    # Handwritten slips feature irregular strokes and high height variance (ascenders, descenders, ruled lines)
-    if cv_h > 1.25:
-        return ReceiptType.HANDWRITTEN
-    return ReceiptType.PRINTED
+    # Aspect ratio: printed chars are taller-relative; handwritten glyphs sprawl
+    mean_aspect = float(np.mean([w / (h + 1e-5) for w, h in zip(widths, heights)]))
+
+    glyph_count  = len(valid_stats)
+    image_area   = gray.shape[0] * gray.shape[1]
+    glyph_density = glyph_count / max(image_area, 1) * 1e6
+
+    # ── Decision rule ──────────────────────────────────────────────────────────
+    # Empirical values from sample images after CLAHE preprocessing:
+    #   Printed:     edge=0.13, cv_h=1.24, aspect=1.49, glyph_density=658
+    #   Handwritten: edge=0.21, cv_h=1.35, aspect=4.86, glyph_density=696
+    #
+    # Mean glyph aspect ratio is the STRONGEST discriminator:
+    #   Handwritten receipts have ruling lines / large ink strokes → very wide glyphs
+    #   Printed receipts have compact typeface characters → moderate aspect ratio
+    printed_score = 0
+    if mean_aspect < 2.5:
+        printed_score += 3   # Strong signal: compact chars = printed
+    if cv_h < 1.3:
+        printed_score += 1
+    if edge_density < 0.15:
+        printed_score += 1
+
+    if printed_score >= 3:
+        return ReceiptType.PRINTED
+    return ReceiptType.HANDWRITTEN
 
 
 # ── OCR Routing & Extraction ──────────────────────────────────────────────────
