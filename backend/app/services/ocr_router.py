@@ -145,13 +145,14 @@ async def _extract_printed(image_bytes: bytes) -> Tuple[List[OCRToken], str]:
         except Exception as exc:
             logger.warning("Cloud Vision unavailable (%s). Falling back to Tesseract.", exc)
 
-    # Fallback: Tesseract
-    return await _run_tesseract(image_bytes)
+    # Fallback: Tesseract (printed path uses clean English)
+    return await _run_tesseract(image_bytes, lang="eng")
 
 
 async def _extract_handwritten(image: np.ndarray) -> Tuple[List[OCRToken], str]:
     """
     Handwritten path: EasyOCR with Tesseract digit voting.
+    Falls back to Tesseract (eng first, then eng+urd if empty).
     """
     try:
         from app.services.easyocr_client import (
@@ -162,19 +163,32 @@ async def _extract_handwritten(image: np.ndarray) -> Tuple[List[OCRToken], str]:
             logger.info("Using EasyOCR for handwritten receipt.")
             loop = asyncio.get_event_loop()
             tokens = await loop.run_in_executor(None, easy_extract, image)
-            return tokens, "easyocr"
+            if tokens:
+                return tokens, "easyocr"
     except Exception as exc:
         logger.warning("EasyOCR failed (%s). Falling back to Tesseract.", exc)
 
-    # Fallback: Tesseract
-    return await _run_tesseract(None, image=image)
+    # Fallback: Tesseract. Pakistani karyana slips write product names in Roman Urdu/English (Atta, Chawal, Daal).
+    # 'eng' OCR prevents Urdu LSTM ligature hallucination on Roman text.
+    tokens, eng = await _run_tesseract(None, image=image, lang="eng")
+    if len(tokens) >= 3:
+        return tokens, eng
+
+    # If 'eng' yielded very few tokens, try eng+urd
+    from app.services.tesseract_client import _get_ocr_lang
+    fallback_lang = _get_ocr_lang()
+    if fallback_lang != "eng":
+        return await _run_tesseract(None, image=image, lang=fallback_lang)
+    return tokens, eng
 
 
 async def _run_tesseract(
     image_bytes: bytes | None,
     image: np.ndarray | None = None,
+    lang: str | None = None,
 ) -> Tuple[List[OCRToken], str]:
     """Run Tesseract 5 extraction (used as fallback for both paths)."""
+    import functools
     import numpy as _np
 
     from app.services.tesseract_client import (
@@ -192,59 +206,102 @@ async def _run_tesseract(
         image = cv2.imdecode(np_arr, cv2.IMREAD_GRAYSCALE)
 
     loop = asyncio.get_event_loop()
-    tokens = await loop.run_in_executor(None, tess_extract, image)
-    logger.info("Tesseract extracted %d tokens.", len(tokens))
+    tokens = await loop.run_in_executor(
+        None, functools.partial(tess_extract, image, lang=lang)
+    )
+    logger.info("Tesseract extracted %d tokens (lang=%s).", len(tokens), lang)
     return tokens, "tesseract"
 
 
 # ── Spatial Line Reassembly ───────────────────────────────────────────────────
+
+def _estimate_text_slant(tokens: List[OCRToken]) -> float:
+    """
+    Estimate dominant text baseline angle (in degrees) from pairs of horizontally
+    proximate tokens across the receipt. Returns 0.0 if insufficient pairs exist.
+    """
+    if len(tokens) < 4:
+        return 0.0
+
+    slopes = []
+    by_x = sorted(tokens, key=lambda t: t.bounding_box.x_min)
+    n = len(by_x)
+    for i in range(n):
+        for j in range(i + 1, min(i + 12, n)):
+            t1, t2 = by_x[i], by_x[j]
+            dx = t2.bounding_box.x_center - t1.bounding_box.x_center
+            dy = t2.bounding_box.y_center - t1.bounding_box.y_center
+            if 50 < dx < 400 and abs(dy) < 50:
+                deg = float(np.degrees(np.arctan2(dy, dx)))
+                if abs(deg) < 15.0:
+                    slopes.append(deg)
+
+    if slopes:
+        return float(np.median(slopes))
+    return 0.0
+
 
 def reassemble_lines(
     tokens: List[OCRToken],
     y_tolerance: int = 15,
 ) -> List[List[OCRToken]]:
     """
-    Group flat OCR token list into logical horizontal text lines using a
-    sweep-line algorithm (as specified in docs/09_DEVELOPMENT_PLAN.md § 3.3).
-
-    Algorithm:
-      1. Sort tokens by y_min (top-to-bottom).
-      2. For each token, compute its y_center.
-      3. If |y_center - current_line_y_avg| ≤ y_tolerance, add to current line.
-      4. Otherwise, finalise current line (sorted left→right by x_min) and start new line.
-
-    Args:
-        tokens: Flat list of OCRToken from any OCR engine.
-        y_tolerance: Maximum vertical pixel distance to consider same line.
-
-    Returns:
-        List of text lines, each line being a list of OCRToken sorted left-to-right.
+    Group flat OCR token list into logical horizontal text lines.
+    Accounts for camera tilt/slant by projecting token y-coordinates along the
+    dominant text baseline angle. Ensures item names on the left and prices on
+    the right stay on the same logical line without being broken across blocks.
     """
     if not tokens:
         return []
 
-    sorted_tokens = sorted(tokens, key=lambda t: t.bounding_box.y_min)
+    # Clean out single-character non-alphanumeric noise speckles with low confidence
+    valid_tokens = [
+        t for t in tokens
+        if len(t.text.strip()) > 1 or t.text.strip().isalnum() or t.confidence >= 0.45
+    ]
+    if not valid_tokens:
+        valid_tokens = tokens
 
+    # Estimate slant angle
+    deg = _estimate_text_slant(valid_tokens)
+    rad = np.radians(deg)
+    tan_theta = np.tan(rad)
+
+    # Assign projected y to each token
+    for t in valid_tokens:
+        proj_y = t.bounding_box.y_center - (t.bounding_box.x_center * tan_theta)
+        setattr(t, "_proj_y", proj_y)
+
+    sorted_tokens = sorted(valid_tokens, key=lambda t: getattr(t, "_proj_y"))
     lines: List[List[OCRToken]] = []
-    current_line: List[OCRToken] = []
 
     for token in sorted_tokens:
-        if not current_line:
-            current_line.append(token)
-            continue
+        placed = False
+        t_y = getattr(token, "_proj_y")
+        t_h = token.bounding_box.y_max - token.bounding_box.y_min
 
-        curr_y = token.bounding_box.y_center
-        line_y_avg = sum(t.bounding_box.y_center for t in current_line) / len(current_line)
+        for line in lines:
+            line_y = sum(getattr(x, "_proj_y") for x in line) / len(line)
+            line_h = sum(x.bounding_box.y_max - x.bounding_box.y_min for x in line) / len(line)
+            # Tolerance threshold based on text height
+            max_diff = max(11, min(t_h, line_h) * 0.6)
 
-        if abs(curr_y - line_y_avg) <= y_tolerance:
-            current_line.append(token)
-        else:
-            # Finalise line: sort left-to-right
-            lines.append(sorted(current_line, key=lambda t: t.bounding_box.x_min))
-            current_line = [token]
+            if abs(t_y - line_y) <= max_diff:
+                line.append(token)
+                placed = True
+                break
 
-    if current_line:
-        lines.append(sorted(current_line, key=lambda t: t.bounding_box.x_min))
+        if not placed:
+            lines.append([token])
 
-    logger.debug("Reassembled %d tokens into %d text lines.", len(tokens), len(lines))
+    # Sort tokens in each line left-to-right
+    for line in lines:
+        line.sort(key=lambda t: t.bounding_box.x_min)
+
+    # Sort lines top-to-bottom
+    lines.sort(key=lambda l: sum(getattr(t, "_proj_y") for t in l) / len(l))
+    logger.debug(
+        "Reassembled %d tokens into %d lines (slant=%.2f deg).",
+        len(valid_tokens), len(lines), deg,
+    )
     return lines

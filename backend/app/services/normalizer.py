@@ -72,12 +72,21 @@ _TAXONOMY: List[TaxonomyEntry] = _load_taxonomy()
 
 # ── Regex Patterns (from dev plan § 3.4) ────────────────────────────────────
 
-# Quantity + optional unit (e.g. "5kg", "2.5 ltr", "500g")
-_QTY_UNIT_RE = re.compile(
-    r"(?P<qty>\d+(?:\.\d+)?)\s*"
-    r"(?P<unit>kg|g|gm|gram|ltr|liter|litre|ml|pkt|packet|pcs|pc|dzn|dozen)?",
+# Quantity with explicit unit (e.g. "5kg", "2.5 ltr", "500g", "1 dozen")
+_QTY_WITH_UNIT_RE = re.compile(
+    r"\b(?P<qty>\d+(?:\.\d+)?)\s*(?P<unit>kg|g|gm|gram|ltr|liter|litre|l|ml|pkt|packet|pcs|pc|dzn|dozen)\b",
     re.IGNORECASE,
 )
+
+# Generic quantity + optional unit
+_QTY_UNIT_RE = re.compile(
+    r"(?P<qty>\d+(?:\.\d+)?)\s*"
+    r"(?P<unit>kg|g|gm|gram|ltr|liter|litre|l|ml|pkt|packet|pcs|pc|dzn|dozen)?",
+    re.IGNORECASE,
+)
+
+# Leading item index (e.g. "1. ", "1, ", "2) ", "<> 2. ", "3- ")
+_LEADING_INDEX_RE = re.compile(r"^\s*[\(\[<>\-~*+.,_]*\s*\d+[\.,\)\-:]\s*")
 
 # Price / amount (e.g. "Rs.1450", "PKR 200", "1,450.00", "450")
 _PRICE_RE = re.compile(
@@ -86,9 +95,17 @@ _PRICE_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Strip common receipt header noise
+# Date pattern (e.g. "09-OCT-2026", "10/10/2026", "2024-05-15")
+_DATE_RE = re.compile(
+    r"\b(?:\d{1,2}[-/](?:[a-zA-Z]{3}|\d{1,2})[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b",
+    re.IGNORECASE,
+)
+
+# Strip common receipt header/footer metadata and noise
 _NOISE_RE = re.compile(
-    r"(total|sub[\s-]?total|amount|vat|gst|tax|discount|balance|change|cash|bill|invoice)",
+    r"\b(total|grand[\s-]?total|net[\s-]?total|sub[\s-]?total|amount|vat|gst|tax|discount|balance|change|cash|"
+    r"bill|invoice|receipt|ntn|nin|strn|pos|date|pate|time|tne|items|rate|description|price|qty|"
+    r"thank\s*you|branch|tel|phone|pechs|shahrah|karachi|clifton|khi)\b",
     re.IGNORECASE,
 )
 
@@ -136,7 +153,7 @@ def fuzzy_match(raw_text: str) -> Optional[TaxonomyEntry]:
     """
     Find the best matching taxonomy entry for a raw item name string.
 
-    Uses normalised Levenshtein ratio:
+    Uses normalised Levenshtein ratio with substring and token containment bonuses:
         Score = 1 - levenshtein_distance(s1, s2) / max(len(s1), len(s2))
 
     Returns the best entry if score ≥ settings.fuzzy_match_threshold, else None.
@@ -145,12 +162,24 @@ def fuzzy_match(raw_text: str) -> Optional[TaxonomyEntry]:
         return None
 
     query = raw_text.lower().strip()
+    if len(query) < 2:
+        return None
+
     best_score = 0.0
     best_entry: Optional[TaxonomyEntry] = None
 
     for entry in _TAXONOMY:
-        for alias in entry.aliases:
-            score = levenshtein_ratio(query, alias)
+        candidates = entry.aliases + [entry.canonical_name.lower()]
+        for alias in candidates:
+            alias = alias.lower()
+            if alias == query:
+                return entry
+            # Substring / token containment bonus (only for substantial queries to avoid 2-letter false matches)
+            if len(query) >= 4 and len(alias) >= 4 and (alias in query or query in alias):
+                score = max(0.85, levenshtein_ratio(query, alias))
+            else:
+                score = levenshtein_ratio(query, alias)
+
             if score > best_score:
                 best_score = score
                 best_entry = entry
@@ -173,25 +202,45 @@ def _parse_single_line(line_text: str, confidence: float) -> Optional[LineItemCr
     Extract structured fields from a single receipt line string.
 
     Strategy:
-      - Find ALL price-like numbers; the last one is treated as total_price,
+      - Strip leading junk symbols (e.g. '?', '>', '~').
+      - Collapse split decimal prices (e.g. '160 .00' -> '160.00').
+      - Strip leading numbering (e.g. '1. ', '1, ', '2) ').
+      - Skip if line matches pure date format.
+      - Find all price-like numbers; the last one is treated as total_price,
         the second-to-last (if present) as unit_price.
-      - Find quantity + unit token near the start of the line.
+      - Find quantity + unit token.
       - Whatever remains after stripping numeric tokens is the raw item name.
     """
-    # Find all price candidates
-    prices = _extract_prices(line_text)
+    # Clean leading noise characters
+    cleaned_line = re.sub(r"^[?><~+*.,_\-|\s]+", "", line_text).strip()
+    # Collapse split decimal prices (e.g. "160 .00" -> "160.00")
+    cleaned_line = re.sub(r"(\d+)\s+(\.\d{1,2})\b", r"\1\2", cleaned_line)
+    # Correct common OCR confusion between digit '6'/'b' and unit 'g' for standard packaging grams
+    cleaned_line = re.sub(r"\b(100|200|250|400|430|450|500|800|900|1000)[6bB]\b", r"\1g", cleaned_line)
+    # Strip leading line index
+    line_body = _LEADING_INDEX_RE.sub("", cleaned_line).strip()
+
+    # Skip lines that are dates
+    if _DATE_RE.search(line_body) and not re.search(r"\b(atta|rice|oil|milk|tea|sugar|bread|eggs|butter|dahi|ghee|soap)\b", line_body, re.IGNORECASE):
+        return None
+
+    # Extract quantity + unit
+    qty, unit = _extract_qty_unit(line_body)
+
+    # Exclude quantity with units from price candidates (e.g. 5KG, 430G shouldn't be prices)
+    line_for_prices = _QTY_WITH_UNIT_RE.sub(" ", line_body)
+    prices = _extract_prices(line_for_prices)
+    if not prices:
+        prices = _extract_prices(line_body)
     if not prices:
         return None  # Lines without any numeric value are unlikely to be items
 
     total_price = prices[-1]
     unit_price = prices[-2] if len(prices) >= 2 else total_price
 
-    # Extract quantity + unit
-    qty, unit = _extract_qty_unit(line_text)
-
-    # Extract raw item name: remove numeric tokens from the line
-    raw_name = _extract_item_name(line_text)
-    if not raw_name:
+    # Extract raw item name: remove numeric tokens and currency words
+    raw_name = _extract_item_name(line_body)
+    if not raw_name or len(re.sub(r"[^a-zA-Z]", "", raw_name)) < 3:
         return None
 
     # Fuzzy match against taxonomy
@@ -199,7 +248,7 @@ def _parse_single_line(line_text: str, confidence: float) -> Optional[LineItemCr
     if match:
         canonical_name = match.canonical_name
         category = match.category
-        if unit == "pcs":  # If unit was not parsed, use the standard unit from taxonomy
+        if unit == "pcs":  # If unit was not parsed, use standard unit from taxonomy
             unit = match.standard_unit
     else:
         canonical_name = raw_name.title()
@@ -233,13 +282,19 @@ def _extract_prices(text: str) -> List[float]:
 def _extract_qty_unit(text: str) -> Tuple[float, str]:
     """
     Extract the first (quantity, unit) pair found in the text.
+    Prioritises explicit units (e.g. 5kg, 2L, 500g).
     Returns (1.0, 'pcs') as default if nothing is found.
     """
+    m = _QTY_WITH_UNIT_RE.search(text)
+    if m:
+        qty_str = m.group("qty")
+        unit_str = (m.group("unit") or "pcs").lower()
+        return float(qty_str), _normalise_unit(unit_str)
+
     m = _QTY_UNIT_RE.search(text)
     if m:
         qty_str = m.group("qty")
         unit_str = (m.group("unit") or "pcs").lower()
-        # Normalise unit aliases
         unit_str = _normalise_unit(unit_str)
         try:
             return float(qty_str), unit_str
@@ -251,13 +306,18 @@ def _extract_qty_unit(text: str) -> Tuple[float, str]:
 def _extract_item_name(text: str) -> str:
     """
     Strip price and quantity tokens from the line to isolate the item description.
+    Preserves English alphabet characters (R, P, K, S) in food names.
     """
+    cleaned = text
     # Remove price patterns
-    cleaned = _PRICE_RE.sub("", text)
+    cleaned = _PRICE_RE.sub("", cleaned)
     # Remove quantity+unit patterns
+    cleaned = _QTY_WITH_UNIT_RE.sub("", cleaned)
     cleaned = _QTY_UNIT_RE.sub("", cleaned)
-    # Remove leading currency symbols and separators
-    cleaned = re.sub(r"[Rs\.PKR×xX@\-–]", " ", cleaned)
+    # Remove currency words (boundary-checked words only, not character sets!)
+    cleaned = re.sub(r"\b(?:Rs\.?|PKR)\b", " ", cleaned, flags=re.IGNORECASE)
+    # Remove leading/trailing symbols, separators, and brackets
+    cleaned = re.sub(r"[×xX@\-–/|*#:~^\\=]", " ", cleaned)
     # Remove stray digits
     cleaned = re.sub(r"\b\d+\b", "", cleaned)
     # Collapse whitespace
@@ -274,8 +334,11 @@ def _is_noise_line(text: str) -> bool:
     # Skip common receipt noise keywords
     if _NOISE_RE.search(stripped):
         return True
+    # Skip lines that are only date or time stamps
+    if _DATE_RE.search(stripped) and not re.search(r"\b(atta|rice|oil|milk|tea|sugar|bread|eggs|butter|dahi|ghee|soap)\b", stripped):
+        return True
     # Skip lines that are only punctuation / separators
-    if re.match(r"^[-=*_.]+$", stripped):
+    if re.match(r"^[-=*_.~^|#]+$", stripped):
         return True
     return False
 
@@ -284,7 +347,7 @@ def _normalise_unit(unit: str) -> str:
     """Map unit aliases to canonical unit abbreviations."""
     mapping = {
         "gram": "g", "gm": "g",
-        "liter": "ltr", "litre": "ltr",
+        "liter": "ltr", "litre": "ltr", "l": "ltr",
         "packet": "pkt",
         "dozen": "dzn",
         "pc": "pcs",

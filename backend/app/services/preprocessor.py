@@ -63,27 +63,23 @@ def preprocess_image(image_bytes: bytes) -> Tuple[np.ndarray, bytes]:
 
     # 3 ── Grayscale + gentle Gaussian blur ────────────────────────────────────
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
-    # 4 ── Canny edge map ──────────────────────────────────────────────────────
-    edged = cv2.Canny(blurred, 50, 150)
+    # 4 ── Corner detection via adaptive paper segmentation ────────────────────
+    quad_pts = _detect_receipt_corners(gray, h_orig * w_orig)
 
-    # 5 ── Contour extraction & 4-point corner detection ──────────────────────
-    quad_pts = _detect_receipt_corners(edged, h_orig * w_orig)
-
-    # 6 ── Perspective warp (only if quad is plausibly the receipt) ────────────
-    if quad_pts is not None:
+    # 5 ── Perspective warp (only if quad has substantial perspective distortion) ─
+    if quad_pts is not None and _needs_perspective_warp(quad_pts):
         warped = _four_point_transform(gray, quad_pts)
-        logger.debug("Perspective warp applied using detected 4-corner polygon.")
+        logger.debug("Perspective warp applied to correct oblique receipt capture.")
     else:
-        warped = gray  # Use full grayscale image — don't crop or warp
-        logger.debug("No large 4-corner polygon found; using full grayscale image.")
+        warped = gray  # Use native grayscale image to preserve thermal print edge sharpness
+        logger.debug("Receipt is already upright; preserving native image resolution.")
 
-    # 7 ── CLAHE contrast enhancement ─────────────────────────────────────────
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    # 6 ── CLAHE contrast enhancement ─────────────────────────────────────────
+    clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
     enhanced = clahe.apply(warped)
 
-    # 8 ── Encode to JPEG ──────────────────────────────────────────────────────
+    # 7 ── Encode to JPEG ──────────────────────────────────────────────────────
     success, buffer = cv2.imencode(".jpg", enhanced, [cv2.IMWRITE_JPEG_QUALITY, 92])
     if not success:
         raise RuntimeError("Failed to encode preprocessed image to JPEG.")
@@ -164,30 +160,50 @@ def _limit_long_edge(image: np.ndarray, max_px: int) -> np.ndarray:
 
 
 def _detect_receipt_corners(
-    edged: np.ndarray,
+    gray: np.ndarray,
     image_area: int,
 ) -> Optional[np.ndarray]:
     """
-    Find the four corners of the receipt in the edge-detected image.
-    Only returns a quad if it covers ≥ _MIN_QUAD_AREA_RATIO of the image area,
-    preventing small UI borders from triggering a mis-warp.
+    Find the four corners of the receipt in the image using Otsu paper
+    segmentation and convex hull / minAreaRect approximation.
+    Only returns a quad if it covers ≥ _MIN_QUAD_AREA_RATIO of the image area.
 
     Returns an (4, 2) float32 array of corner coordinates, or None if not found.
     """
-    contours, _ = cv2.findContours(edged, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    # Sort by area descending, keep top 5 candidates
-    contours = sorted(contours, key=cv2.contourArea, reverse=True)[:5]
-
     min_area = image_area * _MIN_QUAD_AREA_RATIO
 
-    for c in contours:
+    # 1. Otsu threshold to separate light receipt paper from darker background
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # If background border is mostly white, invert so paper is white foreground
+    border = np.concatenate([thresh[0, :], thresh[-1, :], thresh[:, 0], thresh[:, -1]])
+    if np.mean(border) > 127:
+        thresh = cv2.bitwise_not(thresh)
+
+    # 2. Morphological close to bridge internal text/line gaps inside the paper
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
+    closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+
+    contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours = sorted(contours, key=cv2.contourArea, reverse=True)
+
+    for c in contours[:3]:
         area = cv2.contourArea(c)
         if area < min_area:
-            continue  # Too small — skip, don't warp to a tiny region
-        peri = cv2.arcLength(c, True)
-        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+            continue
+        hull = cv2.convexHull(c)
+        peri = cv2.arcLength(hull, True)
+        approx = cv2.approxPolyDP(hull, 0.03 * peri, True)
         if len(approx) == 4:
             return approx.reshape(4, 2).astype(np.float32)
+
+        # Fallback to minAreaRect for wrinkled, creased, or torn edges
+        rect = cv2.minAreaRect(hull)
+        box = cv2.boxPoints(rect)
+        if min(rect[1]) > 0:
+            aspect = max(rect[1]) / min(rect[1])
+            if aspect < 8.0:
+                return np.array(box, dtype=np.float32)
 
     return None
 
@@ -204,6 +220,35 @@ def _order_points(pts: np.ndarray) -> np.ndarray:
     rect[1] = pts[np.argmin(diff)]  # top-right
     rect[3] = pts[np.argmax(diff)]  # bottom-left
     return rect
+
+
+def _needs_perspective_warp(pts: Optional[np.ndarray]) -> bool:
+    """
+    Check if the detected quadrilateral exhibits significant perspective distortion.
+    If the quad is already an upright rectangle with parallel sides, skipping
+    warp avoids interpolation blurring that degrades faint thermal dot-matrix text.
+    """
+    if pts is None:
+        return False
+    rect = _order_points(pts)
+    tl, tr, br, bl = rect
+    w_top = np.linalg.norm(tr - tl)
+    w_bottom = np.linalg.norm(br - bl)
+    h_left = np.linalg.norm(bl - tl)
+    h_right = np.linalg.norm(br - tr)
+
+    max_w = max(w_top, w_bottom)
+    max_h = max(h_left, h_right)
+    if max_w == 0 or max_h == 0:
+        return False
+
+    w_diff = abs(w_top - w_bottom) / max_w
+    h_diff = abs(h_left - h_right) / max_h
+
+    angle_top = abs(np.degrees(np.arctan2(tr[1] - tl[1], tr[0] - tl[0])))
+    angle_left = abs(np.degrees(np.arctan2(bl[0] - tl[0], bl[1] - tl[1])))
+
+    return w_diff > 0.08 or h_diff > 0.08 or angle_top > 5.0 or angle_left > 5.0
 
 
 def _four_point_transform(image: np.ndarray, pts: np.ndarray) -> np.ndarray:

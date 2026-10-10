@@ -17,7 +17,13 @@ class ApiService {
     try {
       final envUrl = dotenv.env['API_BASE_URL'];
       if (envUrl != null && envUrl.isNotEmpty) {
-        _baseUrl = envUrl;
+        // If running in Android emulator and URL points to localhost/127.0.0.1, translate to 10.0.2.2
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android &&
+            (envUrl.contains('127.0.0.1') || envUrl.contains('localhost'))) {
+          _baseUrl = envUrl.replaceAll('127.0.0.1', '10.0.2.2').replaceAll('localhost', '10.0.2.2');
+        } else {
+          _baseUrl = envUrl;
+        }
       } else {
         // If running in Android emulator, 10.0.2.2 connects to host machine
         if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {

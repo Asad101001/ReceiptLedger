@@ -14,7 +14,7 @@
     "category": "Groceries & Food",
     "standard_unit": "kg",
     "aliases": [
-      "rice", "basmati", "chawal", "sela rice", "irri rice", "super basmati",
+      "rice", "basmati", "basmati rice", "chawal", "sela rice", "irri rice", "super basmati",
       "kainat rice", "guard rice", "kernel basmati", "long grain rice",
       "sela chawal", "white rice", "brown rice"
     ]
@@ -52,7 +52,7 @@
     "category": "Groceries & Food",
     "standard_unit": "ltr",
     "aliases": [
-      "milk", "doodh", "whole milk", "fresh milk", "nestle milk", "olper milk",
+      "milk", "doodh", "milk pack", "whole milk", "fresh milk", "nestle milk", "olper milk",
       "haleeb milk", "good milk", "dairy milk", "skimmed milk", "tetra pack milk",
       "uht milk", "pasteurized milk"
     ]
@@ -165,7 +165,7 @@
     "category": "Groceries & Food",
     "standard_unit": "kg",
     "aliases": [
-      "dal", "daal", "lentils", "masoor dal", "mash dal", "chana dal",
+      "dal", "daal", "daal chana", "dal chana", "lentils", "masoor dal", "mash dal", "chana dal",
       "moong dal", "toor dal", "arhar dal", "mixed dal", "whole masoor",
       "black gram", "split peas"
     ]

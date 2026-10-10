@@ -44,8 +44,8 @@ _LOCAL_TESSDATA = Path(__file__).resolve().parents[2] / "tessdata"
 if _LOCAL_TESSDATA.exists() and "TESSDATA_PREFIX" not in os.environ:
     os.environ["TESSDATA_PREFIX"] = str(_LOCAL_TESSDATA)
 
-# Primary Tesseract config for full receipt text
-_FULL_TEXT_CONFIG = "--oem 1 --psm 6"
+# Primary Tesseract config for full receipt text: PSM 4 assumes a single column of variable sizes
+_FULL_TEXT_CONFIG = "--oem 1 --psm 4"
 # Digit-only config used when validating numeric tokens (prices, quantities)
 _DIGIT_CONFIG = "--psm 10 -c tessedit_char_whitelist=0123456789."
 
@@ -75,26 +75,32 @@ def is_available() -> bool:
         return False
 
 
-def extract_tokens(image: np.ndarray) -> List[OCRToken]:
+def extract_tokens(
+    image: np.ndarray,
+    lang: str | None = None,
+) -> List[OCRToken]:
     """
     Run Tesseract on the given grayscale image array.
     Returns a list of OCRToken objects sorted by reading order (top → bottom, left → right).
 
     Args:
         image: Preprocessed grayscale 2-D NumPy array.
+        lang:  OCR language model to use (e.g. 'eng', 'urd', 'eng+urd').
+               Defaults to 'eng'.
 
     Returns:
         List of OCRToken (text, confidence, bounding_box).
     """
+    target_lang = lang if lang is not None else "eng"
     try:
         data = pytesseract.image_to_data(
             image,
-            lang=_get_ocr_lang(),
+            lang=target_lang,
             output_type=Output.DICT,
             config=_FULL_TEXT_CONFIG,
         )
     except Exception as exc:
-        logger.error("Tesseract extraction failed: %s", exc)
+        logger.error("Tesseract extraction failed (%s): %s", target_lang, exc)
         return []
 
     tokens: List[OCRToken] = []
@@ -117,6 +123,7 @@ def extract_tokens(image: np.ndarray) -> List[OCRToken]:
         w = data["width"][i]
         h = data["height"][i]
 
+        line_id = int(data["block_num"][i]) * 1000 + int(data["line_num"][i])
         tokens.append(
             OCRToken(
                 text=raw_text,
@@ -125,6 +132,7 @@ def extract_tokens(image: np.ndarray) -> List[OCRToken]:
                     x_min=x, y_min=y,
                     x_max=x + w, y_max=y + h,
                 ),
+                line_id=line_id,
             )
         )
 
