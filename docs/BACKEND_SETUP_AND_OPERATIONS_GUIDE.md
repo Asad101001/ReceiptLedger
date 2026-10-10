@@ -306,3 +306,112 @@ curl -X PATCH http://localhost:8000/api/v1/review-queue/<QUEUE_ID> \
 | `Tesseract not found on PATH` | Tesseract binary not installed | Install Tesseract 5 via UB-Mannheim installer or apt, or let system use in-memory fallback. |
 | `UnicodeEncodeError on Windows CLI` | Windows console codepage 1252 | Handled automatically in `cli_test.py` via UTF-8 wrapped stdout with replacement error handling. |
 | `Cloud Vision 403 / 401` | Expired or missing GCP service key | Verify `GOOGLE_APPLICATION_CREDENTIALS` points to a valid JSON file with Cloud Vision permissions. |
+
+---
+
+## 8. "Is Me Being on Google AI Pro Going to Help?" (2026 Analysis)
+
+A common point of confusion is how **Google AI Pro (Google One AI Premium / Gemini Advanced)** interacts with developer APIs. Here is the exact breakdown for 2026:
+
+### 8.1 Consumer Subscription vs. Developer APIs
+* **What Google AI Pro Gives You:**
+  - Access to Gemini Advanced on the web (`gemini.google.com`) and mobile app.
+  - 2 TB Google Drive / Photos / Gmail storage.
+  - Gemini in Google Docs, Gmail, and Google Slides.
+  - **Important:** It **does NOT** provide automatic API credits for **Google Cloud Platform (GCP Cloud Vision API)** or **Google Cloud Vertex AI**. They use completely separate billing accounts.
+* **Is It Going to Help with ReceiptLedger?**
+  - **Indirectly, yes:** You can use your Google AI Pro subscription to upload messy receipts directly into the Gemini web UI for rapid prompt engineering, manual benchmark comparisons, or sanity checking difficult handwritten Urdu parchi receipts.
+  - **Directly for the backend:** You do **not** need to spend a single penny, because Google provides developer tiers that are **100% free** regardless of whether you have Google AI Pro.
+
+### 8.2 The 100% Free Developer Alternative: Google AI Studio
+Google provides **Google AI Studio** (`aistudio.google.com`) which is **completely free for developers**:
+* **Gemini 1.5 Flash / Gemini 2.0 Flash Developer API:**
+  - **Rate Limit:** 15 Requests Per Minute (RPM), **1,500 Requests Per Day (RPD)**, and 1,000,000 Tokens Per Minute.
+  - **Cost:** **$0.00 (Completely Free, No Credit Card Required)**.
+  - **Multimodal Receipt OCR:** You can pass receipt images directly to Gemini Flash and prompt it to extract structured JSON with Pakistani grocery entities, serving as an optional zero-cost cloud OCR engine.
+* **Google Cloud Vision Free Tier:**
+  - **Quota:** **1,000 Document Text Detection requests every month for free forever**.
+  - **GCP New Account Credit:** If you open a new GCP billing account with your Google account, you get **$300 free trial credit for 90 days**.
+
+---
+
+## 9. 2026 Free-Tier Master Stack & Setup Checklist
+
+You can run the entire ReceiptLedger stack in production **at zero cost ($0.00/month)**:
+
+| Layer | Service / Technology | Free Allowance | Configuration Key in `.env` |
+|:---|:---|:---|:---|
+| **Primary Cloud OCR** | Google Cloud Vision API | 1,000 calls / month free forever | `GOOGLE_APPLICATION_CREDENTIALS` |
+| **Multimodal Vision Fallback** | Google AI Studio (Gemini Flash) | 1,500 calls / day free forever | Optional `GEMINI_API_KEY` |
+| **Local Printed OCR** | Tesseract OCR 5 | Unlimited (runs on your CPU) | System `PATH` |
+| **Local Handwritten OCR** | EasyOCR + PyTorch | Unlimited (runs on your CPU/GPU) | Python package `easyocr` |
+| **Database & Storage** | Supabase PostgreSQL | 500 MB database + 1 GB storage free | `SUPABASE_URL`, `SUPABASE_ANON_KEY` |
+| **Dev Persist Fallback** | In-Memory Store | Unlimited (zero dependencies) | Default when Supabase keys omitted |
+| **Mobile Client** | Flutter 3.x Client | Unlimited (Windows, Web, Android) | `API_BASE_URL` |
+
+### Step-by-Step Free Setup Checklist:
+1. **Google Cloud Vision (0 PKR / $0):**
+   - Go to [console.cloud.google.com](https://console.cloud.google.com).
+   - Create project `receiptledger`.
+   - Enable **Cloud Vision API**.
+   - Create a service account with `Cloud Vision User` role and download `credentials/google_vision_key.json`.
+   - Keep `VISION_API_MONTHLY_QUOTA=950` in `.env` so you never exceed the 1,000 free request limit.
+2. **Supabase PostgreSQL (0 PKR / $0):**
+   - Go to [supabase.com](https://supabase.com) and create a free project.
+   - Go to **SQL Editor**, paste `backend/app/core/migrations.sql`, and click **Run**.
+   - Copy Project URL and `anon` public key to `backend/.env`.
+3. **Local OCR (0 PKR / $0):**
+   - Windows: Install Tesseract 5 from UB-Mannheim into `C:\Program Files\Tesseract-OCR` and add to PATH.
+   - Run `python -m app.cli_test` to verify all 32 tests pass.
+
+---
+
+## 10. Flutter Mobile Frontend Testing Guide
+
+A cross-platform Flutter frontend is located in `mobile/`. It supports live receipt capture, gallery picking, instant uploading, result inspection, recent ledger viewing, and review queue verification.
+
+### 10.1 Running the Mobile App
+From the `mobile/` directory:
+
+* **On Windows Desktop (Fastest for testing):**
+  ```powershell
+  flutter run -d windows
+  ```
+* **On Web Browser (Chrome):**
+  ```powershell
+  flutter run -d chrome
+  ```
+* **On Android Emulator:**
+  ```powershell
+  flutter run -d emulator
+  ```
+* **On Physical Android/iOS Device:**
+  ```powershell
+  flutter run -d <device-id>
+  ```
+
+### 10.2 Connecting to Backend
+In the app's **Settings tab**:
+* If running on **Windows Desktop** or **Chrome Web**: Use preset `http://127.0.0.1:8000`.
+* If running on **Android Emulator**: Use preset `http://10.0.2.2:8000`.
+* If running on a **Physical Phone via Wi-Fi**: Enter your workstation's LAN IP, e.g. `http://192.168.1.50:8000`.
+* Tap **Save & Test Connection** to verify live communication with the FastAPI backend.
+
+### 10.3 Testing Features in the App:
+1. **Capture Tab:** Pick any receipt photo or select one from `data/sample_receipts/`. Tap **Upload & Process Receipt**. Inspect the extracted merchant name, date, total amount, confidence badge, and itemized table.
+2. **Ledger Tab:** View all processed receipts. Tap any card to expand and review its itemized lines.
+3. **Review Queue Tab:** Inspect items flagged with confidence $< 0.85$. Tap **Edit / Correct** to adjust names or prices and submit human-in-the-loop resolutions.
+
+---
+
+## 11. Challenging Test Receipts Dataset
+
+In addition to standard receipts, challenging test images have been included in `data/sample_receipts/` to stress-test preprocessing and classification:
+
+| File | Challenge Type | Real-World Scenario | Preprocessing / OCR Behavior |
+|:---|:---|:---|:---|
+| `printed_receipt_challenging.jpg` | **Crumpled & Faded Thermal Paper** | Paper with fold creases, torn bottom edge, smudged thermal print on right margin (*Imtiaz Super Market, Clifton*). | OpenCV CLAHE enhances faded print; deskew corrects tilt; classified as `PRINTED`. |
+| `handwritten_receipt_challenging.jpg` | **Messy & Rushed Scrap Slip** | Torn spiral notebook paper, skewed angle, rushed cursive Urdu/English handwriting (*Bismillah General Store*). | Blur variance check verifies sharpness; height CV ($1.75 > 1.25$) routes to `HANDWRITTEN` (EasyOCR). |
+| `printed_receipt_sample.jpg` | **Standard Thermal Receipt** | Flat, crisp thermal print from supermarket with PKR amounts (*Al-Madina Super Market*). | Standard baseline; routes to Vision / Tesseract. |
+| `handwritten_receipt_sample.jpg` | **Standard Lined Parchi** | Ruled notepad paper with neat Urdu/English handwriting (*Madina Karyana Store*). | Lined baseline; routes to EasyOCR. |
+
