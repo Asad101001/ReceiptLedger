@@ -76,6 +76,22 @@ API Documentation will be live at:
 * Swagger UI: `http://localhost:8000/docs`
 * ReDoc: `http://localhost:8000/redoc`
 
+### 4. Run Comprehensive CLI Test Suite (32 Tests)
+
+Test the entire pipeline, all OCR paths, dedup engine, in-memory store, API endpoints, and real sample receipts without running a server or database:
+
+```powershell
+python -m app.cli_test
+```
+
+---
+
+## Operations & Production Setup Guide
+
+For detailed step-by-step instructions on setting up Google Cloud Vision, Supabase PostgreSQL DDL migrations, Tesseract OCR 5, and testing with real sample receipt images, see:
+
+📖 **[Backend Setup & Operations Guide](../docs/BACKEND_SETUP_AND_OPERATIONS_GUIDE.md)**
+
 ---
 
 ## Containerized Execution (Docker)
@@ -92,7 +108,10 @@ docker run -p 8000:8000 --env-file .env receiptledger-backend
 | Endpoint | Method | Description |
 |:---|:---:|:---|
 | `/api/v1/health` | `GET` | Health check and engine status |
-| `/api/v1/receipts/upload` | `POST` | Multipart receipt photo ingestion and parsing |
+| `/api/v1/receipts/upload` | `POST` | Multipart receipt photo ingestion, duplicate check, and parsing |
 | `/api/v1/analytics/monthly` | `GET` | Aggregated monthly spend and category rollups |
+| `/api/v1/analytics/trends` | `GET` | Multi-month spending velocity trends |
+| `/api/v1/analytics/receipts` | `GET` | Paginated, searchable historical receipt ledger |
 | `/api/v1/review-queue` | `GET` | Items with confidence $< 0.85$ requiring confirmation |
 | `/api/v1/review-queue/{id}` | `PATCH` | Human-in-the-loop verification resolution |
+
