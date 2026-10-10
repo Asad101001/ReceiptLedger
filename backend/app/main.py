@@ -9,7 +9,7 @@ Configures:
   • Global exception handlers
 
 Run with:
-    uvicorn app.main:app --reload --port 8000
+    uvicorn app.main:app --reload --port 8000 --host 0.0.0.0
 
 References:
   docs/09_DEVELOPMENT_PLAN.md § 2 (Ingestion & Gateway Tier)
