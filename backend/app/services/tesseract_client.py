@@ -15,6 +15,9 @@ Digit-only secondary pass (for price validation):
 from __future__ import annotations
 
 import logging
+import os
+import shutil
+from pathlib import Path
 from typing import List
 
 import numpy as np
@@ -25,10 +28,42 @@ from app.core.models import BoundingBox, OCRToken
 
 logger = logging.getLogger(__name__)
 
+# Auto-detect Tesseract binary on Windows if not on system PATH
+_DEFAULT_WIN_PATHS = [
+    Path(r"C:\Program Files\Tesseract-OCR\tesseract.exe"),
+    Path(r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe"),
+]
+if not shutil.which("tesseract"):
+    for win_path in _DEFAULT_WIN_PATHS:
+        if win_path.exists():
+            pytesseract.pytesseract.tesseract_cmd = str(win_path)
+            break
+
+# Auto-detect local project tessdata directory if available
+_LOCAL_TESSDATA = Path(__file__).resolve().parents[2] / "tessdata"
+if _LOCAL_TESSDATA.exists() and "TESSDATA_PREFIX" not in os.environ:
+    os.environ["TESSDATA_PREFIX"] = str(_LOCAL_TESSDATA)
+
 # Primary Tesseract config for full receipt text
 _FULL_TEXT_CONFIG = "--oem 1 --psm 6"
 # Digit-only config used when validating numeric tokens (prices, quantities)
 _DIGIT_CONFIG = "--psm 10 -c tessedit_char_whitelist=0123456789."
+
+
+def _get_ocr_lang() -> str:
+    """Return 'eng+urd' if Urdu traineddata is present in tessdata, else 'eng'."""
+    try:
+        tess_prefix = os.environ.get("TESSDATA_PREFIX")
+        if tess_prefix:
+            prefix_path = Path(tess_prefix)
+            if (prefix_path / "urd.traineddata").exists() or (prefix_path / "tessdata" / "urd.traineddata").exists():
+                return "eng+urd"
+        for win_p in _DEFAULT_WIN_PATHS:
+            if (win_p.parent / "tessdata" / "urd.traineddata").exists():
+                return "eng+urd"
+    except Exception:
+        pass
+    return "eng"
 
 
 def is_available() -> bool:
@@ -54,6 +89,7 @@ def extract_tokens(image: np.ndarray) -> List[OCRToken]:
     try:
         data = pytesseract.image_to_data(
             image,
+            lang=_get_ocr_lang(),
             output_type=Output.DICT,
             config=_FULL_TEXT_CONFIG,
         )
