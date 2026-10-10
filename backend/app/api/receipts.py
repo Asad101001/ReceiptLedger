@@ -64,26 +64,34 @@ async def upload_receipt(
     6. Database insertion
     7. Review queue flagging for low-confidence items
     """
-    # ── File type validation ──────────────────────────────────────────────────
-    content_type = file.content_type or ""
-    if content_type not in ("image/jpeg", "image/jpg", "image/png", "image/webp"):
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=f"Unsupported file type: {content_type}. Accepted: JPEG, PNG, WEBP.",
-        )
-
     # ── Read and size-check file ──────────────────────────────────────────────
     image_bytes = await file.read()
+    if len(image_bytes) == 0:
+        raise HTTPException(
+            status_code=422,
+            detail="Uploaded file is empty.",
+        )
+
     if len(image_bytes) > settings.max_upload_bytes:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"File size {len(image_bytes)} bytes exceeds limit of {settings.max_upload_bytes} bytes.",
         )
 
-    if len(image_bytes) == 0:
+    # ── File type validation (Magic bytes, extension, or Content-Type) ────────
+    raw_content_type = (file.content_type or "").lower()
+    filename_lower = (file.filename or "").lower()
+
+    is_jpeg = image_bytes.startswith(b"\xff\xd8\xff")
+    is_png = image_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+    is_webp = len(image_bytes) > 12 and image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP"
+    has_valid_ext = filename_lower.endswith((".jpg", ".jpeg", ".png", ".webp"))
+    has_valid_mime = raw_content_type in ("image/jpeg", "image/jpg", "image/png", "image/webp")
+
+    if not (is_jpeg or is_png or is_webp or has_valid_ext or has_valid_mime):
         raise HTTPException(
-            status_code=422,
-            detail="Uploaded file is empty.",
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Unsupported file type: {raw_content_type or 'unknown'}. Accepted: JPEG, PNG, WEBP.",
         )
 
     # ── Run ingestion pipeline ────────────────────────────────────────────────

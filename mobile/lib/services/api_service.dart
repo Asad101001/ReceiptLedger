@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiService {
@@ -53,11 +54,20 @@ class ApiService {
     final url = Uri.parse('$_baseUrl/api/v1/receipts/upload');
     final request = http.MultipartRequest('POST', url);
 
+    final ext = filename.toLowerCase();
+    String mimeSubtype = 'jpeg';
+    if (ext.endsWith('.png')) {
+      mimeSubtype = 'png';
+    } else if (ext.endsWith('.webp')) {
+      mimeSubtype = 'webp';
+    }
+
     request.files.add(
       http.MultipartFile.fromBytes(
         'file',
         bytes,
         filename: filename,
+        contentType: MediaType('image', mimeSubtype),
       ),
     );
 
