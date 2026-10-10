@@ -21,8 +21,8 @@ develop-eggs/
 dist/
 downloads/
 eggs/
-.eggs/
-lib/
+# Python lib directories in virtualenvs are covered by venv/
+!mobile/lib/
 lib64/
 parts/
 sdist/
