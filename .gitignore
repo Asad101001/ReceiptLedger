@@ -40,6 +40,8 @@ wheels/
 .pub-cache/
 .pub/
 /build/
+*.apk
+*.aab
 
 # Node / React
 node_modules/
