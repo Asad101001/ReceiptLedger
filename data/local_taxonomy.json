@@ -1,0 +1,275 @@
+[
+  {
+    "canonical_name": "Wheat Flour (Atta)",
+    "category": "Groceries & Food",
+    "standard_unit": "kg",
+    "aliases": [
+      "atta", "chakki atta", "fine atta", "flour", "chki ata", "ata",
+      "wheat flour", "aata", "chakki aata", "gehun atta", "safaid atta",
+      "rozana atta", "sunehri atta", "maida", "whole wheat flour"
+    ]
+  },
+  {
+    "canonical_name": "Basmati Rice",
+    "category": "Groceries & Food",
+    "standard_unit": "kg",
+    "aliases": [
+      "rice", "basmati", "chawal", "sela rice", "irri rice", "super basmati",
+      "kainat rice", "guard rice", "kernel basmati", "long grain rice",
+      "sela chawal", "white rice", "brown rice"
+    ]
+  },
+  {
+    "canonical_name": "Cooking Oil",
+    "category": "Groceries & Food",
+    "standard_unit": "ltr",
+    "aliases": [
+      "oil", "cooking oil", "dalda", "habib oil", "canola oil", "sunflower oil",
+      "vegetable oil", "corn oil", "sufi oil", "mezan oil", "eva oil",
+      "kisan oil", "olive oil", "ghee", "banaspati ghee", "tel", "khana tel"
+    ]
+  },
+  {
+    "canonical_name": "Sugar",
+    "category": "Groceries & Food",
+    "standard_unit": "kg",
+    "aliases": [
+      "sugar", "cheeni", "chini", "shakar", "white sugar", "refined sugar",
+      "cane sugar", "crystal sugar", "castor sugar"
+    ]
+  },
+  {
+    "canonical_name": "Salt",
+    "category": "Groceries & Food",
+    "standard_unit": "kg",
+    "aliases": [
+      "salt", "namak", "iodized salt", "pink salt", "himalayan salt",
+      "rock salt", "sea salt", "table salt", "lahori namak"
+    ]
+  },
+  {
+    "canonical_name": "Milk",
+    "category": "Groceries & Food",
+    "standard_unit": "ltr",
+    "aliases": [
+      "milk", "doodh", "whole milk", "fresh milk", "nestle milk", "olper milk",
+      "haleeb milk", "good milk", "dairy milk", "skimmed milk", "tetra pack milk",
+      "uht milk", "pasteurized milk"
+    ]
+  },
+  {
+    "canonical_name": "Eggs",
+    "category": "Groceries & Food",
+    "standard_unit": "dozen",
+    "aliases": [
+      "eggs", "anda", "andey", "dozen eggs", "farm eggs", "brown eggs",
+      "white eggs", "organic eggs", "egg tray"
+    ]
+  },
+  {
+    "canonical_name": "Tomatoes",
+    "category": "Groceries & Food",
+    "standard_unit": "kg",
+    "aliases": [
+      "tomatoes", "tamatar", "tomato", "fresh tomatoes", "cherry tomatoes",
+      "red tomatoes"
+    ]
+  },
+  {
+    "canonical_name": "Onions",
+    "category": "Groceries & Food",
+    "standard_unit": "kg",
+    "aliases": [
+      "onions", "pyaz", "piaz", "onion", "red onion", "white onion",
+      "dried onion", "spring onion"
+    ]
+  },
+  {
+    "canonical_name": "Potatoes",
+    "category": "Groceries & Food",
+    "standard_unit": "kg",
+    "aliases": [
+      "potatoes", "aloo", "alu", "potato", "fresh potatoes", "baby potatoes"
+    ]
+  },
+  {
+    "canonical_name": "Chicken",
+    "category": "Groceries & Food",
+    "standard_unit": "kg",
+    "aliases": [
+      "chicken", "murgh", "broiler chicken", "farm chicken", "whole chicken",
+      "chicken pieces", "chicken breast", "chicken legs", "boneless chicken",
+      "tikka pieces", "karahi chicken", "chicken mince"
+    ]
+  },
+  {
+    "canonical_name": "Mutton",
+    "category": "Groceries & Food",
+    "standard_unit": "kg",
+    "aliases": [
+      "mutton", "gosht", "lamb", "beef", "meat", "goat meat",
+      "baqra gosht", "bakra gosht"
+    ]
+  },
+  {
+    "canonical_name": "Tea (Chai Patti)",
+    "category": "Snacks & Beverages",
+    "standard_unit": "g",
+    "aliases": [
+      "tea", "chai patti", "chay pati", "pati", "chai", "green tea",
+      "lipton tea", "tapal tea", "supreme tea", "brooke bond tea",
+      "danedar", "tez dum tea", "black tea", "loose tea", "tea bags"
+    ]
+  },
+  {
+    "canonical_name": "Biscuits",
+    "category": "Snacks & Beverages",
+    "standard_unit": "pkt",
+    "aliases": [
+      "biscuits", "biscuit", "cookies", "rio biscuits", "peek freans",
+      "oreo", "marie biscuits", "prince biscuits", "digestive", "cracker",
+      "saltine", "nankhatai", "cake rusk"
+    ]
+  },
+  {
+    "canonical_name": "Soft Drink",
+    "category": "Snacks & Beverages",
+    "standard_unit": "ltr",
+    "aliases": [
+      "soft drink", "cola", "pepsi", "coke", "coca cola", "7up", "sprite",
+      "mountain dew", "fanta", "miranda", "mirinda", "rc cola", "drink",
+      "soda", "dew", "7 up", "pakola", "shandy"
+    ]
+  },
+  {
+    "canonical_name": "Juice",
+    "category": "Snacks & Beverages",
+    "standard_unit": "ltr",
+    "aliases": [
+      "juice", "fruit juice", "mango juice", "nestle juice", "shezan juice",
+      "country pure juice", "fresh juice", "tropicana", "minutes maid",
+      "orange juice", "apple juice"
+    ]
+  },
+  {
+    "canonical_name": "Bread",
+    "category": "Groceries & Food",
+    "standard_unit": "pkt",
+    "aliases": [
+      "bread", "double roti", "roti", "naan", "sheermal", "toast bread",
+      "white bread", "brown bread", "sandwich bread", "pao"
+    ]
+  },
+  {
+    "canonical_name": "Lentils (Dal)",
+    "category": "Groceries & Food",
+    "standard_unit": "kg",
+    "aliases": [
+      "dal", "daal", "lentils", "masoor dal", "mash dal", "chana dal",
+      "moong dal", "toor dal", "arhar dal", "mixed dal", "whole masoor",
+      "black gram", "split peas"
+    ]
+  },
+  {
+    "canonical_name": "Yogurt (Dahi)",
+    "category": "Groceries & Food",
+    "standard_unit": "kg",
+    "aliases": [
+      "yogurt", "dahi", "curd", "plain yogurt", "fresh dahi", "set yogurt",
+      "low fat yogurt", "milk yogurt", "packaged dahi"
+    ]
+  },
+  {
+    "canonical_name": "Butter",
+    "category": "Groceries & Food",
+    "standard_unit": "g",
+    "aliases": [
+      "butter", "makhan", "unsalted butter", "salted butter", "lurpak",
+      "country butter", "table butter"
+    ]
+  },
+  {
+    "canonical_name": "Washing Powder / Detergent",
+    "category": "Household & Cleaning",
+    "standard_unit": "kg",
+    "aliases": [
+      "washing powder", "detergent", "surf excel", "ariel", "tide",
+      "bonus", "brite", "express powder", "cap", "rin", "wheel",
+      "washing liquid", "laundry powder", "kapra dhone ka powder",
+      "detergent powder", "surf", "excel"
+    ]
+  },
+  {
+    "canonical_name": "Dishwash Liquid",
+    "category": "Household & Cleaning",
+    "standard_unit": "ml",
+    "aliases": [
+      "dishwash", "dish wash", "vim", "pril", "fairy", "dishwashing liquid",
+      "dish soap", "bartan saaf", "dish cleaner"
+    ]
+  },
+  {
+    "canonical_name": "Toilet Cleaner",
+    "category": "Household & Cleaning",
+    "standard_unit": "ml",
+    "aliases": [
+      "toilet cleaner", "harpic", "lavatory cleaner", "bathroom cleaner",
+      "flush cleaner", "toilet gel", "commode cleaner"
+    ]
+  },
+  {
+    "canonical_name": "Shampoo",
+    "category": "Personal Care",
+    "standard_unit": "ml",
+    "aliases": [
+      "shampoo", "head and shoulders", "pantene", "sunsilk", "dove shampoo",
+      "clear shampoo", "loreal shampoo", "hair shampoo", "anti dandruff shampoo"
+    ]
+  },
+  {
+    "canonical_name": "Soap (Bath)",
+    "category": "Personal Care",
+    "standard_unit": "pcs",
+    "aliases": [
+      "soap", "sabun", "bath soap", "lux", "lifebuoy", "dove soap",
+      "imperial leather", "dettol soap", "safeguard", "palmolive",
+      "toilet soap", "body wash"
+    ]
+  },
+  {
+    "canonical_name": "Toothpaste",
+    "category": "Personal Care",
+    "standard_unit": "g",
+    "aliases": [
+      "toothpaste", "colgate", "close up", "sensodyne", "pepsodent",
+      "dental cream", "tooth gel", "manjan"
+    ]
+  },
+  {
+    "canonical_name": "Electricity Bill",
+    "category": "Utilities & Bills",
+    "standard_unit": "pcs",
+    "aliases": [
+      "electricity bill", "bijli bill", "wapda", "kesc", "hesco", "lesco",
+      "mepco", "electric bill", "power bill", "units consumed"
+    ]
+  },
+  {
+    "canonical_name": "Gas Bill",
+    "category": "Utilities & Bills",
+    "standard_unit": "pcs",
+    "aliases": [
+      "gas bill", "sui gas", "sngpl", "ssgc", "natural gas", "gas charges"
+    ]
+  },
+  {
+    "canonical_name": "Mobile Top-Up",
+    "category": "Utilities & Bills",
+    "standard_unit": "pcs",
+    "aliases": [
+      "top up", "topup", "recharge", "jazz", "zong", "ufone", "telenor",
+      "warid", "mobile recharge", "scratch card", "sms package",
+      "data package", "internet package"
+    ]
+  }
+]
