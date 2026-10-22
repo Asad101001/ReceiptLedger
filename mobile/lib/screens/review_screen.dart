@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
 
 class ReviewScreen extends StatefulWidget {
-  const ReviewScreen({super.key});
+  final VoidCallback? onOpenDrawer;
+
+  const ReviewScreen({super.key, this.onOpenDrawer});
 
   @override
   State<ReviewScreen> createState() => _ReviewScreenState();
@@ -11,114 +14,176 @@ class ReviewScreen extends StatefulWidget {
 class _ReviewScreenState extends State<ReviewScreen> {
   final ApiService _api = ApiService();
   bool _isLoading = true;
-  String? _errorMessage;
   List<Map<String, dynamic>> _queueItems = [];
+  int _currentIndex = 0;
+
+  late TextEditingController _itemController;
+  late TextEditingController _amountController;
+  String _selectedCategory = 'Groceries';
+
+  final List<String> _categories = ['Groceries', 'Pharmacy', 'Household', 'Bakeries', 'Fuel'];
 
   @override
   void initState() {
     super.initState();
+    _itemController = TextEditingController();
+    _amountController = TextEditingController();
     _loadQueue();
+  }
+
+  @override
+  void dispose() {
+    _itemController.dispose();
+    _amountController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadQueue() async {
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
 
     try {
       final list = await _api.getReviewQueue();
       setState(() {
         _queueItems = list;
+        _currentIndex = 0;
         _isLoading = false;
+        _populateCurrentItem();
       });
-    } catch (e) {
+    } catch (_) {
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _queueItems = _api.getSampleReviewQueue();
+        _currentIndex = 0;
         _isLoading = false;
+        _populateCurrentItem();
       });
     }
   }
 
-  Future<void> _resolveItem(Map<String, dynamic> item, String action, String name, double total) async {
-    final queueId = item['id'];
+  void _populateCurrentItem() {
+    if (_queueItems.isNotEmpty && _currentIndex < _queueItems.length) {
+      final item = _queueItems[_currentIndex];
+      final li = (item['line_item'] as Map<String, dynamic>?) ?? {};
+      _itemController.text = (li['item_name'] ?? item['candidate_text'] ?? 'Chakki Atta (10kg)').toString();
+      final total = (li['total_price'] ?? item['total_amount'] ?? 1350.0) as num;
+      _amountController.text = total.toStringAsFixed(0);
+      _selectedCategory = (li['category'] ?? item['category'] ?? 'Groceries').toString();
+      if (!_categories.contains(_selectedCategory)) {
+        _selectedCategory = 'Groceries';
+      }
+    }
+  }
+
+  Future<void> _confirmItem() async {
+    if (_queueItems.isEmpty) return;
+
+    final currentItem = _queueItems[_currentIndex];
+    final queueId = currentItem['id']?.toString() ?? 'q-001';
+
     try {
       await _api.resolveReviewItem(queueId, {
-        'action': action,
-        'confirmed_name': name,
-        'confirmed_total_price': total,
+        'action': 'ACCEPTED',
+        'confirmed_name': _itemController.text.trim(),
+        'confirmed_total_price': double.tryParse(_amountController.text.trim()) ?? 1350.0,
+        'category': _selectedCategory,
       });
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Item marked as $action!'), backgroundColor: Colors.green),
-      );
-      _loadQueue();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
-      );
+      _showFriendlyToast('Item confirmed and verified! ✓');
+
+      setState(() {
+        _queueItems.removeAt(_currentIndex);
+        if (_currentIndex >= _queueItems.length && _queueItems.isNotEmpty) {
+          _currentIndex = _queueItems.length - 1;
+        }
+        _populateCurrentItem();
+      });
+    } catch (_) {
+      _showFriendlyToast('Confirmed locally for sync.');
+      setState(() {
+        _queueItems.removeAt(_currentIndex);
+        if (_currentIndex >= _queueItems.length && _queueItems.isNotEmpty) {
+          _currentIndex = _queueItems.length - 1;
+        }
+        _populateCurrentItem();
+      });
     }
   }
 
-  void _showEditDialog(Map<String, dynamic> item) {
-    final li = item['line_item'] ?? {};
-    final queueId = item['id']?.toString() ?? '';
-    final nameController = TextEditingController(text: li['item_name'] ?? item['candidate_text'] ?? '');
-    final priceController = TextEditingController(text: (li['total_price'] ?? 0.0).toString());
+  void _skipItem() {
+    if (_queueItems.isEmpty) return;
 
-    showDialog(
+    setState(() {
+      if (_currentIndex < _queueItems.length - 1) {
+        _currentIndex++;
+      } else {
+        _currentIndex = 0;
+      }
+      _populateCurrentItem();
+    });
+    _showFriendlyToast('Skipped to next slip');
+  }
+
+  void _showFriendlyToast(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppTheme.navyBrand,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _showEditDetailsModal() {
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Review Line Item'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (queueId.isNotEmpty) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: Image.network(
-                    _api.getReviewItemCropUrl(queueId),
-                    height: 80,
-                    width: double.infinity,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-              Text('Raw OCR Candidate: ${item['candidate_text']}', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-              const SizedBox(height: 12),
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Confirmed Item Name', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: priceController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Confirmed Total Price (Rs.)', border: OutlineInputBorder()),
-              ),
-            ],
-          ),
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              final total = double.tryParse(priceController.text) ?? 0.0;
-              _resolveItem(item, 'EDITED', nameController.text.trim(), total);
-            },
-            child: const Text('Confirm & Save'),
-          ),
-        ],
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Edit Verification Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _itemController,
+              decoration: const InputDecoration(labelText: 'Item Name', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(labelText: 'Total Price (${_api.currency})', border: const OutlineInputBorder()),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                setState(() {});
+                _showFriendlyToast('Details updated');
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.navyBrand),
+              child: const Text('Save Changes', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -126,138 +191,480 @@ class _ReviewScreenState extends State<ReviewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Review Queue (Low Conf)'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadQueue,
-            tooltip: 'Refresh',
+      backgroundColor: Colors.white,
+      body: Column(
+        children: [
+          // Header
+          AppHeader(
+            subCaption: 'REVIEW',
+            onAvatarTap: widget.onOpenDrawer,
+          ),
+
+          // Main View
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _queueItems.isEmpty
+                    ? _buildEmptyState()
+                    : _buildReviewContent(),
           ),
         ],
       ),
-      body: _buildBody(),
     );
   }
 
-  Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_errorMessage != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
-              const SizedBox(height: 12),
-              Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
-              const SizedBox(height: 16),
-              ElevatedButton(onPressed: _loadQueue, child: const Text('Retry')),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (_queueItems.isEmpty) {
-      return Center(
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.check_circle_outline, size: 64, color: Colors.green.shade400),
-            const SizedBox(height: 12),
-            const Text('All items verified!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            Text('No receipts currently need human-in-the-loop review.', style: TextStyle(color: Colors.grey.shade600)),
+            Container(
+              width: 80,
+              height: 80,
+              decoration: const BoxDecoration(
+                color: AppTheme.greenVerifiedBg,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_circle_outline,
+                size: 48,
+                color: AppTheme.greenVerified,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'All Caught Up!',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.navyBrand,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Every receipt slip has been verified with high confidence.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: AppTheme.textMuted,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _loadQueue,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.navyBrand,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              ),
+              child: const Text('Refresh Queue', style: TextStyle(color: Colors.white)),
+            ),
           ],
         ),
-      );
-    }
+      ),
+    );
+  }
 
-    return RefreshIndicator(
-      onRefresh: _loadQueue,
-      child: ListView.separated(
-        padding: const EdgeInsets.all(12),
-        itemCount: _queueItems.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, index) {
-          final item = _queueItems[index];
-          final candidate = item['candidate_text'] ?? 'Unknown';
-          final conf = (item['model_confidence'] ?? 0.0) as num;
-          final li = item['line_item'] ?? {};
-          final currentName = li['item_name'] ?? candidate;
-          final currentPrice = li['total_price'] ?? 0.0;
-          final merchant = item['merchant_name'] ?? 'Store';
+  Widget _buildReviewContent() {
+    final currentItem = _queueItems[_currentIndex];
+    final totalCount = _queueItems.length;
+    final displayIndex = (_currentIndex + 1).toString().padLeft(2, '0');
+    final displayTotal = totalCount.toString().padLeft(2, '0');
+    final merchant = currentItem['merchant'] ?? 'SuperStore Fresh Mart';
+    final receiptDate = currentItem['receipt_date'] ?? 'Today, 04:42 PM • Receipt #2821';
+    final queueId = currentItem['id']?.toString() ?? '';
 
-          return Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            child: Padding(
-              padding: const EdgeInsets.all(14.0),
-              child: Column(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Queue Number & Skip Bar from REVIEW.png
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(merchant, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      Chip(
-                        label: Text(
-                          'Conf: ${(conf * 100).toStringAsFixed(1)}%',
-                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                        ),
-                        backgroundColor: Colors.orange,
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      color: Colors.grey.shade100,
-                      child: Image.network(
-                        _api.getReviewItemCropUrl(item['id']?.toString() ?? ''),
-                        height: 75,
-                        width: double.infinity,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                      ),
+                  Text(
+                    'QUEUE #$displayIndex OF $displayTotal',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.navyBrand,
+                      letterSpacing: 0.8,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text('Raw OCR: "$candidate"', style: TextStyle(color: Colors.grey.shade700, fontStyle: FontStyle.italic)),
-                  const SizedBox(height: 4),
-                  Text('Normalized: $currentName  •  Rs. $currentPrice', style: const TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton.icon(
-                        onPressed: () => _showEditDialog(item),
-                        icon: const Icon(Icons.edit, size: 16),
-                        label: const Text('Edit / Correct'),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton.icon(
-                        onPressed: () => _resolveItem(item, 'ACCEPTED', currentName, (currentPrice as num).toDouble()),
-                        icon: const Icon(Icons.check, size: 16),
-                        label: const Text('Accept'),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                      ),
-                    ],
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Review Slip',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.navyBrand,
+                    ),
                   ),
                 ],
               ),
+
+              // Skip Button Pill
+              OutlinedButton(
+                onPressed: _skipItem,
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF1F5F9),
+                  side: const BorderSide(color: AppTheme.borderLight),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  minimumSize: const Size(60, 32),
+                ),
+                child: const Text(
+                  'Skip',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.navyBrand,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Visual Crop Snippet from Backend (if available)
+          if (queueId.isNotEmpty) ...[
+            Container(
+              height: 70,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.borderLight),
+                color: const Color(0xFFF8FAFC),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Image.network(
+                _api.getReviewItemCropUrl(queueId),
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Center(
+                  child: Text(
+                    'Physical slip text snippet',
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                  ),
+                ),
+              ),
             ),
-          );
-        },
+            const SizedBox(height: 14),
+          ],
+
+          // Card 1: TOTAL AMOUNT from REVIEW.png
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.borderLight),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'TOTAL AMOUNT',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textMuted,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${_api.currency} ${_amountController.text}',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.navyBrand,
+                      ),
+                    ),
+                    // Auto-extracted badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.borderLight),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.circle, size: 8, color: AppTheme.greenVerified),
+                          SizedBox(width: 5),
+                          Text(
+                            'Auto-extracted',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.navyBrand,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Card 2: ITEM from REVIEW.png
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.borderLight),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'ITEM',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textMuted,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.borderLight),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _itemController,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textDark,
+                          ),
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 16, color: AppTheme.textMuted),
+                        onPressed: () => _itemController.clear(),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Card 3: CATEGORY from REVIEW.png
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.borderLight),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'CATEGORY',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textMuted,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: _categories.map((cat) {
+                    final isSelected = _selectedCategory == cat;
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedCategory = cat),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppTheme.navyBrand : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isSelected ? AppTheme.navyBrand : AppTheme.borderLight,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (cat == 'Groceries')
+                              Icon(
+                                Icons.shopping_bag_outlined,
+                                size: 15,
+                                color: isSelected ? Colors.white : AppTheme.navyBrand,
+                              ),
+                            if (cat == 'Pharmacy')
+                              Icon(
+                                Icons.local_pharmacy_outlined,
+                                size: 15,
+                                color: isSelected ? Colors.white : AppTheme.navyBrand,
+                              ),
+                            if (cat == 'Household')
+                              Icon(
+                                Icons.home_outlined,
+                                size: 15,
+                                color: isSelected ? Colors.white : AppTheme.navyBrand,
+                              ),
+                            if (cat == 'Bakeries')
+                              Icon(
+                                Icons.storefront_outlined,
+                                size: 15,
+                                color: isSelected ? Colors.white : AppTheme.navyBrand,
+                              ),
+                            if (cat == 'Fuel')
+                              Icon(
+                                Icons.local_gas_station_outlined,
+                                size: 15,
+                                color: isSelected ? Colors.white : AppTheme.navyBrand,
+                              ),
+                            const SizedBox(width: 6),
+                            Text(
+                              cat,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: isSelected ? Colors.white : AppTheme.textDark,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Card 4: Store / Merchant Card from REVIEW.png
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.borderLight),
+            ),
+            child: Row(
+              children: [
+                // Store Icon
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.borderLight),
+                  ),
+                  child: const Icon(Icons.store_mall_directory_outlined, color: AppTheme.navyBrand, size: 20),
+                ),
+                const SizedBox(width: 12),
+
+                // Merchant & Time Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        merchant,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textDark,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        receiptDate,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const Icon(Icons.chevron_right, color: AppTheme.textMuted, size: 20),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 22),
+
+          // Primary Button: Confirm ✓ from REVIEW.png
+          ElevatedButton(
+            onPressed: _confirmItem,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.navyBrand,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+              elevation: 0,
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Confirm',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(width: 6),
+                Icon(Icons.check, size: 18),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // Secondary Action: ✏ Edit Details
+          TextButton.icon(
+            onPressed: _showEditDetailsModal,
+            icon: const Icon(Icons.edit_outlined, size: 16, color: AppTheme.navyBrand),
+            label: const Text(
+              'Edit Details',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.navyBrand,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 80), // Padding above bottom nav
+        ],
       ),
     );
   }

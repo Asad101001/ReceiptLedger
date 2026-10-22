@@ -5,13 +5,14 @@ import 'screens/ledger_screen.dart';
 import 'screens/review_screen.dart';
 import 'screens/settings_screen.dart';
 import 'services/api_service.dart';
+import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await dotenv.load(fileName: '.env');
   } catch (_) {
-    // If .env is not packaged or missing, default fallback is used
+    // Fallback if .env missing
   }
   ApiService().init();
 
@@ -24,19 +25,11 @@ class ReceiptLedgerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ReceiptLedger Test Client',
+      title: 'ReceiptLedger',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF10B981), // Emerald green from design tokens
-          brightness: Brightness.light,
-        ),
-        appBarTheme: const AppBarTheme(
-          elevation: 0,
-          scrolledUnderElevation: 1,
-        ),
-      ),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.light,
       home: const MainNavigationScreen(),
     );
   }
@@ -50,49 +43,53 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
-    UploadScreen(),
-    LedgerScreen(),
-    ReviewScreen(),
-    SettingsScreen(),
-  ];
+  void _openDrawer() {
+    _scaffoldKey.currentState?.openEndDrawer();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final screens = [
+      UploadScreen(onOpenDrawer: _openDrawer),
+      LedgerScreen(onOpenDrawer: _openDrawer),
+      ReviewScreen(onOpenDrawer: _openDrawer),
+      SettingsScreen(onOpenDrawer: _openDrawer),
+    ];
+
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.document_scanner_outlined),
-            selectedIcon: Icon(Icons.document_scanner),
-            label: 'Capture',
+      key: _scaffoldKey,
+      backgroundColor: Colors.white,
+      endDrawer: const AppProfileDrawer(),
+      body: Stack(
+        children: [
+          // Current active screen
+          IndexedStack(
+            index: _currentIndex,
+            children: screens,
           ),
-          NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long),
-            label: 'Ledger',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.rate_review_outlined),
-            selectedIcon: Icon(Icons.rate_review),
-            label: 'Review Queue',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
+
+          // Floating Pill Bottom Navigation Bar matching mockups
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: ValueListenableBuilder<int>(
+              valueListenable: ApiService().reviewCountNotifier,
+              builder: (ctx, badgeCount, _) {
+                return AppBottomNav(
+                  currentIndex: _currentIndex,
+                  reviewBadgeCount: badgeCount,
+                  onTabSelected: (index) {
+                    setState(() {
+                      _currentIndex = index;
+                    });
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
