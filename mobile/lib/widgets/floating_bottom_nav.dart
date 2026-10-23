@@ -97,16 +97,10 @@ class FloatingBottomNav extends StatelessWidget {
   }) {
     final isSelected = currentIndex == index;
 
-    // Leafora active style: soft sage pill with deep forest green icon & label
-    final Color activePillBg = isDark
-        ? const Color(0xFF22352A)
-        : AppTheme.sageLight;
-    final Color activeContent = isDark
-        ? const Color(0xFF86AB93)
-        : AppTheme.forestPrimary;
-    final Color inactiveContent = isDark
-        ? const Color(0xFF6B8071)
-        : AppTheme.textMutedLight;
+    // Reference active style: deep forest green pill with white text & icon
+    const Color activePillBg = AppTheme.forestPrimary;
+    const Color activeContent = Colors.white;
+    const Color inactiveContent = AppTheme.textMuted;
 
     return GestureDetector(
       onTap: () => onTabSelected(index),

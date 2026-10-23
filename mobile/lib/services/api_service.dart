@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -12,7 +11,6 @@ class ApiService {
 
   String _baseUrl = 'http://192.168.100.78:8000';
   final ValueNotifier<String> currencyNotifier = ValueNotifier<String>('Rs.');
-  final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier<ThemeMode>(ThemeMode.light);
   final ValueNotifier<int> reviewCountNotifier = ValueNotifier<int>(5);
   final ValueNotifier<bool> backendOnlineNotifier = ValueNotifier<bool>(false);
 
@@ -22,10 +20,6 @@ class ApiService {
 
   void setCurrency(String newCurrency) {
     currencyNotifier.value = newCurrency;
-  }
-
-  void setThemeMode(ThemeMode mode) {
-    themeModeNotifier.value = mode;
   }
 
   void init() {

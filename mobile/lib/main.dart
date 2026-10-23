@@ -25,18 +25,11 @@ class ReceiptLedgerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: ApiService().themeModeNotifier,
-      builder: (ctx, mode, _) {
-        return MaterialApp(
-          title: 'ReceiptLedger',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          themeMode: mode,
-          home: const MainNavigationScreen(),
-        );
-      },
+    return MaterialApp(
+      title: 'ReceiptLedger',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      home: const MainNavigationScreen(),
     );
   }
 }
