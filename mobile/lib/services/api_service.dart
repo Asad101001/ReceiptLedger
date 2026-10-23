@@ -99,6 +99,7 @@ class ApiService {
     required String filename,
     String? deviceTimestamp,
     String captureMode = 'single',
+    String ocrEngine = 'auto',  // 'auto', 'gemini', or 'local'
   }) async {
     final url = Uri.parse('$_baseUrl/api/v1/receipts/upload');
     final request = http.MultipartRequest('POST', url);
@@ -124,9 +125,10 @@ class ApiService {
       request.fields['device_timestamp'] = deviceTimestamp;
     }
     request.fields['capture_mode'] = captureMode;
+    request.fields['ocr_engine'] = ocrEngine;  // Always send engine preference
 
     try {
-      final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 45));
       final responseBody = await streamedResponse.stream.bytesToString();
       final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
 
@@ -134,10 +136,11 @@ class ApiService {
         refreshReviewCount();
         return decoded;
       } else if (streamedResponse.statusCode == 409) {
+        // Duplicate — return with enriched info so UI can show which merchant
         return {
           ...decoded,
           'is_duplicate': true,
-          'error_message': 'Duplicate receipt already recorded in ledger.',
+          'error_message': 'Duplicate: ${decoded['merchant_name'] ?? 'Receipt'} already in ledger.',
         };
       } else {
         final detail = decoded['detail'] ?? 'Upload failed (${streamedResponse.statusCode})';
@@ -152,17 +155,16 @@ class ApiService {
   Future<List<Map<String, dynamic>>> getReceipts({int page = 1, int pageSize = 50}) async {
     final url = Uri.parse('$_baseUrl/api/v1/analytics/receipts?page=$page&page_size=$pageSize');
     try {
-      final response = await http.get(url).timeout(const Duration(seconds: 6));
+      final response = await http.get(url).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final list = data['receipts'] as List<dynamic>? ?? [];
-        if (list.isNotEmpty) {
-          return list.cast<Map<String, dynamic>>();
-        }
+        // Always return what the backend gave us, even if empty
+        return list.cast<Map<String, dynamic>>();
       }
     } catch (_) {}
 
-    // If server is not responding, return mock sample receipts matching mockup LEDGER.png
+    // Only use sample data when backend is completely unreachable
     return getSampleReceipts();
   }
 
@@ -194,22 +196,28 @@ class ApiService {
   Future<List<Map<String, dynamic>>> getReviewQueue() async {
     final url = Uri.parse('$_baseUrl/api/v1/review-queue');
     try {
-      final response = await http.get(url).timeout(const Duration(seconds: 6));
+      final response = await http.get(url).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
         final list = jsonDecode(response.body) as List<dynamic>? ?? [];
-        if (list.isNotEmpty) {
-          reviewCountNotifier.value = list.length;
-          return list.cast<Map<String, dynamic>>();
-        }
+        reviewCountNotifier.value = list.length;
+        // Return real data even if empty — empty is valid (all caught up)
+        return list.cast<Map<String, dynamic>>();
       }
     } catch (_) {}
 
-    // Mock items matching REVIEW.png if backend queue empty
+    // Only fall back to sample when server is unreachable
     return getSampleReviewQueue();
   }
 
   /// Resolves an item in the review queue PATCH /api/v1/review-queue/{id}
   Future<Map<String, dynamic>> resolveReviewItem(String queueId, Map<String, dynamic> payload) async {
+    if (queueId.startsWith('q-') || queueId.length < 10) {
+      if (reviewCountNotifier.value > 0) {
+        reviewCountNotifier.value--;
+      }
+      return {'status': 'resolved', 'id': queueId};
+    }
+
     final url = Uri.parse('$_baseUrl/api/v1/review-queue/$queueId');
     try {
       final response = await http.patch(
@@ -247,195 +255,74 @@ class ApiService {
     return '$_baseUrl/api/v1/analytics/export?$query';
   }
 
-  /// High-fidelity sample dataset covering all realistic categories
+  /// High-fidelity sample dataset — field names match backend API schema
   List<Map<String, dynamic>> getSampleReceipts() {
     return [
       {
         'id': 'rec-001',
-        'merchant': 'Imtiaz Super Market',
-        'date': 'Today, 2:38 PM',
-        'items_count': 8,
+        'merchant_name': 'Imtiaz Super Market',
+        'receipt_date': '2026-10-24',
+        'items_count': 4,
         'total_amount': 3420.0,
-        'status': 'VERIFIED',
-        'category': 'Groceries',
-        'payment_method': 'VISA ••4921',
-        'tax': 162.0,
+        'status': 'PROCESSED',
+        'category_name': 'Groceries & Food',
         'line_items': [
-          {'item_name': 'Chakki Atta (10kg)', 'qty': 1, 'price': 1350.0, 'category': 'Groceries'},
-          {'item_name': 'Basmati Rice Super Kernel (2kg)', 'qty': 1, 'price': 980.0, 'category': 'Groceries'},
-          {'item_name': 'Milk Pack UHT 1L', 'qty': 4, 'price': 840.0, 'category': 'Groceries'},
-          {'item_name': 'Tapal Danedar Tea 400g', 'qty': 1, 'price': 250.0, 'category': 'Groceries'},
+          {'item_name': 'Chakki Atta (10kg)', 'quantity': 1, 'total_price': 1350.0, 'category_name': 'Groceries & Food'},
+          {'item_name': 'Basmati Rice Super Kernel (2kg)', 'quantity': 1, 'total_price': 980.0, 'category_name': 'Groceries & Food'},
+          {'item_name': 'Milk Pack UHT 1L', 'quantity': 4, 'total_price': 840.0, 'category_name': 'Groceries & Food'},
+          {'item_name': 'Tapal Danedar Tea 400g', 'quantity': 1, 'total_price': 250.0, 'category_name': 'Groceries & Food'},
         ],
       },
       {
         'id': 'rec-002',
-        'merchant': 'Shell V-Power Station',
-        'date': 'Today, 10:14 AM',
+        'merchant_name': 'Shell V-Power Station',
+        'receipt_date': '2026-10-24',
         'items_count': 1,
         'total_amount': 6800.0,
-        'status': 'VERIFIED',
-        'category': 'Fuel',
-        'payment_method': 'Mastercard ••8104',
-        'tax': 0.0,
+        'status': 'PROCESSED',
+        'category_name': 'Miscellaneous',
         'line_items': [
-          {'item_name': 'V-Power High Octane Fuel (23.4L)', 'qty': 1, 'price': 6800.0, 'category': 'Fuel'},
+          {'item_name': 'V-Power High Octane Fuel', 'quantity': 1, 'total_price': 6800.0, 'category_name': 'Miscellaneous'},
         ],
       },
       {
         'id': 'rec-003',
-        'merchant': "Espresso Cafe & Roastery",
-        'date': 'Yesterday, 5:12 PM',
+        'merchant_name': 'Metro Cash & Carry',
+        'receipt_date': '2026-10-22',
         'items_count': 3,
-        'total_amount': 2150.0,
-        'status': 'VERIFIED',
-        'category': 'Dining',
-        'payment_method': 'Cash',
-        'tax': 275.0,
+        'total_amount': 8920.0,
+        'status': 'PROCESSED',
+        'category_name': 'Groceries & Food',
         'line_items': [
-          {'item_name': 'Iced Caramel Macchiato', 'qty': 2, 'price': 1300.0, 'category': 'Dining'},
-          {'item_name': 'Butter Croissant', 'qty': 1, 'price': 450.0, 'category': 'Dining'},
-          {'item_name': 'Belgian Chocolate Brownie', 'qty': 1, 'price': 400.0, 'category': 'Dining'},
+          {'item_name': 'Sunflower Cooking Oil 5L Can', 'quantity': 2, 'total_price': 5700.0, 'category_name': 'Groceries & Food'},
+          {'item_name': 'Detergent Powder 3kg', 'quantity': 1, 'total_price': 1650.0, 'category_name': 'Household & Cleaning'},
+          {'item_name': 'Dishwashing Liquid 1L', 'quantity': 2, 'total_price': 820.0, 'category_name': 'Household & Cleaning'},
         ],
       },
       {
         'id': 'rec-004',
-        'merchant': 'Servaid Pharmacy',
-        'date': 'Yesterday, 1:45 PM',
+        'merchant_name': 'Servaid Pharmacy',
+        'receipt_date': '2026-10-21',
         'items_count': 3,
         'total_amount': 1480.0,
-        'status': 'VERIFIED',
-        'category': 'Pharmacy',
-        'payment_method': 'VISA ••4921',
-        'tax': 0.0,
+        'status': 'PROCESSED',
+        'category_name': 'Health & Pharmacy',
         'line_items': [
-          {'item_name': 'Panadol Extra 500mg (Pack of 20)', 'qty': 2, 'price': 400.0, 'category': 'Pharmacy'},
-          {'item_name': 'Surbex-Z Multivitamins', 'qty': 1, 'price': 580.0, 'category': 'Pharmacy'},
-          {'item_name': 'Hydrating Facial Moisturizer', 'qty': 1, 'price': 500.0, 'category': 'Pharmacy'},
+          {'item_name': 'Panadol Extra 500mg (20 pcs)', 'quantity': 2, 'total_price': 400.0, 'category_name': 'Health & Pharmacy'},
+          {'item_name': 'Surbex-Z Multivitamins', 'quantity': 1, 'total_price': 580.0, 'category_name': 'Health & Pharmacy'},
+          {'item_name': 'Hydrating Facial Moisturizer', 'quantity': 1, 'total_price': 500.0, 'category_name': 'Personal Care'},
         ],
       },
       {
         'id': 'rec-005',
-        'merchant': 'Metro Cash & Carry',
-        'date': '18 Oct, 3:20 PM',
-        'items_count': 6,
-        'total_amount': 8920.0,
-        'status': 'VERIFIED',
-        'category': 'Groceries',
-        'payment_method': 'Mastercard ••8104',
-        'tax': 420.0,
-        'line_items': [
-          {'item_name': 'Sunflower Cooking Oil (5L Can)', 'qty': 2, 'price': 5700.0, 'category': 'Groceries'},
-          {'item_name': 'Detergent Powder 3kg', 'qty': 1, 'price': 1650.0, 'category': 'Household'},
-          {'item_name': 'Dishwashing Liquid 1L', 'qty': 2, 'price': 820.0, 'category': 'Household'},
-          {'item_name': 'Paper Towel Jumbo Pack', 'qty': 1, 'price': 750.0, 'category': 'Household'},
-        ],
-      },
-      {
-        'id': 'rec-006',
-        'merchant': 'K-Electric Billing',
-        'date': '16 Oct, 11:00 AM',
+        'merchant_name': 'K-Electric Billing',
+        'receipt_date': '2026-10-20',
         'items_count': 1,
         'total_amount': 14200.0,
-        'status': 'VERIFIED',
-        'category': 'Utilities',
-        'payment_method': 'Bank Transfer',
-        'tax': 1200.0,
+        'status': 'PROCESSED',
+        'category_name': 'Utilities & Bills',
         'line_items': [
-          {'item_name': 'Residential Electricity Bill (Sep)', 'qty': 1, 'price': 14200.0, 'category': 'Utilities'},
-        ],
-      },
-      {
-        'id': 'rec-007',
-        'merchant': 'Tehzeeb Bakers',
-        'date': '15 Oct, 7:15 PM',
-        'items_count': 4,
-        'total_amount': 1890.0,
-        'status': 'VERIFIED',
-        'category': 'Bakeries',
-        'payment_method': 'Cash',
-        'tax': 140.0,
-        'line_items': [
-          {'item_name': 'Chicken Patties (6 pcs)', 'qty': 1, 'price': 720.0, 'category': 'Bakeries'},
-          {'item_name': 'Cream Caramel Pastry', 'qty': 2, 'price': 520.0, 'category': 'Bakeries'},
-          {'item_name': 'Multi-grain Bread', 'qty': 1, 'price': 280.0, 'category': 'Bakeries'},
-          {'item_name': 'Almond Macarons Box', 'qty': 1, 'price': 370.0, 'category': 'Bakeries'},
-        ],
-      },
-      {
-        'id': 'rec-008',
-        'merchant': "Agha's Supermarket",
-        'date': '14 Oct, 4:50 PM',
-        'items_count': 4,
-        'total_amount': 4310.0,
-        'status': 'VERIFIED',
-        'category': 'Groceries',
-        'payment_method': 'VISA ••4921',
-        'tax': 210.0,
-        'line_items': [
-          {'item_name': 'Organic Hass Avocados (Pack of 3)', 'qty': 1, 'price': 1450.0, 'category': 'Groceries'},
-          {'item_name': 'Imported Olive Oil Extra Virgin 500ml', 'qty': 1, 'price': 1850.0, 'category': 'Groceries'},
-          {'item_name': 'Greek Yogurt 400g', 'qty': 2, 'price': 650.0, 'category': 'Groceries'},
-          {'item_name': 'Artisan Baguette', 'qty': 1, 'price': 360.0, 'category': 'Bakeries'},
-        ],
-      },
-      {
-        'id': 'rec-009',
-        'merchant': 'PTCL Flash Fiber',
-        'date': '12 Oct, 9:30 AM',
-        'items_count': 1,
-        'total_amount': 4199.0,
-        'status': 'VERIFIED',
-        'category': 'Utilities',
-        'payment_method': 'Online Payment',
-        'tax': 580.0,
-        'line_items': [
-          {'item_name': '100 Mbps Unlimited Fiber Internet (Monthly)', 'qty': 1, 'price': 4199.0, 'category': 'Utilities'},
-        ],
-      },
-      {
-        'id': 'rec-010',
-        'merchant': 'Total Parco Fuel Station',
-        'date': '10 Oct, 6:18 PM',
-        'items_count': 1,
-        'total_amount': 4500.0,
-        'status': 'VERIFIED',
-        'category': 'Fuel',
-        'payment_method': 'Mastercard ••8104',
-        'tax': 0.0,
-        'line_items': [
-          {'item_name': 'Super Unleaded Motor Gasoline', 'qty': 1, 'price': 4500.0, 'category': 'Fuel'},
-        ],
-      },
-      {
-        'id': 'rec-011',
-        'merchant': 'Fazal Din Pharma Plus',
-        'date': '08 Oct, 2:10 PM',
-        'items_count': 2,
-        'total_amount': 2340.0,
-        'status': 'VERIFIED',
-        'category': 'Pharmacy',
-        'payment_method': 'Cash',
-        'tax': 0.0,
-        'line_items': [
-          {'item_name': 'Digital Blood Pressure Monitor Strips', 'qty': 1, 'price': 1850.0, 'category': 'Pharmacy'},
-          {'item_name': 'First Aid Antiseptic Bandages', 'qty': 1, 'price': 490.0, 'category': 'Pharmacy'},
-        ],
-      },
-      {
-        'id': 'rec-012',
-        'merchant': 'Al-Fatah Department Store',
-        'date': '05 Oct, 8:40 PM',
-        'items_count': 5,
-        'total_amount': 5600.0,
-        'status': 'VERIFIED',
-        'category': 'Shopping',
-        'payment_method': 'VISA ••4921',
-        'tax': 380.0,
-        'line_items': [
-          {'item_name': 'Desk Organizer Leather Finish', 'qty': 2, 'price': 2200.0, 'category': 'Shopping'},
-          {'item_name': 'Cotton Kitchen Towels (3-pack)', 'qty': 1, 'price': 950.0, 'category': 'Shopping'},
-          {'item_name': 'Glass Storage Jar Set', 'qty': 1, 'price': 1650.0, 'category': 'Shopping'},
-          {'item_name': 'Scented Soy Candle Cedarwood', 'qty': 1, 'price': 800.0, 'category': 'Shopping'},
+          {'item_name': 'Electricity Bill (Sep)', 'quantity': 1, 'total_price': 14200.0, 'category_name': 'Utilities & Bills'},
         ],
       },
     ];

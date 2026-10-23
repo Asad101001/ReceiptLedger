@@ -348,6 +348,7 @@ async def ingest_receipt(
         needs_review=needs_review,
         receipt_type=receipt_type,
         line_items=response_items,
+        engine=engine_used,
     )
 
 

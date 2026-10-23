@@ -37,6 +37,8 @@ logging.basicConfig(
     format="%(asctime)s  [%(levelname)-8s]  %(name)s — %(message)s",
     datefmt="%H:%M:%S",
 )
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("hpack").setLevel(logging.WARNING)
 logger = logging.getLogger("receiptledger")
 
 
@@ -66,8 +68,12 @@ async def lifespan(app: FastAPI):
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = settings.google_application_credentials
         logger.info("Google credentials path set.")
 
-    # In development mode, auto-seed realistic sample data if store is empty
-    if settings.is_development and settings.seed_demo_data_on_startup:
+    # NOTE: Auto-seeding is disabled when Supabase is connected because:
+    # 1. Supabase already has real receipts from phone captures.
+    # 2. Seeded demo data uses non-UUID IDs (q-001) that Supabase rejects.
+    # 3. Seeded receipts have no images in the bucket, causing 400/404 errors.
+    # To manually seed, hit POST /api/v1/system/seed-demo-data.
+    if settings.is_development and settings.seed_demo_data_on_startup and not settings.supabase_enabled:
         existing = store.list_receipts()
         if len(existing) == 0:
             seeded = store.seed_demo_data()

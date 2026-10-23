@@ -139,6 +139,9 @@ def init_supabase() -> bool:
 
 def get_category_id(name: str) -> Optional[str]:
     """Return the category UUID for a given category name, or None if not found."""
+    if not _categories:
+        _sync_categories()
+
     # Exact match (case-insensitive)
     for cat_id, cat in _categories.items():
         if cat["name"].lower() == name.lower():
@@ -148,6 +151,33 @@ def get_category_id(name: str) -> Optional[str]:
     for cat_id, cat in _categories.items():
         if name.lower() in cat["name"].lower() or cat["name"].lower() in name.lower():
             return cat_id
+
+    n_lower = name.lower()
+    # Semantic mapping to standard categories
+    if any(k in n_lower for k in ("pharma", "health", "med", "doctor", "care", "beauty", "cosmetic")):
+        for cat_id, cat in _categories.items():
+            if "personal" in cat["name"].lower() or "care" in cat["name"].lower():
+                return cat_id
+
+    if any(k in n_lower for k in ("grocer", "food", "dine", "dining", "restaur", "cafe", "baker", "supermarket", "meat", "vegetable", "fruit")):
+        for cat_id, cat in _categories.items():
+            if "grocer" in cat["name"].lower() or "food" in cat["name"].lower():
+                return cat_id
+
+    if any(k in n_lower for k in ("snack", "bever", "drink", "coffee", "tea", "juice", "soda")):
+        for cat_id, cat in _categories.items():
+            if "snack" in cat["name"].lower() or "bever" in cat["name"].lower():
+                return cat_id
+
+    if any(k in n_lower for k in ("utilit", "bill", "electr", "gas", "water", "internet", "fiber", "fuel", "petrol", "diesel")):
+        for cat_id, cat in _categories.items():
+            if "utilit" in cat["name"].lower() or "bill" in cat["name"].lower():
+                return cat_id
+
+    if any(k in n_lower for k in ("clean", "house", "detergent", "soap", "home")):
+        for cat_id, cat in _categories.items():
+            if "house" in cat["name"].lower() or "clean" in cat["name"].lower():
+                return cat_id
 
     # Fallback to Miscellaneous
     for cat_id, cat in _categories.items():
@@ -227,7 +257,7 @@ def get_receipt(receipt_id: str) -> Optional[Dict]:
         return _receipts[receipt_id]
 
     client = get_supabase_client()
-    if client:
+    if client and _safe_uuid(receipt_id):
         try:
             res = client.table("receipts").select("*").eq("id", receipt_id).execute()
             if res.data and len(res.data) > 0:
@@ -430,7 +460,7 @@ def insert_line_item(
 def get_line_items_for_receipt(receipt_id: str) -> List[Dict]:
     """Retrieve all line items associated with a receipt."""
     client = get_supabase_client()
-    if client:
+    if client and _safe_uuid(receipt_id):
         try:
             res = client.table("line_items").select("*").eq("receipt_id", receipt_id).execute()
             if res.data:
@@ -453,7 +483,7 @@ def get_line_item(item_id: str) -> Optional[Dict]:
     if item_id in _line_items:
         return _line_items[item_id]
     client = get_supabase_client()
-    if client:
+    if client and _safe_uuid(item_id):
         try:
             res = client.table("line_items").select("*").eq("id", item_id).execute()
             if res.data and len(res.data) > 0:
@@ -472,7 +502,7 @@ def update_line_item(item_id: str, updates: Dict[str, Any]) -> Optional[Dict]:
         _line_items[item_id].update(updates)
 
     client = get_supabase_client()
-    if client:
+    if client and _safe_uuid(item_id):
         try:
             # Clean fields for Supabase table
             db_updates = {k: v for k, v in updates.items() if k != "category_name"}
@@ -575,6 +605,7 @@ def get_review_queue(status: str = "UNRESOLVED") -> List[Dict]:
                         "line_item": li_data,
                         "receipt_id": li_data.get("receipt_id"),
                         "merchant_name": rcpt_data.get("merchant_name"),
+                        "receipt": rcpt_data,
                     })
                 return enriched
         except Exception as exc:
@@ -592,6 +623,7 @@ def get_review_queue(status: str = "UNRESOLVED") -> List[Dict]:
             "line_item": li,
             "receipt_id": li.get("receipt_id"),
             "merchant_name": receipt.get("merchant_name"),
+            "receipt": receipt,
         })
     return sorted(results, key=lambda r: r.get("flagged_at", ""), reverse=True)
 
@@ -599,7 +631,15 @@ def get_review_queue(status: str = "UNRESOLVED") -> List[Dict]:
 def get_review_queue_item(queue_id: str) -> Optional[Dict]:
     """Retrieve a single review queue item enriched with line item and receipt context."""
     client = get_supabase_client()
-    if client:
+    is_valid_uuid = False
+    try:
+        import uuid as _uuid
+        _uuid.UUID(str(queue_id))
+        is_valid_uuid = True
+    except (ValueError, TypeError, AttributeError):
+        is_valid_uuid = False
+
+    if client and is_valid_uuid:
         try:
             res = client.table("review_queue").select("*, line_items(*, receipts(*))").eq("id", queue_id).maybe_single().execute()
             if res and res.data:
@@ -618,6 +658,7 @@ def get_review_queue_item(queue_id: str) -> Optional[Dict]:
                     "line_item": li_data,
                     "receipt_id": li_data.get("receipt_id"),
                     "merchant_name": rcpt_data.get("merchant_name"),
+                    "receipt": rcpt_data,
                 }
         except Exception as exc:
             logger.warning("Supabase get_review_queue_item error: %s", exc)
@@ -632,6 +673,7 @@ def get_review_queue_item(queue_id: str) -> Optional[Dict]:
         "line_item": li,
         "receipt_id": li.get("receipt_id"),
         "merchant_name": receipt.get("merchant_name"),
+        "receipt": receipt,
     }
 
 
@@ -668,21 +710,33 @@ def resolve_review_queue_item(
         updates["total_price"] = float(confirmed_total_price)
 
     client = get_supabase_client()
-    if client:
+    rq_item = None
+    is_valid_uuid = False
+    try:
+        import uuid as _uuid
+        _uuid.UUID(str(queue_id))
+        is_valid_uuid = True
+    except (ValueError, TypeError, AttributeError):
+        is_valid_uuid = False
+
+    if client and is_valid_uuid:
         try:
             # 1. Update review_queue table
-            client.table("review_queue").update({
+            rq_update_res = client.table("review_queue").update({
                 "review_status": review_status,
                 "resolved_at": now_str,
             }).eq("id", queue_id).execute()
 
-            # 2. Get line_item_id if not found locally
-            if not line_item_id:
-                rq_row = client.table("review_queue").select("line_item_id").eq("id", queue_id).execute()
+            if rq_update_res.data and len(rq_update_res.data) > 0:
+                rq_item = rq_update_res.data[0]
+                line_item_id = rq_item.get("line_item_id")
+            elif not line_item_id:
+                rq_row = client.table("review_queue").select("*").eq("id", queue_id).execute()
                 if rq_row.data:
-                    line_item_id = rq_row.data[0]["line_item_id"]
+                    rq_item = rq_row.data[0]
+                    line_item_id = rq_item.get("line_item_id")
 
-            # 3. Update line_item
+            # 2. Update line_item
             if line_item_id:
                 update_line_item(line_item_id, updates)
         except Exception as exc:
@@ -691,7 +745,24 @@ def resolve_review_queue_item(
     if line_item_id:
         update_line_item(line_item_id, updates)
 
-    return _review_queue.get(queue_id)
+    if queue_id in _review_queue:
+        return _review_queue[queue_id]
+    elif rq_item:
+        rq_item["review_status"] = review_status
+        rq_item["resolved_at"] = now_str
+        _review_queue[queue_id] = rq_item
+        return rq_item
+    elif line_item_id:
+        synthetic = {
+            "id": queue_id,
+            "line_item_id": line_item_id,
+            "review_status": review_status,
+            "resolved_at": now_str,
+        }
+        _review_queue[queue_id] = synthetic
+        return synthetic
+
+    return None
 
 
 # ── Analytics Queries ─────────────────────────────────────────────────────────
@@ -1163,12 +1234,15 @@ def reset_store() -> None:
     _review_queue.clear()
     _categories.clear()
     _hashes.clear()
-    _seed_categories()
+    _sync_categories()
 
     client = get_supabase_client()
     if client:
         try:
-            # Cascading delete from receipts clears line_items, hashes, and review_queue
+            # Delete in dependency order: review_queue → receipt_hashes → line_items → receipts
+            client.table("review_queue").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+            client.table("receipt_hashes").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+            client.table("line_items").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
             client.table("receipts").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
             logger.info("Cleared all receipts and related records from Supabase")
         except Exception as exc:
@@ -1256,17 +1330,26 @@ def get_receipt_image_bytes(receipt_id: str) -> Optional[bytes]:
         except Exception as exc:
             logger.warning("Failed to read local receipt image: %s", exc)
 
-    # 2. Fall back to Supabase Storage
+    # 2. Fall back to Supabase Storage — use a signed URL check first to avoid
+    # triggering 400 Bad Request for every extension attempt on missing files
     client = get_supabase_client()
-    if client:
+    if client and _safe_uuid(receipt_id):
+        # First try to get a signed URL to see which extension exists
         for ext in ("jpg", "jpeg", "png", "webp"):
             try:
-                data = client.storage.from_(settings.supabase_storage_bucket).download(
-                    f"{receipt_id}.{ext}"
+                result = client.storage.from_(settings.supabase_storage_bucket).create_signed_url(
+                    path=f"{receipt_id}.{ext}",
+                    expires_in=60,
                 )
-                if data:
+                url = result.get("signedURL") or result.get("signedUrl") or result.get("data", {}).get("signedUrl")
+                if not url:
+                    continue
+                # Download via the signed URL
+                import httpx
+                resp = httpx.get(url, timeout=15.0)
+                if resp.status_code == 200:
                     logger.debug("Receipt image retrieved from Supabase Storage: %s.%s", receipt_id, ext)
-                    return data
+                    return resp.content
             except Exception:
                 continue
 
@@ -1285,7 +1368,7 @@ def get_supabase_image_url(receipt_id: str, expires_in: int = 3600) -> Optional[
         Signed URL string, or None if Supabase Storage is unavailable.
     """
     client = get_supabase_client()
-    if not client:
+    if not client or not _safe_uuid(receipt_id):
         return None
 
     for ext in ("jpg", "jpeg", "png", "webp"):

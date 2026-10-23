@@ -52,7 +52,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
     try {
       final list = await _api.getReviewQueue();
       setState(() {
-        _queueItems = list.isNotEmpty ? List.from(list) : List.from(_api.getSampleReviewQueue());
+        _queueItems = List.from(list);
         _currentIndex = 0;
         _isLoading = false;
         _populateCurrentItem();
@@ -71,11 +71,13 @@ class _ReviewScreenState extends State<ReviewScreen> {
     if (_queueItems.isNotEmpty && _currentIndex < _queueItems.length) {
       final item = _queueItems[_currentIndex];
       final li = (item['line_item'] as Map<String, dynamic>?) ?? {};
+      final rec = (item['receipt'] as Map<String, dynamic>?) ?? {};
+
       _itemController.text = (li['item_name'] ?? item['candidate_text'] ?? 'Chakki Atta (10kg)').toString();
-      final total = (li['total_price'] ?? item['total_amount'] ?? 1350.0) as num;
+      final total = (li['total_price'] ?? item['total_amount'] ?? rec['total_amount'] ?? 1350.0) as num;
       _amountController.text = total.toStringAsFixed(0);
 
-      final cat = (li['category'] ?? item['category'] ?? 'Groceries').toString();
+      final cat = (li['category'] ?? li['category_name'] ?? item['category'] ?? 'Groceries').toString();
       _selectedCategory = _categoryOptions.any((c) => c['name'] == cat) ? cat : 'Groceries';
     }
   }
@@ -347,10 +349,15 @@ class _ReviewScreenState extends State<ReviewScreen> {
     final currentItem = _queueItems[_currentIndex];
     final totalCount = _queueItems.length;
     final displayIndex = _currentIndex + 1;
-    final merchant = currentItem['merchant'] ?? 'SuperStore Fresh Mart';
-    final ticketNo = currentItem['ticket_no'] ?? '2821';
-    final confidence = ((currentItem['confidence'] ?? 0.98) as num).toDouble();
-    final candidateText = currentItem['candidate_text'] ?? _itemController.text;
+    final rec = (currentItem['receipt'] as Map<String, dynamic>?) ?? {};
+    final li = (currentItem['line_item'] as Map<String, dynamic>?) ?? {};
+    final queueId = currentItem['id']?.toString() ?? '';
+    final merchant = rec['merchant_name'] ?? currentItem['merchant_name'] ?? currentItem['merchant'] ?? 'SuperStore Fresh Mart';
+    final ticketNo = rec['id'] != null
+        ? rec['id'].toString().substring(0, 4).toUpperCase()
+        : (currentItem['ticket_no'] ?? '2821');
+    final confidence = ((currentItem['model_confidence'] ?? currentItem['confidence'] ?? li['confidence_score'] ?? 0.98) as num).toDouble();
+    final candidateText = currentItem['candidate_text'] ?? li['raw_text'] ?? _itemController.text;
 
     // Up next item (if exists)
     final hasNext = _currentIndex < totalCount - 1;
@@ -491,7 +498,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 ),
                 const SizedBox(height: 10),
 
-                // 1. STORE TICKET SNIPPET BOX
+                // 1. STORE TICKET SNIPPET BOX WITH REAL SCANNED CROP
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -536,9 +543,13 @@ class _ReviewScreenState extends State<ReviewScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            candidateText,
-                            style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                          Expanded(
+                            child: Text(
+                              candidateText,
+                              style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                           Text(
                             '${_api.currency} ${_amountController.text}',
@@ -550,6 +561,37 @@ class _ReviewScreenState extends State<ReviewScreen> {
                           ),
                         ],
                       ),
+                      if (queueId.length > 10) ...[
+                        const SizedBox(height: 10),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            height: 85,
+                            width: double.infinity,
+                            color: Colors.white,
+                            child: Image.network(
+                              _api.getReviewItemCropUrl(queueId),
+                              fit: BoxFit.cover,
+                              loadingBuilder: (ctx, child, progress) {
+                                if (progress == null) return child;
+                                return const Center(
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.forestPrimary),
+                                  ),
+                                );
+                              },
+                              errorBuilder: (ctx, err, stack) => const Center(
+                                child: Text(
+                                  'Snippet ready for verification',
+                                  style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -895,7 +937,10 @@ class _ReviewScreenState extends State<ReviewScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            nextItem['merchant'] ?? 'Next Receipt',
+                            (nextItem['receipt'] as Map<String, dynamic>?)?['merchant_name'] ??
+                                nextItem['merchant_name'] ??
+                                nextItem['merchant'] ??
+                                'Next Receipt',
                             style: const TextStyle(
                               fontSize: 13.5,
                               fontWeight: FontWeight.w700,
@@ -906,7 +951,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                       ),
                     ),
                     Text(
-                      '${_api.currency} ${(nextItem['total_amount'] ?? 2450.0).toStringAsFixed(0)}',
+                      '${_api.currency} ${(((nextItem['line_item'] as Map<String, dynamic>?)?['total_price'] ?? (nextItem['receipt'] as Map<String, dynamic>?)?['total_amount'] ?? nextItem['total_amount'] ?? 2450.0) as num).toStringAsFixed(0)}',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,

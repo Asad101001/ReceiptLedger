@@ -61,9 +61,9 @@ class _LedgerScreenState extends State<LedgerScreen> {
   }
 
   void _showReceiptDetailDialog(Map<String, dynamic> r) {
-    final merchant = r['merchant'] ?? 'Receipt';
+    final merchant = r['merchant_name'] ?? r['merchant'] ?? 'Receipt';
     final total = r['total_amount'] ?? 0.0;
-    final date = r['date'] ?? 'Recent';
+    final date = r['receipt_date'] ?? r['date'] ?? 'Recent';
     final lineItems = (r['line_items'] as List<dynamic>?) ?? [];
     final receiptId = r['id']?.toString() ?? '';
 
@@ -126,17 +126,19 @@ class _LedgerScreenState extends State<LedgerScreen> {
                     separatorBuilder: (_, __) => const Divider(height: 10),
                     itemBuilder: (ctx, i) {
                       final item = lineItems[i] as Map<String, dynamic>;
+                      final qty = item['quantity'] ?? item['qty'] ?? 1;
+                      final price = (item['total_price'] ?? item['price'] ?? 0.0) as num;
                       return Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
                             child: Text(
-                              '${item['qty'] ?? 1}x ${item['item_name'] ?? 'Item'}',
+                              '${qty}x ${item['item_name'] ?? 'Item'}',
                               style: const TextStyle(fontSize: 13),
                             ),
                           ),
                           Text(
-                            '${_api.currency} ${(item['price'] ?? 0.0).toStringAsFixed(0)}',
+                            '${_api.currency} ${price.toStringAsFixed(0)}',
                             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                           ),
                         ],
@@ -206,15 +208,32 @@ class _LedgerScreenState extends State<LedgerScreen> {
               ),
             ),
             Container(
-              height: 380,
+              height: 420,
               color: Colors.black,
               child: Image.network(
                 imgUrl,
                 fit: BoxFit.contain,
+                loadingBuilder: (ctx, child, progress) {
+                  if (progress == null) return child;
+                  return const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  );
+                },
                 errorBuilder: (_, __, ___) => const Center(
-                  child: Text(
-                    'Preview not stored on server.',
-                    style: TextStyle(color: Colors.white70),
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.image_not_supported_outlined, color: Colors.white54, size: 40),
+                        SizedBox(height: 10),
+                        Text(
+                          'No photo stored for this entry.\n(Generated text fixture)',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white70, fontSize: 13),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -271,7 +290,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
     final filteredReceipts = _selectedCategoryFilter == null
         ? _receipts
         : _receipts.where((r) {
-            final cat = (r['category'] ?? '').toString().toLowerCase();
+            final cat = (r['category_name'] ?? r['category'] ?? '').toString().toLowerCase();
             final filter = _selectedCategoryFilter!.toLowerCase();
             return cat.contains(filter) || filter.contains(cat);
           }).toList();
@@ -654,9 +673,9 @@ class _LedgerScreenState extends State<LedgerScreen> {
 
   Widget _buildReceiptTile(Map<String, dynamic> r) {
     final id = r['id']?.toString() ?? '';
-    final merchant = r['merchant'] ?? 'Merchant';
-    final date = r['date'] ?? 'Recent';
-    final itemsCount = r['items_count'] ?? 1;
+    final merchant = r['merchant_name'] ?? r['merchant'] ?? 'Merchant';
+    final date = r['receipt_date'] ?? r['date'] ?? 'Recent';
+    final itemsCount = r['items_count'] ?? (r['line_items'] as List?)?.length ?? 1;
     final total = (r['total_amount'] ?? 0.0) as num;
     final lineItems = (r['line_items'] as List<dynamic>?) ?? [];
     final isExpanded = _expandedReceiptId == id;

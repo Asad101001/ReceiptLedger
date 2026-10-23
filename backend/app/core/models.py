@@ -137,6 +137,9 @@ class UploadReceiptResponse(BaseModel):
     needs_review: bool
     receipt_type: ReceiptType
     line_items: List[LineItemResponse]
+    engine: Optional[str] = None
+
+    model_config = {"extra": "allow"}
 
 
 # ── Analytics ─────────────────────────────────────────────────────────────────
@@ -208,6 +211,7 @@ class ReviewQueueItemDetail(BaseModel):
     receipt_id: Optional[str] = None
     merchant_name: Optional[str] = None
     line_item: Optional[Dict[str, Any]] = None
+    receipt: Optional[Dict[str, Any]] = None
 
     model_config = {"extra": "allow"}
 

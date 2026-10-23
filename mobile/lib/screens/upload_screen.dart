@@ -42,10 +42,29 @@ class _UploadScreenState extends State<UploadScreen> {
     'Shopping',
   ];
 
+  List<Map<String, dynamic>> _receipts = [];
+
   @override
   void initState() {
     super.initState();
-    // Camera is strictly on-demand now; no continuous viewfinder running in background!
+    _loadReceipts();
+  }
+
+  Future<void> _loadReceipts() async {
+    try {
+      final list = await _api.getReceipts();
+      if (mounted) {
+        setState(() {
+          _receipts = list;
+        });
+      }
+    } catch (_) {
+      if (mounted && _receipts.isEmpty) {
+        setState(() {
+          _receipts = _api.getSampleReceipts();
+        });
+      }
+    }
   }
 
   // --- Capture Action: Opens camera on-demand ---
@@ -63,22 +82,27 @@ class _UploadScreenState extends State<UploadScreen> {
       setState(() => _isCapturing = true);
 
       final bytes = await photo.readAsBytes();
-      await _api.uploadReceipt(
+      final result = await _api.uploadReceipt(
         bytes: bytes,
         filename: photo.name,
         captureMode: _captureMode,
+        ocrEngine: 'auto',  // Prefers Gemini 3.5 Flash Lite, falls back to local
       );
 
       if (!mounted) return;
+      final merchant = (result['merchant_name'] ?? 'Receipt').toString();
+      final total = result['total_amount'] != null ? '${_api.currency} ${result['total_amount']}' : '';
+      final engine = result['engine'] ?? 'Gemini Flash Lite';
       AppToast.success(
         context,
-        'Receipt captured and queued for OCR parsing!',
+        '$merchant extracted via $engine ($total)!',
         actionLabel: 'Review',
         onAction: () => widget.onNavigateTab != null
             ? widget.onNavigateTab!(2)
             : widget.onNavigateToReview?.call(),
       );
       _api.refreshReviewCount();
+      await _loadReceipts();
     } catch (e) {
       if (!mounted) return;
       AppToast.error(context, 'Capture failed: ${e.toString().split('\n').first}');
@@ -102,22 +126,27 @@ class _UploadScreenState extends State<UploadScreen> {
       setState(() => _isCapturing = true);
 
       final bytes = await image.readAsBytes();
-      await _api.uploadReceipt(
+      final result = await _api.uploadReceipt(
         bytes: bytes,
         filename: image.name,
         captureMode: _captureMode,
+        ocrEngine: 'auto',  // Prefers Gemini 3.5 Flash Lite, falls back to local
       );
 
       if (!mounted) return;
+      final merchant = (result['merchant_name'] ?? 'Receipt').toString();
+      final total = result['total_amount'] != null ? '${_api.currency} ${result['total_amount']}' : '';
+      final engine = result['engine'] ?? 'Gemini Flash Lite';
       AppToast.success(
         context,
-        'Receipt uploaded from gallery successfully!',
+        '$merchant extracted via $engine ($total)!',
         actionLabel: 'Review',
         onAction: () => widget.onNavigateTab != null
             ? widget.onNavigateTab!(2)
             : widget.onNavigateToReview?.call(),
       );
       _api.refreshReviewCount();
+      await _loadReceipts();
     } catch (e) {
       if (!mounted) return;
       AppToast.error(context, 'Gallery upload failed: $e');
@@ -623,13 +652,14 @@ class _UploadScreenState extends State<UploadScreen> {
   // --- Receipt Detail Modal Sheet ---
   void _showReceiptDetail(Map<String, dynamic> r) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final merchant = r['merchant'] ?? 'Receipt Detail';
+    final merchant = r['merchant_name'] ?? r['merchant'] ?? 'Receipt Detail';
     final total = (r['total_amount'] ?? 0.0) as num;
-    final date = r['date'] ?? 'Recent';
+    final date = r['receipt_date'] ?? r['date'] ?? 'Recent';
     final lineItems = (r['line_items'] as List<dynamic>?) ?? [];
-    final category = r['category'] ?? 'General';
+    final category = r['category_name'] ?? r['category'] ?? 'General';
     final tax = (r['tax'] ?? 0.0) as num;
     final payment = r['payment_method'] ?? 'Card / Cash';
+    final receiptId = r['id']?.toString() ?? '';
 
     showModalBottomSheet(
       context: context,
@@ -779,8 +809,8 @@ class _UploadScreenState extends State<UploadScreen> {
               else
                 ...lineItems.map((item) {
                   final name = item['item_name'] ?? 'Item';
-                  final qty = item['qty'] ?? 1;
-                  final price = (item['price'] ?? 0.0) as num;
+                  final qty = item['quantity'] ?? item['qty'] ?? 1;
+                  final price = (item['total_price'] ?? item['price'] ?? 0.0) as num;
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     child: Row(
@@ -826,6 +856,27 @@ class _UploadScreenState extends State<UploadScreen> {
                   );
                 }),
               const SizedBox(height: 20),
+              if (receiptId.length > 10) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.forestPrimary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.receipt_outlined, size: 18),
+                    label: const Text('View Original Receipt Image', style: TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _viewReceiptImage(receiptId, merchant);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
@@ -841,6 +892,73 @@ class _UploadScreenState extends State<UploadScreen> {
           ),
         );
       },
+    );
+  }
+
+  void _viewReceiptImage(String receiptId, String merchant) {
+    final imgUrl = _api.getReceiptImageUrl(receiptId);
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      merchant,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              height: 420,
+              color: Colors.black,
+              child: Image.network(
+                imgUrl,
+                fit: BoxFit.contain,
+                loadingBuilder: (ctx, child, progress) {
+                  if (progress == null) return child;
+                  return const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  );
+                },
+                errorBuilder: (_, __, ___) => const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.image_not_supported_outlined, color: Colors.white54, size: 40),
+                        SizedBox(height: 10),
+                        Text(
+                          'No photo stored for this entry.\n(Generated text fixture)',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white70, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -864,10 +982,14 @@ class _UploadScreenState extends State<UploadScreen> {
     final textPrimary = isDark ? AppTheme.textLight : AppTheme.textDark;
     final textMuted = isDark ? AppTheme.textMutedDark : AppTheme.textMuted;
 
-    final sampleReceipts = _api.getSampleReceipts();
+    final receiptsList = _receipts.isNotEmpty ? _receipts : _api.getSampleReceipts();
     final filteredReceipts = _selectedCategory == 'All'
-        ? sampleReceipts
-        : sampleReceipts.where((r) => (r['category']?.toString().toLowerCase() ?? '').contains(_selectedCategory.toLowerCase())).toList();
+        ? receiptsList
+        : receiptsList.where((r) {
+            // Support both backend field (category_name) and sample data field (category)
+            final cat = (r['category_name'] ?? r['category'] ?? '').toString().toLowerCase();
+            return cat.contains(_selectedCategory.toLowerCase());
+          }).toList();
 
     return Scaffold(
       backgroundColor: isDark ? AppTheme.canvasDark : AppTheme.canvasLight,
@@ -886,7 +1008,7 @@ class _UploadScreenState extends State<UploadScreen> {
               onRefresh: () async {
                 await _api.checkHealthSilently();
                 await _api.refreshReviewCount();
-                setState(() {});
+                await _loadReceipts();
               },
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(18, 12, 18, 110), // Clears floating bottom nav
@@ -1281,11 +1403,11 @@ class _UploadScreenState extends State<UploadScreen> {
                     )
                   else
                     ...filteredReceipts.take(5).map((r) {
-                      final merchant = r['merchant'] ?? 'Merchant';
-                      final date = r['date'] ?? 'Recent';
+                      final merchant = r['merchant_name'] ?? r['merchant'] ?? 'Merchant';
+                      final date = r['receipt_date'] ?? r['date'] ?? 'Recent';
                       final total = (r['total_amount'] ?? 0.0) as num;
-                      final category = r['category'] ?? 'General';
-                      final count = r['items_count'] ?? 1;
+                      final category = r['category_name'] ?? r['category'] ?? 'General';
+                      final count = r['items_count'] ?? (r['line_items'] as List?)?.length ?? 1;
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 10),

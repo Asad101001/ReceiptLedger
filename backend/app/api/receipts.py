@@ -136,8 +136,10 @@ async def upload_receipt(
     return result
 
 
-@router.get(
+@router.api_route(
     "/receipts/{receipt_id}/image",
+    methods=["GET", "HEAD"],
+    operation_id="get_receipt_image",
     summary="Serve the preprocessed receipt image",
     tags=["Receipts"],
     responses={
