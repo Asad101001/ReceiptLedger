@@ -8,6 +8,8 @@ void main() {
     expect(find.text('ReceiptLedger'), findsWidgets);
     expect(find.text('CAPTURE'), findsOneWidget);
     expect(find.text('Capture'), findsOneWidget);
-    expect(find.text('Single\nReceipt'), findsOneWidget);
+    expect(find.text('Ledger'), findsOneWidget);
+    expect(find.text('Review'), findsWidgets);
+    expect(find.text('Single Receipt'), findsOneWidget);
   });
 }

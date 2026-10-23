@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_header.dart';
+import '../widgets/app_toast.dart';
 
 class LedgerScreen extends StatefulWidget {
   final VoidCallback? onOpenDrawer;
@@ -275,7 +277,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
           }).toList();
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
           // Persistent Header
@@ -521,9 +523,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                               ),
                               TextButton(
                                 onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Showing all ${filteredReceipts.length} receipts recorded.')),
-                                  );
+                                  AppToast.showInfo(context, 'Showing all ${filteredReceipts.length} receipts recorded.');
                                 },
                                 style: TextButton.styleFrom(
                                   padding: EdgeInsets.zero,

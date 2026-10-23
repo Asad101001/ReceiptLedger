@@ -3,9 +3,10 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'screens/upload_screen.dart';
 import 'screens/ledger_screen.dart';
 import 'screens/review_screen.dart';
-import 'screens/settings_screen.dart';
 import 'services/api_service.dart';
 import 'theme/app_theme.dart';
+import 'widgets/floating_bottom_nav.dart';
+import 'widgets/app_drawer.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,19 +56,27 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     _scaffoldKey.currentState?.openEndDrawer();
   }
 
+  void _navigateToTab(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final screens = [
-      UploadScreen(onOpenDrawer: _openDrawer),
+      UploadScreen(
+        onOpenDrawer: _openDrawer,
+        onNavigateTab: _navigateToTab,
+      ),
       LedgerScreen(onOpenDrawer: _openDrawer),
       ReviewScreen(onOpenDrawer: _openDrawer),
-      SettingsScreen(onOpenDrawer: _openDrawer),
     ];
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: Colors.white,
-      endDrawer: const AppProfileDrawer(),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      endDrawer: const AppDrawer(),
       body: Stack(
         children: [
           // Current active screen
@@ -84,14 +93,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             child: ValueListenableBuilder<int>(
               valueListenable: ApiService().reviewCountNotifier,
               builder: (ctx, badgeCount, _) {
-                return AppBottomNav(
+                return FloatingBottomNav(
                   currentIndex: _currentIndex,
                   reviewBadgeCount: badgeCount,
-                  onTabSelected: (index) {
-                    setState(() {
-                      _currentIndex = index;
-                    });
-                  },
+                  onTabSelected: _navigateToTab,
                 );
               },
             ),

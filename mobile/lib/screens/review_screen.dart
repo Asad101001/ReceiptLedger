@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_header.dart';
+import '../widgets/app_toast.dart';
 
 class ReviewScreen extends StatefulWidget {
   final VoidCallback? onOpenDrawer;
@@ -125,16 +127,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
   }
 
   void _showFriendlyToast(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppTheme.navyBrand,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    AppToast.showSuccess(context, message);
   }
 
   void _showEditDetailsModal() {
@@ -191,7 +184,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
           // Header
@@ -663,7 +656,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
             ),
           ),
 
-          const SizedBox(height: 80), // Padding above bottom nav
+          const SizedBox(height: 100), // Clearance above floating bottom nav
         ],
       ),
     );

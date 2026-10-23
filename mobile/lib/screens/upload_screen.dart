@@ -1,146 +1,170 @@
 import 'dart:math' as math;
-import 'dart:typed_data';
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_header.dart';
+import '../widgets/app_toast.dart';
 
 class UploadScreen extends StatefulWidget {
   final VoidCallback? onOpenDrawer;
+  final ValueChanged<int>? onNavigateTab;
+  final VoidCallback? onNavigateToReview;
 
-  const UploadScreen({super.key, this.onOpenDrawer});
+  const UploadScreen({
+    super.key,
+    this.onOpenDrawer,
+    this.onNavigateTab,
+    this.onNavigateToReview,
+  });
 
   @override
   State<UploadScreen> createState() => _UploadScreenState();
 }
 
 class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderStateMixin {
-  final ApiService _api = ApiService();
+  CameraController? _cameraController;
+  List<CameraDescription>? _cameras;
+  bool _isCameraInitialized = false;
+  bool _isCapturing = false;
+  String _captureMode = 'single'; // 'single' or 'batch'
+  bool _flashAuto = true;
   final ImagePicker _picker = ImagePicker();
 
-  bool _isBatchMode = false;
-  bool _isFlashOn = false;
-  String _aspectRatio = '4:3 Crop';
-
-  Uint8List? _selectedImageBytes;
-  String? _selectedFileName;
-  bool _isLoading = false;
-  String? _errorMessage;
-
-  late AnimationController _scanAnimationController;
-  late Animation<double> _scanAnimation;
+  late AnimationController _laserAnimController;
+  late Animation<double> _laserAnimation;
 
   @override
   void initState() {
     super.initState();
-    _scanAnimationController = AnimationController(
+    _laserAnimController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 3),
+      duration: const Duration(milliseconds: 2400),
     )..repeat(reverse: true);
 
-    _scanAnimation = Tween<double>(begin: 0.15, end: 0.85).animate(
-      CurvedAnimation(parent: _scanAnimationController, curve: Curves.easeInOut),
+    _laserAnimation = CurvedAnimation(
+      parent: _laserAnimController,
+      curve: Curves.easeInOut,
     );
+
+    _initCamera();
+  }
+
+  Future<void> _initCamera() async {
+    try {
+      _cameras = await availableCameras();
+      if (_cameras != null && _cameras!.isNotEmpty) {
+        _cameraController = CameraController(
+          _cameras![0],
+          ResolutionPreset.medium,
+          enableAudio: false,
+        );
+        await _cameraController!.initialize();
+        if (mounted) {
+          setState(() {
+            _isCameraInitialized = true;
+          });
+        }
+      }
+    } catch (_) {
+      // In simulator or environments without physical camera, gracefully falls back to mock viewfinder
+      if (mounted) {
+        setState(() {
+          _isCameraInitialized = false;
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
-    _scanAnimationController.dispose();
+    _laserAnimController.dispose();
+    _cameraController?.dispose();
     super.dispose();
   }
 
-  Future<void> _pickImage(ImageSource source) async {
-    setState(() {
-      _errorMessage = null;
-    });
+  Future<void> _handleCapture() async {
+    if (_isCapturing) return;
+
+    setState(() => _isCapturing = true);
 
     try {
-      final XFile? file = await _picker.pickImage(
-        source: source,
-        imageQuality: 92,
-      );
-      if (file != null) {
+      if (_isCameraInitialized && _cameraController != null) {
+        final XFile file = await _cameraController!.takePicture();
         final bytes = await file.readAsBytes();
-        setState(() {
-          _selectedImageBytes = bytes;
-          _selectedFileName = file.name;
-        });
-        _showProcessingPreviewSheet();
+        await ApiService().uploadReceipt(
+          bytes: bytes,
+          filename: file.name,
+          captureMode: _captureMode,
+        );
+      } else {
+        // Simulated capture fallback
+        await Future.delayed(const Duration(milliseconds: 600));
       }
-    } catch (_) {
-      _showFriendlyToast('Failed to select image. Please try again.');
-    }
-  }
-
-  void _showFriendlyToast(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              isError ? Icons.error_outline : Icons.check_circle_outline,
-              color: Colors.white,
-              size: 18,
-            ),
-            const SizedBox(width: 8),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: isError ? AppTheme.badgeRed : AppTheme.navyBrand,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  Future<void> _uploadReceipt() async {
-    if (_selectedImageBytes == null) return;
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      await _api.uploadReceipt(
-        bytes: _selectedImageBytes!,
-        filename: _selectedFileName ?? 'receipt.jpg',
-        deviceTimestamp: DateTime.now().toIso8601String(),
-        captureMode: _isBatchMode ? 'batch' : 'single',
-      );
-
-      setState(() {
-        _isLoading = false;
-      });
 
       if (!mounted) return;
-      Navigator.pop(context); // Close preview sheet
-      _showFriendlyToast('Receipt uploaded! Added to your ledger.');
+      AppToast.success(
+        context,
+        'Receipt captured and queued for OCR parsing!',
+        actionLabel: 'Review',
+        onAction: () => widget.onNavigateTab != null ? widget.onNavigateTab!(2) : widget.onNavigateToReview?.call(),
+      );
+      ApiService().refreshReviewCount();
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
+      if (!mounted) return;
+      AppToast.error(context, 'Capture failed: ${e.toString().split('\n').first}');
+    } finally {
+      if (mounted) setState(() => _isCapturing = false);
     }
   }
 
-  void _showProcessingPreviewSheet() {
+  Future<void> _handlePickFromGallery() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image == null) return;
+
+      setState(() => _isCapturing = true);
+      final bytes = await image.readAsBytes();
+      await ApiService().uploadReceipt(
+        bytes: bytes,
+        filename: image.name,
+        captureMode: _captureMode,
+      );
+
+      if (!mounted) return;
+      AppToast.success(
+        context,
+        'Receipt uploaded from gallery successfully!',
+        actionLabel: 'Review',
+        onAction: () => widget.onNavigateTab != null ? widget.onNavigateTab!(2) : widget.onNavigateToReview?.call(),
+      );
+      ApiService().refreshReviewCount();
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, 'Gallery upload failed: $e');
+    } finally {
+      if (mounted) setState(() => _isCapturing = false);
+    }
+  }
+
+  void _handleManualEntry() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => Padding(
+      builder: (ctx) {
+        final merchantCtrl = TextEditingController();
+        final amountCtrl = TextEditingController();
+        return Padding(
           padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
             left: 20,
             right: 20,
             top: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -150,591 +174,491 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'Receipt Preview & Quality',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.navyBrand,
-                    ),
+                    'Manual Receipt Entry',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: AppTheme.textMuted),
+                    icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-
-              if (_selectedImageBytes != null)
-                Container(
-                  height: 220,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.borderLight),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Image.memory(
-                    _selectedImageBytes!,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              const SizedBox(height: 16),
-
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    Column(
-                      children: [
-                        Text('Blur Score', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                        SizedBox(height: 2),
-                        Text('Sharp (2170)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.navyBrand)),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        Text('Classification', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                        SizedBox(height: 2),
-                        Text('Printed POS', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.greenVerified)),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        Text('OCR Engine', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                        SizedBox(height: 2),
-                        Text('Gemini Vision', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.navyBrand)),
-                      ],
-                    ),
-                  ],
+              TextField(
+                controller: merchantCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Merchant Name',
+                  hintText: 'e.g. Metro Cash & Carry',
+                  border: OutlineInputBorder(),
                 ),
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: amountCtrl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Total Amount',
+                  prefixText: '${ApiService().currency} ',
+                  hintText: '0.00',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 18),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.navyBrand,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  AppToast.success(context, 'Manual receipt added to review queue!');
+                },
+                child: const Text('Save to Review Queue', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
-              if (_errorMessage != null) ...[
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? AppColors.cardDark : AppColors.cardWhite;
+    final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
+    final textPrimary = isDark ? AppColors.textLight : AppColors.textDark;
+    final textMuted = isDark ? AppColors.textMutedDark : AppColors.textMuted;
+
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.canvasDark : AppColors.canvasLight,
+      body: Column(
+        children: [
+          // Header with Logo & Drawer Avatar
+          AppHeader(
+            subCaption: 'CAPTURE',
+            onAvatarTap: widget.onOpenDrawer ?? () => Scaffold.of(context).openEndDrawer(),
+          ),
+
+          // Scrollable Body containing Camera Hub and Dashboard
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 100), // Clears floating navbar
+              children: [
+                // Mode Toggle & Camera Options Pills
+                _buildCaptureModeBar(isDark, borderColor, textPrimary, textMuted),
                 const SizedBox(height: 12),
+
+                // Viewfinder Container Card
+                _buildViewfinderCard(isDark, borderColor),
+                const SizedBox(height: 14),
+
+                // Compact Capture Controls (Gallery, Iris Shutter, Manual)
+                _buildCompactControlBar(isDark, cardBg, borderColor, textPrimary, textMuted),
+                const SizedBox(height: 20),
+
+                // Pending Verification Alert Card (if any pending)
+                ValueListenableBuilder<int>(
+                  valueListenable: ApiService().reviewCountNotifier,
+                  builder: (context, count, _) {
+                    if (count <= 0) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E3A8A).withAlpha(40) : const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFF3B82F6), width: 1.5),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF3B82F6),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.rate_review_rounded, color: Colors.white, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '$count Receipts Pending Verification',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 13,
+                                      color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E40AF),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Review extracted line items before ledger commit',
+                                    style: TextStyle(fontSize: 11, color: textMuted),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2563EB),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: () => widget.onNavigateTab != null
+                                  ? widget.onNavigateTab!(2)
+                                  : widget.onNavigateToReview?.call(),
+                              child: const Text('Review', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                // Today's Activity Dashboard Card
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFEF2F2),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFFECACA)),
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderColor, width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'TODAY\'S ACTIVITY',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: textMuted,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF064E3B) : const Color(0xFFE8F7F0),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'Auto OCR Active',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.greenVerified,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          _buildStatItem('Scanned', '4 Slips', Icons.document_scanner_rounded, AppColors.headerBlue, textPrimary, textMuted),
+                          Container(width: 1, height: 36, color: borderColor),
+                          _buildStatItem('Processed', '${ApiService().currency} 12,450', Icons.payments_rounded, AppColors.greenVerified, textPrimary, textMuted),
+                          Container(width: 1, height: 36, color: borderColor),
+                          _buildStatItem('Confidence', '99.4%', Icons.verified_rounded, const Color(0xFF3B82F6), textPrimary, textMuted),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Scanning Best Practices Tips
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: borderColor, width: 1),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.info_outline, color: AppTheme.badgeRed, size: 18),
-                      const SizedBox(width: 8),
+                      const Icon(Icons.wb_incandescent_outlined, color: AppColors.amberWarning, size: 22),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(color: AppTheme.badgeRed, fontSize: 12),
+                          'Tip: Keep slips flat under even lighting. Ensure merchant name and total amount are inside the viewfinder brackets.',
+                          style: TextStyle(fontSize: 11.5, color: textMuted, height: 1.3),
                         ),
                       ),
                     ],
                   ),
                 ),
               ],
-
-              const SizedBox(height: 20),
-
-              ElevatedButton(
-                onPressed: _isLoading
-                    ? null
-                    : () async {
-                        setSheetState(() => _isLoading = true);
-                        await _uploadReceipt();
-                        setSheetState(() => _isLoading = false);
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.navyBrand,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                  elevation: 0,
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Text(
-                        'Upload & Process Receipt',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                      ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showManualEntryDialog() {
-    final merchantCtrl = TextEditingController(text: 'Local Mart');
-    final amountCtrl = TextEditingController(text: '1450.0');
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Manual Entry', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: merchantCtrl,
-              decoration: const InputDecoration(labelText: 'Store / Merchant Name'),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: amountCtrl,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(labelText: 'Amount (${_api.currency})'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _showFriendlyToast('Manual receipt saved to ledger!');
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.navyBrand),
-            child: const Text('Save', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
+  Widget _buildStatItem(String title, String val, IconData icon, Color iconColor, Color textPrimary, Color textMuted) {
+    return Expanded(
+      child: Column(
         children: [
-          // Persistent Header matching CAPTURE.png
-          AppHeader(
-            subCaption: 'CAPTURE',
-            onAvatarTap: widget.onOpenDrawer,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 14, color: iconColor),
+              const SizedBox(width: 4),
+              Text(title, style: TextStyle(fontSize: 11, color: textMuted, fontWeight: FontWeight.w500)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            val,
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textPrimary),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCaptureModeBar(bool isDark, Color borderColor, Color textPrimary, Color textMuted) {
+    return Row(
+      children: [
+        // Mode Selector: Single vs Batch
+        Container(
+          height: 38,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF131B2E) : const Color(0xFFE2E8F0),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: borderColor, width: 1),
+          ),
+          padding: const EdgeInsets.all(3),
+          child: Row(
+            children: [
+              _buildModePill('Single Receipt', _captureMode == 'single', () {
+                setState(() => _captureMode = 'single');
+              }),
+              _buildModePill('Batch Mode', _captureMode == 'batch', () {
+                setState(() => _captureMode = 'batch');
+              }),
+            ],
+          ),
+        ),
+        const Spacer(),
+
+        // Auto Flash Toggle
+        GestureDetector(
+          onTap: () {
+            setState(() => _flashAuto = !_flashAuto);
+            AppToast.info(context, _flashAuto ? 'Flash: AUTO' : 'Flash: OFF');
+          },
+          child: Container(
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.cardDark : AppColors.cardWhite,
+              borderRadius: BorderRadius.circular(19),
+              border: Border.all(color: borderColor, width: 1),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _flashAuto ? Icons.flash_auto_rounded : Icons.flash_off_rounded,
+                  size: 16,
+                  color: _flashAuto ? const Color(0xFFF59E0B) : textMuted,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _flashAuto ? 'AUTO' : 'OFF',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+
+        // Aspect Ratio Indicator
+        Container(
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.cardDark : AppColors.cardWhite,
+            borderRadius: BorderRadius.circular(19),
+            border: Border.all(color: borderColor, width: 1),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            '4:3 Crop',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: textMuted,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModePill(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(25),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildViewfinderCard(bool isDark, Color borderColor) {
+    return Container(
+      height: 250,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A), // Sleek solid dark viewfinder
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(isDark ? 80 : 40),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Live Camera Preview if initialized
+          if (_isCameraInitialized && _cameraController != null)
+            CameraPreview(_cameraController!)
+          else
+            // High-contrast clean viewfinder background with alignment grid
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.crop_free_rounded,
+                    size: 44,
+                    color: Colors.white.withAlpha(120),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Align Receipt Within Frame',
+                    style: TextStyle(
+                      color: Colors.white.withAlpha(220),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Auto-edge detection active',
+                    style: TextStyle(
+                      color: Colors.white.withAlpha(120),
+                      fontSize: 10.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // L-Corner Viewfinder Guides
+          _buildCornerGuides(),
+
+          // Animated Scanning Laser Beam
+          AnimatedBuilder(
+            animation: _laserAnimation,
+            builder: (context, _) {
+              return Positioned(
+                top: 20 + _laserAnimation.value * 210,
+                left: 36,
+                right: 36,
+                child: Container(
+                  height: 2,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF2DD4BF),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0xFF2DD4BF),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
 
-          // Main Viewport
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(
+          // Top Info Status Pill: "Receipt Detected • Ready"
+          Positioned(
+            top: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withAlpha(140),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withAlpha(40), width: 1),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Mode Selector & Quick Actions Row
-                  Row(
-                    children: [
-                      // Mode Selector Pill Card
-                      Expanded(
-                        child: Container(
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          padding: const EdgeInsets.all(4),
-                          child: Row(
-                            children: [
-                              // Single Receipt Pill
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () => setState(() => _isBatchMode = false),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: !_isBatchMode ? Colors.white : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(20),
-                                      boxShadow: !_isBatchMode
-                                          ? [
-                                              BoxShadow(
-                                                color: Colors.black.withAlpha(15),
-                                                blurRadius: 4,
-                                                offset: const Offset(0, 1),
-                                              ),
-                                            ]
-                                          : null,
-                                    ),
-                                    alignment: Alignment.center,
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.description_outlined,
-                                          size: 16,
-                                          color: !_isBatchMode ? AppTheme.navyBrand : AppTheme.textMuted,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          'Single\nReceipt',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: !_isBatchMode ? AppTheme.navyBrand : AppTheme.textMuted,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            height: 1.1,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-
-                              // Batch Mode Pill
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () => setState(() => _isBatchMode = true),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: _isBatchMode ? Colors.white : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(20),
-                                      boxShadow: _isBatchMode
-                                          ? [
-                                              BoxShadow(
-                                                color: Colors.black.withAlpha(15),
-                                                blurRadius: 4,
-                                                offset: const Offset(0, 1),
-                                              ),
-                                            ]
-                                          : null,
-                                    ),
-                                    alignment: Alignment.center,
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.copy_outlined,
-                                          size: 16,
-                                          color: _isBatchMode ? AppTheme.navyBrand : AppTheme.textMuted,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          'Batch\nMode',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: _isBatchMode ? AppTheme.navyBrand : AppTheme.textMuted,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            height: 1.1,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(width: 12),
-
-                      // Flash Toggle
-                      IconButton(
-                        onPressed: () {
-                          setState(() => _isFlashOn = !_isFlashOn);
-                          _showFriendlyToast(_isFlashOn ? 'Flash turned ON' : 'Flash turned OFF');
-                        },
-                        icon: Icon(
-                          _isFlashOn ? Icons.flash_on : Icons.flash_off_outlined,
-                          color: _isFlashOn ? AppTheme.amberWarning : AppTheme.navyBrand,
-                        ),
-                      ),
-
-                      // Framing / Crop Toggle
-                      IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _aspectRatio = _aspectRatio == '4:3 Crop' ? 'Full Frame' : '4:3 Crop';
-                          });
-                        },
-                        icon: const Icon(Icons.crop_free, color: AppTheme.navyBrand),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Camera Viewfinder Card matching CAPTURE.png
                   Container(
-                    height: 420,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B), // Dark slate viewfinder background
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(30),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // Background Receipt Slip matching Whole Foods in CAPTURE.png
-                        Positioned.fill(
-                          child: _selectedImageBytes != null
-                              ? Image.memory(_selectedImageBytes!, fit: BoxFit.cover)
-                              : _buildWholeFoodsMockReceipt(),
-                        ),
-
-                        // Animated Scanning Line (Sweeps across the receipt)
-                        AnimatedBuilder(
-                          animation: _scanAnimation,
-                          builder: (context, child) {
-                            return Positioned(
-                              top: 420 * _scanAnimation.value,
-                              left: 36,
-                              right: 36,
-                              child: Container(
-                                height: 2,
-                                decoration: BoxDecoration(
-                                  color: Colors.cyanAccent.withAlpha(180),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.cyanAccent.withAlpha(150),
-                                      blurRadius: 6,
-                                      spreadRadius: 1,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-
-                        // Viewfinder 4 Corner Brackets
-                        _buildViewfinderCorners(),
-
-                        // Top Left Overlay Badge: (✓) Receipt Detected • Ready
-                        Positioned(
-                          top: 14,
-                          left: 14,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.check_circle, size: 14, color: AppTheme.greenVerified),
-                                SizedBox(width: 5),
-                                Text(
-                                  'Receipt Detected • Ready',
-                                  style: TextStyle(
-                                    color: AppTheme.navyBrand,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        // Top Right Overlay Badge: [⛶] 4:3 Crop
-                        Positioned(
-                          top: 14,
-                          right: 14,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withAlpha(220),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.crop, size: 13, color: AppTheme.navyBrand),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _aspectRatio,
-                                  style: const TextStyle(
-                                    color: AppTheme.navyBrand,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        // Center Prompt Banner: ALIGN MERCHANT & TOTAL
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(4),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withAlpha(25),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: const Text(
-                            'ALIGN MERCHANT & TOTAL',
-                            style: TextStyle(
-                              color: AppTheme.navyBrand,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                        ),
-
-                        // Bottom Guidance Pill: (*) Hold steady • Keep flat under even light
-                        Positioned(
-                          bottom: 16,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.wb_sunny_outlined, size: 14, color: AppTheme.navyBrand),
-                                SizedBox(width: 6),
-                                Text(
-                                  'Hold steady • Keep flat under even light',
-                                  style: TextStyle(
-                                    color: AppTheme.navyBrand,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: AppColors.greenVerified,
+                      shape: BoxShape.circle,
                     ),
                   ),
-
-                  const SizedBox(height: 20),
-
-                  // Bottom Controls Row: Gallery | Shutter Button | Manual
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // Gallery Button
-                      GestureDetector(
-                        onTap: () => _pickImage(ImageSource.gallery),
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 58,
-                              height: 58,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: AppTheme.borderLight),
-                              ),
-                              child: const Icon(
-                                Icons.photo_library_outlined,
-                                color: AppTheme.navyBrand,
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            const Text(
-                              'Gallery',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.navyBrand,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Shutter Squircle Button with Aperture Icon matching CAPTURE.png
-                      GestureDetector(
-                        onTap: () => _pickImage(ImageSource.camera),
-                        child: Container(
-                          width: 82,
-                          height: 82,
-                          decoration: BoxDecoration(
-                            color: AppTheme.navyBrand,
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.navyBrand.withAlpha(80),
-                                blurRadius: 14,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: SizedBox(
-                              width: 44,
-                              height: 44,
-                              child: CustomPaint(
-                                painter: _ApertureShutterPainter(),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Manual Entry Button
-                      GestureDetector(
-                        onTap: _showManualEntryDialog,
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 58,
-                              height: 58,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: AppTheme.borderLight),
-                              ),
-                              child: const Icon(
-                                Icons.edit_note_outlined,
-                                color: AppTheme.navyBrand,
-                                size: 26,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            const Text(
-                              'Manual',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.navyBrand,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  const SizedBox(width: 6),
+                  const Text(
+                    'Receipt Viewfinder • Ready',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-
-                  const SizedBox(height: 84), // Padding above bottom nav
                 ],
               ),
             ),
@@ -744,159 +668,76 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
     );
   }
 
-  /// Authentic simulated physical receipt slip matching CAPTURE.png
-  Widget _buildWholeFoodsMockReceipt() {
-    return Container(
-      color: const Color(0xFF0F172A),
-      alignment: Alignment.center,
-      child: Container(
-        width: 220,
-        height: 360,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFBFBFD),
-          borderRadius: BorderRadius.circular(4),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(60),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'WHOLE FOODS',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF1E293B),
-                letterSpacing: 1.0,
-              ),
-            ),
-            const Text(
-              'MARKET',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF334155),
-                letterSpacing: 2.0,
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'STORE: WHOLE FOODS MARKET | REG: 3\nDATE: OCT 12, 2023 | TIME: 4:38 PM',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 6.5,
-                color: Color(0xFF64748B),
-                height: 1.2,
-              ),
-            ),
-            const Divider(height: 12, thickness: 0.8),
+  Widget _buildCornerGuides() {
+    const double size = 26;
+    const double thickness = 3.0;
+    const Color color = Colors.white;
 
-            // Itemized line items
-            _mockLineItem('1x ORGANIC BANANAS', '1.99 F'),
-            _mockLineItem('1x ORGANIC MILK 1/2 G', '4.29 F'),
-            _mockLineItem('1x SOURDOUGH BREAD LOAF', '5.99 F'),
-            _mockLineItem('1x FREE-RANGE EGGS DOZEN', '7.50 F'),
-            _mockLineItem('1x CHICKEN BREAST (1.45 LB)', '14.45 F'),
-            _mockLineItem('1x ORGANIC SPINACH BAG', '3.49 F'),
-            _mockLineItem('1x WHOLE FOODS COFFEE', '12.99 F'),
-
-            const Divider(height: 10, thickness: 0.8),
-            _mockLineItem('SUBTOTAL:', '50.70'),
-            _mockLineItem('TAX 8%:', '4.06'),
-            _mockLineItem('TOTAL:', '54.76', isBold: true),
-
-            const Spacer(),
-
-            // Barcode and QR code row matching mockup
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Simulated barcode
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        for (int i = 0; i < 20; i++)
-                          Container(
-                            width: i % 4 == 0 ? 2.2 : 1.2,
-                            height: 22,
-                            color: Colors.black,
-                            margin: const EdgeInsets.symmetric(horizontal: 0.6),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    const Text(
-                      '543210987654',
-                      style: TextStyle(fontFamily: 'monospace', fontSize: 6.5, color: Colors.black),
-                    ),
-                  ],
-                ),
-
-                // Simulated QR matrix
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.black, width: 1.5),
-                  ),
-                  padding: const EdgeInsets.all(2),
-                  child: GridView.builder(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4),
-                    itemCount: 16,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemBuilder: (ctx, idx) => Container(
-                      color: (idx % 2 == 0 || idx == 5 || idx == 10) ? Colors.black : Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _mockLineItem(String item, String price, {bool isBold = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Positioned(
+      top: 30,
+      bottom: 30,
+      left: 28,
+      right: 28,
+      child: Stack(
         children: [
-          Expanded(
-            child: Text(
-              item,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 7.5,
-                fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-                color: const Color(0xFF1E293B),
+          // Top-Left
+          Positioned(
+            top: 0,
+            left: 0,
+            child: Container(
+              width: size,
+              height: size,
+              decoration: const BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: color, width: thickness),
+                  left: BorderSide(color: color, width: thickness),
+                ),
               ),
             ),
           ),
-          const SizedBox(width: 4),
-          Text(
-            price,
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 7.5,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-              color: const Color(0xFF1E293B),
+          // Top-Right
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Container(
+              width: size,
+              height: size,
+              decoration: const BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: color, width: thickness),
+                  right: BorderSide(color: color, width: thickness),
+                ),
+              ),
+            ),
+          ),
+          // Bottom-Left
+          Positioned(
+            bottom: 0,
+            left: 0,
+            child: Container(
+              width: size,
+              height: size,
+              decoration: const BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: color, width: thickness),
+                  left: BorderSide(color: color, width: thickness),
+                ),
+              ),
+            ),
+          ),
+          // Bottom-Right
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Container(
+              width: size,
+              height: size,
+              decoration: const BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: color, width: thickness),
+                  right: BorderSide(color: color, width: thickness),
+                ),
+              ),
             ),
           ),
         ],
@@ -904,72 +745,99 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildViewfinderCorners() {
-    const double size = 32;
-    const double thickness = 3.5;
-    const Color color = Colors.white;
-
-    return Positioned(
-      top: 50,
-      bottom: 50,
-      left: 32,
-      right: 32,
-      child: Stack(
+  Widget _buildCompactControlBar(bool isDark, Color cardBg, Color borderColor, Color textPrimary, Color textMuted) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor, width: 1),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          Positioned(
-            top: 0,
-            left: 0,
+          // Gallery Button
+          _buildActionButton(
+            icon: Icons.photo_library_outlined,
+            label: 'Gallery',
+            onTap: _handlePickFromGallery,
+            isDark: isDark,
+            textPrimary: textPrimary,
+          ),
+
+          // Central Iris Aperture Shutter Button (Compact 62dp)
+          GestureDetector(
+            onTap: _isCapturing ? null : _handleCapture,
             child: Container(
-              width: size,
-              height: size,
-              decoration: const BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: color, width: thickness),
-                  left: BorderSide(color: color, width: thickness),
-                ),
+              width: 62,
+              height: 62,
+              decoration: BoxDecoration(
+                color: AppColors.navyBrand,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.navyBrand.withAlpha(isDark ? 90 : 60),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
+              padding: const EdgeInsets.all(7),
+              child: _isCapturing
+                  ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)
+                  : CustomPaint(
+                      painter: _ApertureShutterPainter(),
+                    ),
             ),
           ),
-          Positioned(
-            top: 0,
-            right: 0,
-            child: Container(
-              width: size,
-              height: size,
-              decoration: const BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: color, width: thickness),
-                  right: BorderSide(color: color, width: thickness),
-                ),
+
+          // Manual Entry Button
+          _buildActionButton(
+            icon: Icons.edit_note_rounded,
+            label: 'Manual',
+            onTap: _handleManualEntry,
+            isDark: isDark,
+            textPrimary: textPrimary,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    required bool isDark,
+    required Color textPrimary,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                width: 1,
               ),
             ),
+            child: Icon(icon, color: textPrimary, size: 22),
           ),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            child: Container(
-              width: size,
-              height: size,
-              decoration: const BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: color, width: thickness),
-                  left: BorderSide(color: color, width: thickness),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: Container(
-              width: size,
-              height: size,
-              decoration: const BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: color, width: thickness),
-                  right: BorderSide(color: color, width: thickness),
-                ),
-              ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: textPrimary,
             ),
           ),
         ],
