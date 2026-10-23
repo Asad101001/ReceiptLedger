@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -13,7 +14,7 @@ class UploadScreen extends StatefulWidget {
   State<UploadScreen> createState() => _UploadScreenState();
 }
 
-class _UploadScreenState extends State<UploadScreen> {
+class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderStateMixin {
   final ApiService _api = ApiService();
   final ImagePicker _picker = ImagePicker();
 
@@ -25,6 +26,28 @@ class _UploadScreenState extends State<UploadScreen> {
   String? _selectedFileName;
   bool _isLoading = false;
   String? _errorMessage;
+
+  late AnimationController _scanAnimationController;
+  late Animation<double> _scanAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _scanAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat(reverse: true);
+
+    _scanAnimation = Tween<double>(begin: 0.15, end: 0.85).animate(
+      CurvedAnimation(parent: _scanAnimationController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _scanAnimationController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickImage(ImageSource source) async {
     setState(() {
@@ -44,7 +67,7 @@ class _UploadScreenState extends State<UploadScreen> {
         });
         _showProcessingPreviewSheet();
       }
-    } catch (e) {
+    } catch (_) {
       _showFriendlyToast('Failed to select image. Please try again.');
     }
   }
@@ -67,6 +90,7 @@ class _UploadScreenState extends State<UploadScreen> {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -122,12 +146,11 @@ class _UploadScreenState extends State<UploadScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Sheet Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'Receipt Preview',
+                    'Receipt Preview & Quality',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -142,7 +165,6 @@ class _UploadScreenState extends State<UploadScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Thumbnail Card
               if (_selectedImageBytes != null)
                 Container(
                   height: 220,
@@ -158,12 +180,11 @@ class _UploadScreenState extends State<UploadScreen> {
                 ),
               const SizedBox(height: 16),
 
-              // Inspection Stats
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppTheme.headerBlue.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -219,13 +240,14 @@ class _UploadScreenState extends State<UploadScreen> {
 
               const SizedBox(height: 20),
 
-              // Primary Upload Action
               ElevatedButton(
-                onPressed: _isLoading ? null : () async {
-                  setSheetState(() => _isLoading = true);
-                  await _uploadReceipt();
-                  setSheetState(() => _isLoading = false);
-                },
+                onPressed: _isLoading
+                    ? null
+                    : () async {
+                        setSheetState(() => _isLoading = true);
+                        await _uploadReceipt();
+                        setSheetState(() => _isLoading = false);
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.navyBrand,
                   foregroundColor: Colors.white,
@@ -252,12 +274,13 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 
   void _showManualEntryDialog() {
-    final merchantCtrl = TextEditingController(text: 'Local Store');
-    final amountCtrl = TextEditingController(text: '1200.0');
+    final merchantCtrl = TextEditingController(text: 'Local Mart');
+    final amountCtrl = TextEditingController(text: '1450.0');
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Manual Entry', style: TextStyle(fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -298,7 +321,7 @@ class _UploadScreenState extends State<UploadScreen> {
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          // Persistent Header
+          // Persistent Header matching CAPTURE.png
           AppHeader(
             subCaption: 'CAPTURE',
             onAvatarTap: widget.onOpenDrawer,
@@ -335,7 +358,7 @@ class _UploadScreenState extends State<UploadScreen> {
                                       boxShadow: !_isBatchMode
                                           ? [
                                               BoxShadow(
-                                                color: Colors.black.withOpacity(0.06),
+                                                color: Colors.black.withAlpha(15),
                                                 blurRadius: 4,
                                                 offset: const Offset(0, 1),
                                               ),
@@ -379,7 +402,7 @@ class _UploadScreenState extends State<UploadScreen> {
                                       boxShadow: _isBatchMode
                                           ? [
                                               BoxShadow(
-                                                color: Colors.black.withOpacity(0.06),
+                                                color: Colors.black.withAlpha(15),
                                                 blurRadius: 4,
                                                 offset: const Offset(0, 1),
                                               ),
@@ -434,7 +457,7 @@ class _UploadScreenState extends State<UploadScreen> {
                       IconButton(
                         onPressed: () {
                           setState(() {
-                            _aspectRatio = _aspectRatio == '4:3 Crop' ? 'Full Crop' : '4:3 Crop';
+                            _aspectRatio = _aspectRatio == '4:3 Crop' ? 'Full Frame' : '4:3 Crop';
                           });
                         },
                         icon: const Icon(Icons.crop_free, color: AppTheme.navyBrand),
@@ -444,16 +467,16 @@ class _UploadScreenState extends State<UploadScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Camera Viewfinder Card from CAPTURE.png
+                  // Camera Viewfinder Card matching CAPTURE.png
                   Container(
-                    height: 400,
+                    height: 420,
                     width: double.infinity,
                     decoration: BoxDecoration(
                       color: const Color(0xFF1E293B), // Dark slate viewfinder background
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.12),
+                          color: Colors.black.withAlpha(30),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -463,91 +486,42 @@ class _UploadScreenState extends State<UploadScreen> {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        // Background textured paper receipt / user image / mock receipt slip
+                        // Background Receipt Slip matching Whole Foods in CAPTURE.png
                         Positioned.fill(
                           child: _selectedImageBytes != null
                               ? Image.memory(_selectedImageBytes!, fit: BoxFit.cover)
-                              : Container(
-                                  color: const Color(0xFF0F172A),
-                                  alignment: Alignment.center,
-                                  child: Container(
-                                    width: 200,
-                                    height: 310,
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF8FAFC),
-                                      borderRadius: BorderRadius.circular(4),
+                              : _buildWholeFoodsMockReceipt(),
+                        ),
+
+                        // Animated Scanning Line (Sweeps across the receipt)
+                        AnimatedBuilder(
+                          animation: _scanAnimation,
+                          builder: (context, child) {
+                            return Positioned(
+                              top: 420 * _scanAnimation.value,
+                              left: 36,
+                              right: 36,
+                              child: Container(
+                                height: 2,
+                                decoration: BoxDecoration(
+                                  color: Colors.cyanAccent.withAlpha(180),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.cyanAccent.withAlpha(150),
+                                      blurRadius: 6,
+                                      spreadRadius: 1,
                                     ),
-                                    child: Column(
-                                      children: [
-                                        const Text(
-                                          'STORE RECEIPT',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w900,
-                                            color: Color(0xFF0F172A),
-                                            letterSpacing: 0.8,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Container(width: 70, height: 5, color: const Color(0xFFCBD5E1)),
-                                            Container(width: 28, height: 5, color: const Color(0xFF94A3B8)),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Container(width: 85, height: 5, color: const Color(0xFFCBD5E1)),
-                                            Container(width: 32, height: 5, color: const Color(0xFF94A3B8)),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Container(width: 60, height: 5, color: const Color(0xFFCBD5E1)),
-                                            Container(width: 24, height: 5, color: const Color(0xFF94A3B8)),
-                                          ],
-                                        ),
-                                        const Spacer(),
-                                        // Barcode simulation
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            for (int j = 0; j < 22; j++)
-                                              Container(
-                                                width: j % 3 == 0 ? 3 : 1.5,
-                                                height: 22,
-                                                color: Colors.black,
-                                                margin: const EdgeInsets.symmetric(horizontal: 1),
-                                              ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                  ],
                                 ),
+                              ),
+                            );
+                          },
                         ),
 
                         // Viewfinder 4 Corner Brackets
                         _buildViewfinderCorners(),
 
-                        // Center guideline / scan line
-                        Positioned(
-                          left: 40,
-                          right: 40,
-                          child: Container(
-                            height: 1.5,
-                            color: Colors.white.withOpacity(0.4),
-                          ),
-                        ),
-
-                        // Top Overlay Badges
+                        // Top Left Overlay Badge: (✓) Receipt Detected • Ready
                         Positioned(
                           top: 14,
                           left: 14,
@@ -575,13 +549,14 @@ class _UploadScreenState extends State<UploadScreen> {
                           ),
                         ),
 
+                        // Top Right Overlay Badge: [⛶] 4:3 Crop
                         Positioned(
                           top: 14,
                           right: 14,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.85),
+                              color: Colors.white.withAlpha(220),
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: Row(
@@ -602,7 +577,7 @@ class _UploadScreenState extends State<UploadScreen> {
                           ),
                         ),
 
-                        // Center Prompt Banner
+                        // Center Prompt Banner: ALIGN MERCHANT & TOTAL
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
@@ -610,7 +585,7 @@ class _UploadScreenState extends State<UploadScreen> {
                             borderRadius: BorderRadius.circular(4),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
+                                color: Colors.black.withAlpha(25),
                                 blurRadius: 4,
                                 offset: const Offset(0, 2),
                               ),
@@ -627,7 +602,7 @@ class _UploadScreenState extends State<UploadScreen> {
                           ),
                         ),
 
-                        // Bottom Guidance Pill
+                        // Bottom Guidance Pill: (*) Hold steady • Keep flat under even light
                         Positioned(
                           bottom: 16,
                           child: Container(
@@ -670,8 +645,8 @@ class _UploadScreenState extends State<UploadScreen> {
                         child: Column(
                           children: [
                             Container(
-                              width: 56,
-                              height: 56,
+                              width: 58,
+                              height: 58,
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF1F5F9),
                                 borderRadius: BorderRadius.circular(16),
@@ -696,37 +671,29 @@ class _UploadScreenState extends State<UploadScreen> {
                         ),
                       ),
 
-                      // Large Shutter Squircle Button from CAPTURE.png
+                      // Shutter Squircle Button with Aperture Icon matching CAPTURE.png
                       GestureDetector(
                         onTap: () => _pickImage(ImageSource.camera),
                         child: Container(
-                          width: 80,
-                          height: 80,
+                          width: 82,
+                          height: 82,
                           decoration: BoxDecoration(
                             color: AppTheme.navyBrand,
                             borderRadius: BorderRadius.circular(24),
                             boxShadow: [
                               BoxShadow(
-                                color: AppTheme.navyBrand.withOpacity(0.3),
-                                blurRadius: 12,
+                                color: AppTheme.navyBrand.withAlpha(80),
+                                blurRadius: 14,
                                 offset: const Offset(0, 4),
                               ),
                             ],
                           ),
                           child: Center(
-                            child: Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 3),
-                              ),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.camera,
-                                  color: Colors.white,
-                                  size: 26,
-                                ),
+                            child: SizedBox(
+                              width: 44,
+                              height: 44,
+                              child: CustomPaint(
+                                painter: _ApertureShutterPainter(),
                               ),
                             ),
                           ),
@@ -739,8 +706,8 @@ class _UploadScreenState extends State<UploadScreen> {
                         child: Column(
                           children: [
                             Container(
-                              width: 56,
-                              height: 56,
+                              width: 58,
+                              height: 58,
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF1F5F9),
                                 borderRadius: BorderRadius.circular(16),
@@ -767,9 +734,169 @@ class _UploadScreenState extends State<UploadScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 80), // Padding above bottom nav
+                  const SizedBox(height: 84), // Padding above bottom nav
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Authentic simulated physical receipt slip matching CAPTURE.png
+  Widget _buildWholeFoodsMockReceipt() {
+    return Container(
+      color: const Color(0xFF0F172A),
+      alignment: Alignment.center,
+      child: Container(
+        width: 220,
+        height: 360,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFBFBFD),
+          borderRadius: BorderRadius.circular(4),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(60),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'WHOLE FOODS',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF1E293B),
+                letterSpacing: 1.0,
+              ),
+            ),
+            const Text(
+              'MARKET',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF334155),
+                letterSpacing: 2.0,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'STORE: WHOLE FOODS MARKET | REG: 3\nDATE: OCT 12, 2023 | TIME: 4:38 PM',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 6.5,
+                color: Color(0xFF64748B),
+                height: 1.2,
+              ),
+            ),
+            const Divider(height: 12, thickness: 0.8),
+
+            // Itemized line items
+            _mockLineItem('1x ORGANIC BANANAS', '1.99 F'),
+            _mockLineItem('1x ORGANIC MILK 1/2 G', '4.29 F'),
+            _mockLineItem('1x SOURDOUGH BREAD LOAF', '5.99 F'),
+            _mockLineItem('1x FREE-RANGE EGGS DOZEN', '7.50 F'),
+            _mockLineItem('1x CHICKEN BREAST (1.45 LB)', '14.45 F'),
+            _mockLineItem('1x ORGANIC SPINACH BAG', '3.49 F'),
+            _mockLineItem('1x WHOLE FOODS COFFEE', '12.99 F'),
+
+            const Divider(height: 10, thickness: 0.8),
+            _mockLineItem('SUBTOTAL:', '50.70'),
+            _mockLineItem('TAX 8%:', '4.06'),
+            _mockLineItem('TOTAL:', '54.76', isBold: true),
+
+            const Spacer(),
+
+            // Barcode and QR code row matching mockup
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Simulated barcode
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        for (int i = 0; i < 20; i++)
+                          Container(
+                            width: i % 4 == 0 ? 2.2 : 1.2,
+                            height: 22,
+                            color: Colors.black,
+                            margin: const EdgeInsets.symmetric(horizontal: 0.6),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      '543210987654',
+                      style: TextStyle(fontFamily: 'monospace', fontSize: 6.5, color: Colors.black),
+                    ),
+                  ],
+                ),
+
+                // Simulated QR matrix
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black, width: 1.5),
+                  ),
+                  padding: const EdgeInsets.all(2),
+                  child: GridView.builder(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4),
+                    itemCount: 16,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemBuilder: (ctx, idx) => Container(
+                      color: (idx % 2 == 0 || idx == 5 || idx == 10) ? Colors.black : Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _mockLineItem(String item, String price, {bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              item,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 7.5,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+                color: const Color(0xFF1E293B),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            price,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 7.5,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              color: const Color(0xFF1E293B),
             ),
           ),
         ],
@@ -783,13 +910,12 @@ class _UploadScreenState extends State<UploadScreen> {
     const Color color = Colors.white;
 
     return Positioned(
-      top: 60,
-      bottom: 60,
-      left: 36,
-      right: 36,
+      top: 50,
+      bottom: 50,
+      left: 32,
+      right: 32,
       child: Stack(
         children: [
-          // Top-left
           Positioned(
             top: 0,
             left: 0,
@@ -804,7 +930,6 @@ class _UploadScreenState extends State<UploadScreen> {
               ),
             ),
           ),
-          // Top-right
           Positioned(
             top: 0,
             right: 0,
@@ -819,7 +944,6 @@ class _UploadScreenState extends State<UploadScreen> {
               ),
             ),
           ),
-          // Bottom-left
           Positioned(
             bottom: 0,
             left: 0,
@@ -834,7 +958,6 @@ class _UploadScreenState extends State<UploadScreen> {
               ),
             ),
           ),
-          // Bottom-right
           Positioned(
             bottom: 0,
             right: 0,
@@ -853,4 +976,73 @@ class _UploadScreenState extends State<UploadScreen> {
       ),
     );
   }
+}
+
+/// Custom painter for the camera iris aperture shutter icon from CAPTURE.png
+class _ApertureShutterPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+
+    final bladePaint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+
+    final outerRingPaint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke;
+
+    // Draw outer circle
+    canvas.drawCircle(center, radius - 1, outerRingPaint);
+
+    // Draw 8 aperture blades around the iris
+    const int blades = 8;
+    for (int i = 0; i < blades; i++) {
+      final angle = (i * 2 * math.pi) / blades;
+      final p1 = Offset(
+        center.dx + (radius - 2) * math.cos(angle),
+        center.dy + (radius - 2) * math.sin(angle),
+      );
+      final p2 = Offset(
+        center.dx + (radius * 0.42) * math.cos(angle + math.pi / 3),
+        center.dy + (radius * 0.42) * math.sin(angle + math.pi / 3),
+      );
+      canvas.drawLine(p1, p2, bladePaint);
+    }
+
+    // Center circular aperture with red & blue accent dot
+    final centerCirclePaint = Paint()
+      ..color = const Color(0xFF0C1E4A)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, radius * 0.35, centerCirclePaint);
+
+    final redAccent = Paint()
+      ..color = const Color(0xFFEF4444)
+      ..style = PaintingStyle.fill;
+    final blueAccent = Paint()
+      ..color = const Color(0xFF3B82F6)
+      ..style = PaintingStyle.fill;
+
+    // Split red/blue center iris core
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius * 0.22),
+      -math.pi / 2,
+      math.pi,
+      true,
+      redAccent,
+    );
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius * 0.22),
+      math.pi / 2,
+      math.pi,
+      true,
+      blueAccent,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

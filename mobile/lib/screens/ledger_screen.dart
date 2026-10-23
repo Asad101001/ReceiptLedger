@@ -18,6 +18,17 @@ class _LedgerScreenState extends State<LedgerScreen> {
   Map<String, dynamic>? _monthlySummary;
   String _selectedPeriod = 'Monthly';
 
+  String? _selectedCategoryFilter;
+  int _selectedDayIndex = 2; // 0=Mon, 1=Wed, 2=Today, 3=Sun
+  final Map<int, String> _dayAmounts = {
+    0: '8,200',
+    1: '14,350',
+    2: '42,850',
+    3: '42,850',
+  };
+
+  String? _expandedReceiptId;
+
   @override
   void initState() {
     super.initState();
@@ -253,13 +264,21 @@ class _LedgerScreenState extends State<LedgerScreen> {
   @override
   Widget build(BuildContext context) {
     final totalSpend = _monthlySummary?['total_spend'] ?? 42850.0;
-    final receiptsCount = _receipts.length;
+
+    // Filter receipts if a category chip is selected
+    final filteredReceipts = _selectedCategoryFilter == null
+        ? _receipts
+        : _receipts.where((r) {
+            final cat = (r['category'] ?? '').toString().toLowerCase();
+            final filter = _selectedCategoryFilter!.toLowerCase();
+            return cat.contains(filter) || filter.contains(cat);
+          }).toList();
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          // Header
+          // Persistent Header
           AppHeader(
             subCaption: 'LEDGER',
             onAvatarTap: widget.onOpenDrawer,
@@ -277,91 +296,153 @@ class _LedgerScreenState extends State<LedgerScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                    // OCTOBER TOTAL Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'OCTOBER TOTAL',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.navyBrand,
-                                letterSpacing: 0.8,
+                          // OCTOBER TOTAL Row
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'OCTOBER TOTAL',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.navyBrand,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  ValueListenableBuilder<String>(
+                                    valueListenable: _api.currencyNotifier,
+                                    builder: (ctx, curr, _) {
+                                      return Text(
+                                        '$curr ${totalSpend.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                                        style: const TextStyle(
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.w900,
+                                          color: AppTheme.textDark,
+                                          letterSpacing: -0.5,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${_api.currency} ${totalSpend.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
-                              style: const TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w900,
-                                color: AppTheme.textDark,
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                          ],
-                        ),
 
-                        // Monthly Dropdown Pill
-                        GestureDetector(
-                          onTap: _showPeriodPicker,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: AppTheme.borderLight),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _selectedPeriod,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.navyBrand,
+                              // Monthly Dropdown Pill
+                              GestureDetector(
+                                onTap: _showPeriodPicker,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: AppTheme.borderLight),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        _selectedPeriod,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.navyBrand,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.arrow_drop_down, size: 16, color: AppTheme.navyBrand),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(width: 4),
-                                const Icon(Icons.arrow_drop_down, size: 16, color: AppTheme.navyBrand),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 18),
+
+                          // Weekly Activity Card with interactive day selectors
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: AppTheme.borderLight),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withAlpha(8),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'Weekly Activity',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppTheme.textDark,
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        '68% target • ${_api.currency} ${_dayAmounts[_selectedDayIndex]}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.navyBrand,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 18),
+
+                                // Trend line & Sparkline Chart
+                                SizedBox(
+                                  height: 40,
+                                  child: CustomPaint(
+                                    painter: _WeeklyActivityTrendPainter(selectedDayIndex: _selectedDayIndex),
+                                    size: Size.infinite,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+
+                                // Days of Week Row (Interactive)
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    _buildDayLabel('Mon', 0),
+                                    _buildDayLabel('Wed', 1),
+                                    _buildDayLabel('Today', 2, isBold: true),
+                                    _buildDayLabel('Sun', 3),
+                                  ],
+                                ),
                               ],
                             ),
                           ),
-                        ),
-                      ],
-                    ),
 
-                    const SizedBox(height: 18),
+                          const SizedBox(height: 20),
 
-                    // Weekly Activity Card
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.borderLight),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.03),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
+                          // Spending Categories Section
+                          Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'Weekly Activity',
+                              const Text(
+                                'Spending Categories',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w800,
@@ -369,158 +450,225 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                 ),
                               ),
                               Text(
-                                '68% target',
+                                'Oct 2023',
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w600,
-                                  color: AppTheme.textMuted,
+                                  color: AppTheme.textMuted.withAlpha(200),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 12),
 
-                          // Trend line & Sparkline Chart
-                          SizedBox(
-                            height: 36,
-                            child: CustomPaint(
-                              painter: _WeeklyActivityTrendPainter(),
-                              size: Size.infinite,
+                          // 4 Category Cards Row from LEDGER.png (Interactive tap to filter)
+                          Row(
+                            children: [
+                              Expanded(child: _buildCategoryCard(Icons.shopping_bag_outlined, 'Groceries', '18.4k')),
+                              const SizedBox(width: 10),
+                              Expanded(child: _buildCategoryCard(Icons.storefront_outlined, 'Bakeries', '9.2k')),
+                              const SizedBox(width: 10),
+                              Expanded(child: _buildCategoryCard(Icons.local_gas_station_outlined, 'Fuel', '7.5k')),
+                              const SizedBox(width: 10),
+                              Expanded(child: _buildCategoryCard(Icons.bolt_outlined, 'Utilities', '4.6k')),
+                            ],
+                          ),
+
+                          // Active Filter Indicator (if any)
+                          if (_selectedCategoryFilter != null) ...[
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Text(
+                                  'Filtered by: $_selectedCategoryFilter',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.navyBrand),
+                                ),
+                                const SizedBox(width: 8),
+                                GestureDetector(
+                                  onTap: () => setState(() => _selectedCategoryFilter = null),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE2E8F0),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Row(
+                                      children: [
+                                        Text('Clear', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                                        SizedBox(width: 3),
+                                        Icon(Icons.close, size: 12),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
+                          ],
+
+                          const SizedBox(height: 22),
+
+                          // Recent Receipts Section
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Recent Receipts',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.textDark,
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Showing all ${filteredReceipts.length} receipts recorded.')),
+                                  );
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: const Size(50, 30),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
+                                  'View All (${filteredReceipts.length})',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.headerBlueDark,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 8),
 
-                          // Days of Week Row
-                          const Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Mon', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                              Text('Wed', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                              Text(
-                                'Today',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.navyBrand,
-                                ),
-                              ),
-                              Text('Sun', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                            ],
+                          // Receipts List
+                          ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: filteredReceipts.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 10),
+                            itemBuilder: (ctx, idx) {
+                              final item = filteredReceipts[idx];
+                              return _buildReceiptTile(item);
+                            },
                           ),
+
+                          const SizedBox(height: 84), // Padding above bottom nav
                         ],
                       ),
                     ),
-
-                    const SizedBox(height: 20),
-
-                    // Spending Categories Section
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Spending Categories',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.textDark,
-                          ),
-                        ),
-                        Text(
-                          'Oct 2023',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textMuted.withOpacity(0.8),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // 4 Category Cards Row from LEDGER.png
-                    Row(
-                      children: [
-                        Expanded(child: _buildCategoryCard(Icons.shopping_bag_outlined, 'Groceries', '18.4k')),
-                        const SizedBox(width: 10),
-                        Expanded(child: _buildCategoryCard(Icons.storefront_outlined, 'Bakeries', '9.2k')),
-                        const SizedBox(width: 10),
-                        Expanded(child: _buildCategoryCard(Icons.local_gas_station_outlined, 'Fuel', '7.5k')),
-                        const SizedBox(width: 10),
-                        Expanded(child: _buildCategoryCard(Icons.bolt_outlined, 'Utilities', '4.6k')),
-                      ],
-                    ),
-
-                    const SizedBox(height: 22),
-
-                    // Recent Receipts Section
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Recent Receipts',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.textDark,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Showing all $receiptsCount receipts recorded.')),
-                            );
-                          },
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: const Size(50, 30),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: Text(
-                            'View All ($receiptsCount)',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.headerBlueDark,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Receipts List
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _receipts.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (ctx, idx) {
-                        final item = _receipts[idx];
-                        return _buildReceiptTile(item);
-                      },
-                    ),
-
-                    const SizedBox(height: 80), // Padding above bottom nav
-                  ],
-                ),
-              ),
-            ),
+                  ),
           ),
         ],
       ),
     );
   }
 
+  Widget _buildDayLabel(String label, int index, {bool isBold = false}) {
+    final isSelected = _selectedDayIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedDayIndex = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.headerBlue.withAlpha(30) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: isSelected ? 12 : 11,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? AppTheme.navyBrand : AppTheme.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildCategoryCard(IconData icon, String name, String amount) {
+    final isSelected = _selectedCategoryFilter == name;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedCategoryFilter = isSelected ? null : name;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.navyBrand.withAlpha(15) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? AppTheme.navyBrand : AppTheme.borderLight,
+            width: isSelected ? 1.8 : 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(5),
+              blurRadius: 6,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isSelected ? AppTheme.navyBrand : const Color(0xFFF1F5F9),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 18,
+                color: isSelected ? Colors.white : AppTheme.navyBrand,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              name,
+              style: TextStyle(
+                fontSize: 11,
+                color: isSelected ? AppTheme.navyBrand : AppTheme.textMuted,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              amount,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: isSelected ? AppTheme.navyBrand : AppTheme.textDark,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReceiptTile(Map<String, dynamic> r) {
+    final id = r['id']?.toString() ?? '';
+    final merchant = r['merchant'] ?? 'Merchant';
+    final date = r['date'] ?? 'Recent';
+    final itemsCount = r['items_count'] ?? 1;
+    final total = (r['total_amount'] ?? 0.0) as num;
+    final lineItems = (r['line_items'] as List<dynamic>?) ?? [];
+    final isExpanded = _expandedReceiptId == id;
+
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.borderLight),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withAlpha(5),
             blurRadius: 6,
             offset: const Offset(0, 1),
           ),
@@ -528,134 +676,132 @@ class _LedgerScreenState extends State<LedgerScreen> {
       ),
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF1F5F9),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 18, color: AppTheme.navyBrand),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            name,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppTheme.textMuted,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            amount,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.textDark,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReceiptTile(Map<String, dynamic> r) {
-    final merchant = r['merchant'] ?? 'Merchant';
-    final date = r['date'] ?? 'Recent';
-    final itemsCount = r['items_count'] ?? 1;
-    final total = (r['total_amount'] ?? 0.0) as num;
-
-    return GestureDetector(
-      onTap: () => _showReceiptDetailDialog(r),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.borderLight),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 6,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // Left Clipboard Icon inside rounded squircle
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.assignment_outlined,
-                color: AppTheme.navyBrand,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // Store Title & Items Subtitle
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _expandedReceiptId = isExpanded ? null : id;
+              });
+            },
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
                 children: [
-                  Text(
-                    merchant,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textDark,
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.assignment_outlined,
+                      color: AppTheme.navyBrand,
+                      size: 22,
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '$date • $itemsCount items',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppTheme.textMuted,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          merchant,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textDark,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '$date • $itemsCount items',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textMuted,
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '-${_api.currency} ${total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.textDark,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.greenVerifiedBg,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'Verified',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.greenVerified,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
+          ),
 
-            // Amount & Verified Pill on right
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '-${_api.currency} ${total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    color: AppTheme.textDark,
+          // Expandable in-line detail preview
+          if (isExpanded) ...[
+            const Divider(height: 1, indent: 14, endIndent: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: const Color(0xFFF8FAFC),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (lineItems.isNotEmpty)
+                    ...lineItems.take(3).map((item) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${item['qty']}x ${item['item_name']}',
+                              style: const TextStyle(fontSize: 12, color: AppTheme.textDark),
+                            ),
+                            Text(
+                              '${_api.currency} ${(item['price'] ?? 0.0).toStringAsFixed(0)}',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () => _showReceiptDetailDialog(r),
+                        icon: const Icon(Icons.fullscreen, size: 16),
+                        label: const Text('View Full Slip', style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 3),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppTheme.greenVerifiedBg,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    'Verified',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.greenVerified,
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -663,6 +809,10 @@ class _LedgerScreenState extends State<LedgerScreen> {
 
 /// Custom painter for the subtle sparkline trend in Weekly Activity card
 class _WeeklyActivityTrendPainter extends CustomPainter {
+  final int selectedDayIndex;
+
+  _WeeklyActivityTrendPainter({this.selectedDayIndex = 2});
+
   @override
   void paint(Canvas canvas, Size size) {
     final linePaint = Paint()
@@ -676,24 +826,42 @@ class _WeeklyActivityTrendPainter extends CustomPainter {
 
     final dotBorderPaint = Paint()
       ..color = Colors.white
-      ..strokeWidth = 2.0
+      ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke;
 
     final path = Path();
-    // Gentle ascending curve from left to right
     path.moveTo(size.width * 0.05, size.height * 0.75);
     path.lineTo(size.width * 0.35, size.height * 0.65);
-    path.lineTo(size.width * 0.68, size.height * 0.45); // Today's coordinate
+    path.lineTo(size.width * 0.68, size.height * 0.45);
     path.lineTo(size.width * 0.95, size.height * 0.38);
 
     canvas.drawPath(path, linePaint);
 
-    // Marker on Today (around 68% width)
-    final center = Offset(size.width * 0.68, size.height * 0.45);
-    canvas.drawCircle(center, 5.0, dotPaint);
-    canvas.drawCircle(center, 5.0, dotBorderPaint);
+    // Dynamic marker based on selected day
+    Offset center;
+    switch (selectedDayIndex) {
+      case 0:
+        center = Offset(size.width * 0.05, size.height * 0.75);
+        break;
+      case 1:
+        center = Offset(size.width * 0.35, size.height * 0.65);
+        break;
+      case 2:
+        center = Offset(size.width * 0.68, size.height * 0.45);
+        break;
+      case 3:
+        center = Offset(size.width * 0.95, size.height * 0.38);
+        break;
+      default:
+        center = Offset(size.width * 0.68, size.height * 0.45);
+        break;
+    }
+
+    canvas.drawCircle(center, 5.5, dotPaint);
+    canvas.drawCircle(center, 5.5, dotBorderPaint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _WeeklyActivityTrendPainter oldDelegate) =>
+      oldDelegate.selectedDayIndex != selectedDayIndex;
 }
