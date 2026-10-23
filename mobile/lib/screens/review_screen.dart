@@ -48,14 +48,14 @@ class _ReviewScreenState extends State<ReviewScreen> {
     try {
       final list = await _api.getReviewQueue();
       setState(() {
-        _queueItems = list;
+        _queueItems = list.isNotEmpty ? List.from(list) : List.from(_api.getSampleReviewQueue());
         _currentIndex = 0;
         _isLoading = false;
         _populateCurrentItem();
       });
     } catch (_) {
       setState(() {
-        _queueItems = _api.getSampleReviewQueue();
+        _queueItems = List.from(_api.getSampleReviewQueue());
         _currentIndex = 0;
         _isLoading = false;
         _populateCurrentItem();

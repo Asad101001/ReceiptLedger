@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
@@ -23,94 +21,64 @@ class UploadScreen extends StatefulWidget {
   State<UploadScreen> createState() => _UploadScreenState();
 }
 
-class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderStateMixin {
-  CameraController? _cameraController;
-  List<CameraDescription>? _cameras;
-  bool _isCameraInitialized = false;
-  bool _isCapturing = false;
-  String _captureMode = 'single'; // 'single' or 'batch'
-  bool _flashAuto = true;
+class _UploadScreenState extends State<UploadScreen> {
+  final ApiService _api = ApiService();
   final ImagePicker _picker = ImagePicker();
 
-  late AnimationController _laserAnimController;
-  late Animation<double> _laserAnimation;
+  bool _isCapturing = false;
+  String _captureMode = 'single'; // 'single' or 'batch'
+  String _flashMode = 'auto'; // 'auto', 'on', 'off'
+  bool _autoCrop = true;
+  bool _highResOcr = true;
+
+  String _selectedCategory = 'All';
+  final List<String> _categories = [
+    'All',
+    'Groceries',
+    'Fuel',
+    'Dining',
+    'Pharmacy',
+    'Utilities',
+    'Shopping',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _laserAnimController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2400),
-    )..repeat(reverse: true);
-
-    _laserAnimation = CurvedAnimation(
-      parent: _laserAnimController,
-      curve: Curves.easeInOut,
-    );
-
-    _initCamera();
+    // Camera is strictly on-demand now; no continuous viewfinder running in background!
   }
 
-  Future<void> _initCamera() async {
-    try {
-      _cameras = await availableCameras();
-      if (_cameras != null && _cameras!.isNotEmpty) {
-        _cameraController = CameraController(
-          _cameras![0],
-          ResolutionPreset.medium,
-          enableAudio: false,
-        );
-        await _cameraController!.initialize();
-        if (mounted) {
-          setState(() {
-            _isCameraInitialized = true;
-          });
-        }
-      }
-    } catch (_) {
-      // In simulator or environments without physical camera, gracefully falls back to mock viewfinder
-      if (mounted) {
-        setState(() {
-          _isCameraInitialized = false;
-        });
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _laserAnimController.dispose();
-    _cameraController?.dispose();
-    super.dispose();
-  }
-
-  Future<void> _handleCapture() async {
+  // --- Capture Action: Opens camera on-demand ---
+  Future<void> _handleScanReceipt() async {
     if (_isCapturing) return;
 
-    setState(() => _isCapturing = true);
-
     try {
-      if (_isCameraInitialized && _cameraController != null) {
-        final XFile file = await _cameraController!.takePicture();
-        final bytes = await file.readAsBytes();
-        await ApiService().uploadReceipt(
-          bytes: bytes,
-          filename: file.name,
-          captureMode: _captureMode,
-        );
-      } else {
-        // Simulated capture fallback
-        await Future.delayed(const Duration(milliseconds: 600));
-      }
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: _highResOcr ? 95 : 80,
+      );
+
+      if (photo == null) return; // User cancelled camera
+
+      setState(() => _isCapturing = true);
+
+      final bytes = await photo.readAsBytes();
+      await _api.uploadReceipt(
+        bytes: bytes,
+        filename: photo.name,
+        captureMode: _captureMode,
+      );
 
       if (!mounted) return;
       AppToast.success(
         context,
         'Receipt captured and queued for OCR parsing!',
         actionLabel: 'Review',
-        onAction: () => widget.onNavigateTab != null ? widget.onNavigateTab!(2) : widget.onNavigateToReview?.call(),
+        onAction: () => widget.onNavigateTab != null
+            ? widget.onNavigateTab!(2)
+            : widget.onNavigateToReview?.call(),
       );
-      ApiService().refreshReviewCount();
+      _api.refreshReviewCount();
     } catch (e) {
       if (!mounted) return;
       AppToast.error(context, 'Capture failed: ${e.toString().split('\n').first}');
@@ -119,14 +87,22 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
     }
   }
 
+  // --- Pick from Gallery ---
   Future<void> _handlePickFromGallery() async {
+    if (_isCapturing) return;
+
     try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: _highResOcr ? 95 : 85,
+      );
+
       if (image == null) return;
 
       setState(() => _isCapturing = true);
+
       final bytes = await image.readAsBytes();
-      await ApiService().uploadReceipt(
+      await _api.uploadReceipt(
         bytes: bytes,
         filename: image.name,
         captureMode: _captureMode,
@@ -137,9 +113,11 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
         context,
         'Receipt uploaded from gallery successfully!',
         actionLabel: 'Review',
-        onAction: () => widget.onNavigateTab != null ? widget.onNavigateTab!(2) : widget.onNavigateToReview?.call(),
+        onAction: () => widget.onNavigateTab != null
+            ? widget.onNavigateTab!(2)
+            : widget.onNavigateToReview?.call(),
       );
-      ApiService().refreshReviewCount();
+      _api.refreshReviewCount();
     } catch (e) {
       if (!mounted) return;
       AppToast.error(context, 'Gallery upload failed: $e');
@@ -148,74 +126,716 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
     }
   }
 
-  void _handleManualEntry() {
+  // --- Camera & Capture Settings Modal (Hidden under gear icon) ---
+  void _showCaptureSettingsModal() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).cardColor,
+      backgroundColor: isDark ? AppTheme.cardDark : AppTheme.cardWhite,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (ctx) {
-        final merchantCtrl = TextEditingController();
-        final amountCtrl = TextEditingController();
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-            left: 20,
-            right: 20,
-            top: 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Manual Receipt Entry',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  // Handle bar
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.pop(ctx),
+                  const SizedBox(height: 18),
+
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppTheme.cardDarkElevated : AppTheme.sageLight,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.tune_rounded,
+                          color: isDark ? AppTheme.textLight : AppTheme.forestPrimary,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Capture & Camera Options',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? AppTheme.textLight : AppTheme.textDark,
+                              ),
+                            ),
+                            Text(
+                              'Customize scanner behavior and image processing',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Batch Scanning Toggle
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.cardDarkElevated : AppTheme.canvasLight,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Batch Scanning Mode',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: isDark ? AppTheme.textLight : AppTheme.textDark,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Rapidly capture multiple receipts in one session',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: _captureMode == 'batch',
+                          activeColor: AppTheme.forestPrimary,
+                          onChanged: (val) {
+                            setModalState(() {
+                              _captureMode = val ? 'batch' : 'single';
+                            });
+                            setState(() {
+                              _captureMode = val ? 'batch' : 'single';
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Flash Mode Selector
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.cardDarkElevated : AppTheme.canvasLight,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Flash Mode',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: isDark ? AppTheme.textLight : AppTheme.textDark,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            _buildFlashChip('auto', 'Auto', Icons.flash_auto_rounded, isDark, setModalState),
+                            const SizedBox(width: 8),
+                            _buildFlashChip('on', 'Always On', Icons.flash_on_rounded, isDark, setModalState),
+                            const SizedBox(width: 8),
+                            _buildFlashChip('off', 'Off', Icons.flash_off_rounded, isDark, setModalState),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Auto-Crop Toggle
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.cardDarkElevated : AppTheme.canvasLight,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Auto Perspective & Crop',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: isDark ? AppTheme.textLight : AppTheme.textDark,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Detect receipt borders and straighten angles',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: _autoCrop,
+                          activeColor: AppTheme.forestPrimary,
+                          onChanged: (val) {
+                            setModalState(() => _autoCrop = val);
+                            setState(() => _autoCrop = val);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // High Resolution OCR
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.cardDarkElevated : AppTheme.canvasLight,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'High-Resolution OCR',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: isDark ? AppTheme.textLight : AppTheme.textDark,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Max clarity for small itemized receipt font',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: _highResOcr,
+                          activeColor: AppTheme.forestPrimary,
+                          onChanged: (val) {
+                            setModalState(() => _highResOcr = val);
+                            setState(() => _highResOcr = val);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Done Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.forestPrimary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        elevation: 0,
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text(
+                        'Apply Settings',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: merchantCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Merchant Name',
-                  hintText: 'e.g. Metro Cash & Carry',
-                  border: OutlineInputBorder(),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFlashChip(String mode, String label, IconData icon, bool isDark, StateSetter setModalState) {
+    final isSelected = _flashMode == mode;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setModalState(() => _flashMode = mode);
+          setState(() => _flashMode = mode);
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? (isDark ? AppTheme.forestLight : AppTheme.forestPrimary)
+                : (isDark ? AppTheme.cardDark : Colors.white),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? AppTheme.forestPrimary
+                  : (isDark ? AppTheme.borderDark : AppTheme.borderLight),
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? AppTheme.textLight : AppTheme.textDark),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected
+                      ? Colors.white
+                      : (isDark ? AppTheme.textMutedDark : AppTheme.textMuted),
                 ),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: amountCtrl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Total Amount',
-                  prefixText: '${ApiService().currency} ',
-                  hintText: '0.00',
-                  border: const OutlineInputBorder(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- Manual Entry Modal ---
+  void _handleManualEntry() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final merchantCtrl = TextEditingController();
+    final amountCtrl = TextEditingController();
+    String category = 'Groceries';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppTheme.cardDark : AppTheme.cardWhite,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+                left: 24,
+                right: 24,
+                top: 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Manual Receipt Entry',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? AppTheme.textLight : AppTheme.textDark,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: merchantCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Merchant Name',
+                      hintText: 'e.g. Imtiaz Super Market',
+                      filled: true,
+                      fillColor: isDark ? AppTheme.cardDarkElevated : AppTheme.canvasLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: amountCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Total Amount',
+                      prefixText: '${_api.currency} ',
+                      hintText: '0.00',
+                      filled: true,
+                      fillColor: isDark ? AppTheme.cardDarkElevated : AppTheme.canvasLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Category',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: ['Groceries', 'Fuel', 'Dining', 'Pharmacy', 'Utilities'].map((cat) {
+                      final isSelected = category == cat;
+                      return ChoiceChip(
+                        label: Text(cat),
+                        selected: isSelected,
+                        selectedColor: AppTheme.forestPrimary,
+                        backgroundColor: isDark ? AppTheme.cardDarkElevated : AppTheme.canvasLight,
+                        labelStyle: TextStyle(
+                          color: isSelected
+                              ? Colors.white
+                              : (isDark ? AppTheme.textLight : AppTheme.textDark),
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 12,
+                        ),
+                        onSelected: (val) {
+                          if (val) setModalState(() => category = cat);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.forestPrimary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 0,
+                    ),
+                    onPressed: () {
+                      final merchant = merchantCtrl.text.trim();
+                      final amount = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
+                      if (merchant.isEmpty || amount <= 0) {
+                        AppToast.error(ctx, 'Please enter merchant and valid amount');
+                        return;
+                      }
+                      Navigator.pop(ctx);
+                      AppToast.success(context, 'Receipt "$merchant" added to review queue!');
+                      _api.refreshReviewCount();
+                    },
+                    child: const Text('Save to Review Queue', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // --- Receipt Detail Modal Sheet ---
+  void _showReceiptDetail(Map<String, dynamic> r) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final merchant = r['merchant'] ?? 'Receipt Detail';
+    final total = (r['total_amount'] ?? 0.0) as num;
+    final date = r['date'] ?? 'Recent';
+    final lineItems = (r['line_items'] as List<dynamic>?) ?? [];
+    final category = r['category'] ?? 'General';
+    final tax = (r['tax'] ?? 0.0) as num;
+    final payment = r['payment_method'] ?? 'Card / Cash';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppTheme.cardDark : AppTheme.cardWhite,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
                 ),
               ),
               const SizedBox(height: 18),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.navyBrand,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.cardDarkElevated : AppTheme.sageLight,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(
+                      _getCategoryIcon(category),
+                      color: isDark ? AppTheme.textLight : AppTheme.forestPrimary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          merchant,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? AppTheme.textLight : AppTheme.textDark,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '$date • $category',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.greenVerifiedBg,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'VERIFIED',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.greenVerified,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.cardDarkElevated : AppTheme.canvasLight,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: isDark ? AppTheme.borderDark : AppTheme.borderLight,
+                  ),
                 ),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  AppToast.success(context, 'Manual receipt added to review queue!');
-                },
-                child: const Text('Save to Review Queue', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Total Amount', style: TextStyle(fontSize: 13, color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted)),
+                        Text(
+                          '${_api.currency} ${total.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: isDark ? AppTheme.textLight : AppTheme.forestPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Payment Method', style: TextStyle(fontSize: 12, color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted)),
+                        Text(payment, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? AppTheme.textLight : AppTheme.textDark)),
+                      ],
+                    ),
+                    if (tax > 0) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Included Tax', style: TextStyle(fontSize: 12, color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted)),
+                          Text('${_api.currency} ${tax.toStringAsFixed(2)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? AppTheme.textLight : AppTheme.textDark)),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'ITEMIZED BREAKDOWN (${lineItems.length})',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
+                  color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
+                ),
+              ),
+              const SizedBox(height: 10),
+              if (lineItems.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text('No individual line items parsed.', style: TextStyle(fontSize: 12, color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted)),
+                )
+              else
+                ...lineItems.map((item) {
+                  final name = item['item_name'] ?? 'Item';
+                  final qty = item['qty'] ?? 1;
+                  final price = (item['price'] ?? 0.0) as num;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: isDark ? AppTheme.cardDarkElevated : AppTheme.sageLight,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '$qty',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? AppTheme.textLight : AppTheme.forestPrimary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            name,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? AppTheme.textLight : AppTheme.textDark,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${_api.currency} ${price.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? AppTheme.textLight : AppTheme.textDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Close Details'),
+                ),
               ),
             ],
           ),
@@ -224,693 +844,584 @@ class _UploadScreenState extends State<UploadScreen> with SingleTickerProviderSt
     );
   }
 
+  IconData _getCategoryIcon(String category) {
+    final cat = category.toLowerCase();
+    if (cat.contains('groc')) return Icons.local_grocery_store_outlined;
+    if (cat.contains('fuel')) return Icons.local_gas_station_outlined;
+    if (cat.contains('din') || cat.contains('cafe')) return Icons.restaurant_outlined;
+    if (cat.contains('bak')) return Icons.bakery_dining_outlined;
+    if (cat.contains('pharm') || cat.contains('health')) return Icons.local_pharmacy_outlined;
+    if (cat.contains('util')) return Icons.flash_on_outlined;
+    if (cat.contains('shop')) return Icons.shopping_bag_outlined;
+    return Icons.receipt_long_outlined;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? AppColors.cardDark : AppColors.cardWhite;
-    final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
-    final textPrimary = isDark ? AppColors.textLight : AppColors.textDark;
-    final textMuted = isDark ? AppColors.textMutedDark : AppColors.textMuted;
+    final cardBg = isDark ? AppTheme.cardDark : AppTheme.cardWhite;
+    final borderColor = isDark ? AppTheme.borderDark : AppTheme.borderLight;
+    final textPrimary = isDark ? AppTheme.textLight : AppTheme.textDark;
+    final textMuted = isDark ? AppTheme.textMutedDark : AppTheme.textMuted;
+
+    final sampleReceipts = _api.getSampleReceipts();
+    final filteredReceipts = _selectedCategory == 'All'
+        ? sampleReceipts
+        : sampleReceipts.where((r) => (r['category']?.toString().toLowerCase() ?? '').contains(_selectedCategory.toLowerCase())).toList();
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.canvasDark : AppColors.canvasLight,
+      backgroundColor: isDark ? AppTheme.canvasDark : AppTheme.canvasLight,
       body: Column(
         children: [
-          // Header with Logo & Drawer Avatar
+          // Elegant Header with Live/Demo Badge & Drawer Trigger
           AppHeader(
             subCaption: 'CAPTURE',
             onAvatarTap: widget.onOpenDrawer ?? () => Scaffold.of(context).openEndDrawer(),
           ),
 
-          // Scrollable Body containing Camera Hub and Dashboard
+          // Main Scrollable Area
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 100), // Clears floating navbar
-              children: [
-                // Mode Toggle & Camera Options Pills
-                _buildCaptureModeBar(isDark, borderColor, textPrimary, textMuted),
-                const SizedBox(height: 12),
-
-                // Viewfinder Container Card
-                _buildViewfinderCard(isDark, borderColor),
-                const SizedBox(height: 14),
-
-                // Compact Capture Controls (Gallery, Iris Shutter, Manual)
-                _buildCompactControlBar(isDark, cardBg, borderColor, textPrimary, textMuted),
-                const SizedBox(height: 20),
-
-                // Pending Verification Alert Card (if any pending)
-                ValueListenableBuilder<int>(
-                  valueListenable: ApiService().reviewCountNotifier,
-                  builder: (context, count, _) {
-                    if (count <= 0) return const SizedBox.shrink();
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E3A8A).withAlpha(40) : const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFF3B82F6), width: 1.5),
+            child: RefreshIndicator(
+              color: AppTheme.forestPrimary,
+              onRefresh: () async {
+                await _api.checkHealthSilently();
+                await _api.refreshReviewCount();
+                setState(() {});
+              },
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 110), // Clears floating bottom nav
+                children: [
+                  // --- HERO SCAN CARD (Leafora Organic Luxury Aesthetic) ---
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: borderColor, width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(isDark ? 30 : 8),
+                          blurRadius: 18,
+                          offset: const Offset(0, 6),
                         ),
-                        child: Row(
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Badge & Capture Mode status
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF3B82F6),
-                                borderRadius: BorderRadius.circular(10),
+                                color: isDark ? AppTheme.cardDarkElevated : AppTheme.sageLight,
+                                borderRadius: BorderRadius.circular(20),
                               ),
-                              child: const Icon(Icons.rate_review_rounded, color: Colors.white, size: 20),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
-                                    '$count Receipts Pending Verification',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 13,
-                                      color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E40AF),
-                                    ),
+                                  const Icon(
+                                    Icons.auto_awesome_rounded,
+                                    size: 13,
+                                    color: AppTheme.forestPrimary,
                                   ),
-                                  const SizedBox(height: 2),
+                                  const SizedBox(width: 5),
                                   Text(
-                                    'Review extracted line items before ledger commit',
-                                    style: TextStyle(fontSize: 11, color: textMuted),
+                                    'AI OCR ENGINE',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.8,
+                                      color: isDark ? AppTheme.textLight : AppTheme.forestPrimary,
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2563EB),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            // Current mode badge (Single vs Batch)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isDark ? AppTheme.cardDarkElevated : AppTheme.canvasLight,
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                              onPressed: () => widget.onNavigateTab != null
-                                  ? widget.onNavigateTab!(2)
-                                  : widget.onNavigateToReview?.call(),
-                              child: const Text('Review', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              child: Text(
+                                _captureMode == 'batch' ? 'Batch Mode' : 'Single Receipt',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: textMuted,
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                    );
-                  },
-                ),
+                        const SizedBox(height: 14),
 
-                // Today's Activity Dashboard Card
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: cardBg,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: borderColor, width: 1),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'TODAY\'S ACTIVITY',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: textMuted,
-                              letterSpacing: 1.1,
-                            ),
+                        // Title & Subtitle
+                        Text(
+                          'Digitize Any Receipt',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                            color: textPrimary,
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF064E3B) : const Color(0xFFE8F7F0),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'Auto OCR Active',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.greenVerified,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Take a quick photo or upload to automatically extract merchant, tax, items, and total.',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            height: 1.35,
+                            color: textMuted,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+
+                        // Main Action Row: Big Forest Green Button + Sleek Gear Icon for Options
+                        Row(
+                          children: [
+                            // Main Scan Button (Like Leafora's "Get Started" / "Shop Now")
+                            Expanded(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.forestPrimary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                onPressed: _isCapturing ? null : _handleScanReceipt,
+                                child: _isCapturing
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        ),
+                                      )
+                                    : const Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.camera_alt_rounded, size: 20),
+                                          SizedBox(width: 8),
+                                          Text(
+                                            'Scan Receipt',
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 0.3,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          _buildStatItem('Scanned', '4 Slips', Icons.document_scanner_rounded, AppColors.headerBlue, textPrimary, textMuted),
-                          Container(width: 1, height: 36, color: borderColor),
-                          _buildStatItem('Processed', '${ApiService().currency} 12,450', Icons.payments_rounded, AppColors.greenVerified, textPrimary, textMuted),
-                          Container(width: 1, height: 36, color: borderColor),
-                          _buildStatItem('Confidence', '99.4%', Icons.verified_rounded, const Color(0xFF3B82F6), textPrimary, textMuted),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
+                            const SizedBox(width: 10),
 
-                // Scanning Best Practices Tips
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: cardBg,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: borderColor, width: 1),
+                            // Discreet Gear / Tune Button (Addresses user's request to hide clunky controls)
+                            GestureDetector(
+                              onTap: _showCaptureSettingsModal,
+                              child: Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: isDark ? AppTheme.cardDarkElevated : AppTheme.sageLight,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: isDark ? AppTheme.borderDark : AppTheme.sageMuted,
+                                    width: 1.2,
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.tune_rounded,
+                                  color: isDark ? AppTheme.textLight : AppTheme.forestPrimary,
+                                  size: 22,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Secondary Options: Gallery & Manual Entry
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: textPrimary,
+                                  side: BorderSide(color: borderColor),
+                                  padding: const EdgeInsets.symmetric(vertical: 11),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.photo_library_outlined, size: 17),
+                                label: const Text('From Gallery', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                                onPressed: _isCapturing ? null : _handlePickFromGallery,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: textPrimary,
+                                  side: BorderSide(color: borderColor),
+                                  padding: const EdgeInsets.symmetric(vertical: 11),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.edit_note_rounded, size: 19),
+                                label: const Text('Manual Entry', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                                onPressed: _handleManualEntry,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Row(
+                  const SizedBox(height: 16),
+
+                  // --- PENDING REVIEW QUEUE ALERT (If review items exist) ---
+                  ValueListenableBuilder<int>(
+                    valueListenable: _api.reviewCountNotifier,
+                    builder: (context, count, _) {
+                      if (count <= 0) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppTheme.cardDarkElevated : AppTheme.sageLight,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: isDark ? AppTheme.sageAccent.withAlpha(60) : AppTheme.sageAccent.withAlpha(120),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.forestPrimary,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(Icons.fact_check_rounded, color: Colors.white, size: 20),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '$count Slips Ready for Review',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13.5,
+                                        color: isDark ? AppTheme.textLight : AppTheme.forestPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Verify extracted line items and totals',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.forestPrimary,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                onPressed: () {
+                                  if (widget.onNavigateTab != null) {
+                                    widget.onNavigateTab!(2);
+                                  } else {
+                                    widget.onNavigateToReview?.call();
+                                  }
+                                },
+                                child: const Text(
+                                  'Review →',
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  // --- LEAFORA CATEGORY FILTER CHIPS ---
+                  Text(
+                    'CATEGORIES',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                      color: textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 40,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _categories.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, idx) {
+                        final cat = _categories[idx];
+                        final isSelected = _selectedCategory == cat;
+                        return GestureDetector(
+                          onTap: () => setState(() => _selectedCategory = cat),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppTheme.forestPrimary
+                                  : (isDark ? AppTheme.cardDark : AppTheme.cardWhite),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppTheme.forestPrimary
+                                    : (isDark ? AppTheme.borderDark : AppTheme.borderLight),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                if (cat != 'All') ...[
+                                  Icon(
+                                    _getCategoryIcon(cat),
+                                    size: 15,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : (isDark ? AppTheme.textLight : AppTheme.forestPrimary),
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                                Text(
+                                  cat,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : (isDark ? AppTheme.textLight : AppTheme.textDark),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // --- RECENT ACTIVITY SECTION ---
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Icon(Icons.wb_incandescent_outlined, color: AppColors.amberWarning, size: 22),
-                      const SizedBox(width: 10),
-                      Expanded(
+                      Text(
+                        'RECENT ACTIVITY (${filteredReceipts.length})',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                          color: textMuted,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => widget.onNavigateTab != null ? widget.onNavigateTab!(1) : null,
                         child: Text(
-                          'Tip: Keep slips flat under even lighting. Ensure merchant name and total amount are inside the viewfinder brackets.',
-                          style: TextStyle(fontSize: 11.5, color: textMuted, height: 1.3),
+                          'View All →',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? AppTheme.sageAccent : AppTheme.forestPrimary,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+                  const SizedBox(height: 10),
 
-  Widget _buildStatItem(String title, String val, IconData icon, Color iconColor, Color textPrimary, Color textMuted) {
-    return Expanded(
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 14, color: iconColor),
-              const SizedBox(width: 4),
-              Text(title, style: TextStyle(fontSize: 11, color: textMuted, fontWeight: FontWeight.w500)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            val,
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textPrimary),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
+                  if (filteredReceipts.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Text(
+                        'No receipts found in "$_selectedCategory"',
+                        style: TextStyle(fontSize: 13, color: textMuted),
+                      ),
+                    )
+                  else
+                    ...filteredReceipts.take(5).map((r) {
+                      final merchant = r['merchant'] ?? 'Merchant';
+                      final date = r['date'] ?? 'Recent';
+                      final total = (r['total_amount'] ?? 0.0) as num;
+                      final category = r['category'] ?? 'General';
+                      final count = r['items_count'] ?? 1;
 
-  Widget _buildCaptureModeBar(bool isDark, Color borderColor, Color textPrimary, Color textMuted) {
-    return Row(
-      children: [
-        // Mode Selector: Single vs Batch
-        Container(
-          height: 38,
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF131B2E) : const Color(0xFFE2E8F0),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: borderColor, width: 1),
-          ),
-          padding: const EdgeInsets.all(3),
-          child: Row(
-            children: [
-              _buildModePill('Single Receipt', _captureMode == 'single', () {
-                setState(() => _captureMode = 'single');
-              }),
-              _buildModePill('Batch Mode', _captureMode == 'batch', () {
-                setState(() => _captureMode = 'batch');
-              }),
-            ],
-          ),
-        ),
-        const Spacer(),
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          color: cardBg,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(18),
+                          clipBehavior: Clip.antiAlias,
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                            onTap: () => _showReceiptDetail(r),
+                          leading: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: isDark ? AppTheme.cardDarkElevated : AppTheme.sageLight,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(
+                              _getCategoryIcon(category),
+                              color: isDark ? AppTheme.textLight : AppTheme.forestPrimary,
+                              size: 22,
+                            ),
+                          ),
+                          title: Text(
+                            merchant,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: textPrimary,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '$date • $count items',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: textMuted,
+                            ),
+                          ),
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                '${_api.currency} ${total.toStringAsFixed(0)}',
+                                style: TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.greenVerifiedBg,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'VERIFIED',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppTheme.greenVerified,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                    }),
+                  const SizedBox(height: 16),
 
-        // Auto Flash Toggle
-        GestureDetector(
-          onTap: () {
-            setState(() => _flashAuto = !_flashAuto);
-            AppToast.info(context, _flashAuto ? 'Flash: AUTO' : 'Flash: OFF');
-          },
-          child: Container(
-            height: 38,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.cardDark : AppColors.cardWhite,
-              borderRadius: BorderRadius.circular(19),
-              border: Border.all(color: borderColor, width: 1),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _flashAuto ? Icons.flash_auto_rounded : Icons.flash_off_rounded,
-                  size: 16,
-                  color: _flashAuto ? const Color(0xFFF59E0B) : textMuted,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  _flashAuto ? 'AUTO' : 'OFF',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: textPrimary,
+                  // --- OCR CAPTURE TIPS ---
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.cardDarkElevated : AppTheme.canvasLight,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.tips_and_updates_outlined, size: 18, color: isDark ? AppTheme.sageAccent : AppTheme.forestPrimary),
+                            const SizedBox(width: 8),
+                            Text(
+                              'BEST SCANNING PRACTICES',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                                color: textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        _buildTipItem(Icons.crop_free_rounded, 'Lay receipt on a contrasting, dark flat surface', isDark, textMuted),
+                        const SizedBox(height: 6),
+                        _buildTipItem(Icons.wb_sunny_outlined, 'Ensure bright, even lighting to eliminate heavy shadows', isDark, textMuted),
+                        const SizedBox(height: 6),
+                        _buildTipItem(Icons.receipt_rounded, 'Make sure merchant name and grand total are in frame', isDark, textMuted),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
+        ],
+      ),
+    );
+  }
 
-        // Aspect Ratio Indicator
-        Container(
-          height: 38,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.cardDark : AppColors.cardWhite,
-            borderRadius: BorderRadius.circular(19),
-            border: Border.all(color: borderColor, width: 1),
-          ),
-          alignment: Alignment.center,
+  Widget _buildTipItem(IconData icon, String text, bool isDark, Color textMuted) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 15, color: isDark ? AppTheme.sageAccent : AppTheme.forestPrimary),
+        const SizedBox(width: 8),
+        Expanded(
           child: Text(
-            '4:3 Crop',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: textMuted,
-            ),
+            text,
+            style: TextStyle(fontSize: 11.5, color: textMuted, height: 1.3),
           ),
         ),
       ],
     );
   }
-
-  Widget _buildModePill(String label, bool isSelected, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(25),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ]
-              : null,
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-            color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildViewfinderCard(bool isDark, Color borderColor) {
-    return Container(
-      height: 250,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A), // Sleek solid dark viewfinder
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: borderColor, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(isDark ? 80 : 40),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Live Camera Preview if initialized
-          if (_isCameraInitialized && _cameraController != null)
-            CameraPreview(_cameraController!)
-          else
-            // High-contrast clean viewfinder background with alignment grid
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.crop_free_rounded,
-                    size: 44,
-                    color: Colors.white.withAlpha(120),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Align Receipt Within Frame',
-                    style: TextStyle(
-                      color: Colors.white.withAlpha(220),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Auto-edge detection active',
-                    style: TextStyle(
-                      color: Colors.white.withAlpha(120),
-                      fontSize: 10.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          // L-Corner Viewfinder Guides
-          _buildCornerGuides(),
-
-          // Animated Scanning Laser Beam
-          AnimatedBuilder(
-            animation: _laserAnimation,
-            builder: (context, _) {
-              return Positioned(
-                top: 20 + _laserAnimation.value * 210,
-                left: 36,
-                right: 36,
-                child: Container(
-                  height: 2,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF2DD4BF),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(0xFF2DD4BF),
-                        blurRadius: 8,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-
-          // Top Info Status Pill: "Receipt Detected • Ready"
-          Positioned(
-            top: 12,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.black.withAlpha(140),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withAlpha(40), width: 1),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: const BoxDecoration(
-                      color: AppColors.greenVerified,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'Receipt Viewfinder • Ready',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCornerGuides() {
-    const double size = 26;
-    const double thickness = 3.0;
-    const Color color = Colors.white;
-
-    return Positioned(
-      top: 30,
-      bottom: 30,
-      left: 28,
-      right: 28,
-      child: Stack(
-        children: [
-          // Top-Left
-          Positioned(
-            top: 0,
-            left: 0,
-            child: Container(
-              width: size,
-              height: size,
-              decoration: const BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: color, width: thickness),
-                  left: BorderSide(color: color, width: thickness),
-                ),
-              ),
-            ),
-          ),
-          // Top-Right
-          Positioned(
-            top: 0,
-            right: 0,
-            child: Container(
-              width: size,
-              height: size,
-              decoration: const BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: color, width: thickness),
-                  right: BorderSide(color: color, width: thickness),
-                ),
-              ),
-            ),
-          ),
-          // Bottom-Left
-          Positioned(
-            bottom: 0,
-            left: 0,
-            child: Container(
-              width: size,
-              height: size,
-              decoration: const BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: color, width: thickness),
-                  left: BorderSide(color: color, width: thickness),
-                ),
-              ),
-            ),
-          ),
-          // Bottom-Right
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: Container(
-              width: size,
-              height: size,
-              decoration: const BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: color, width: thickness),
-                  right: BorderSide(color: color, width: thickness),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompactControlBar(bool isDark, Color cardBg, Color borderColor, Color textPrimary, Color textMuted) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: 1),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          // Gallery Button
-          _buildActionButton(
-            icon: Icons.photo_library_outlined,
-            label: 'Gallery',
-            onTap: _handlePickFromGallery,
-            isDark: isDark,
-            textPrimary: textPrimary,
-          ),
-
-          // Central Iris Aperture Shutter Button (Compact 62dp)
-          GestureDetector(
-            onTap: _isCapturing ? null : _handleCapture,
-            child: Container(
-              width: 62,
-              height: 62,
-              decoration: BoxDecoration(
-                color: AppColors.navyBrand,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 3),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.navyBrand.withAlpha(isDark ? 90 : 60),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(7),
-              child: _isCapturing
-                  ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)
-                  : CustomPaint(
-                      painter: _ApertureShutterPainter(),
-                    ),
-            ),
-          ),
-
-          // Manual Entry Button
-          _buildActionButton(
-            icon: Icons.edit_note_rounded,
-            label: 'Manual',
-            onTap: _handleManualEntry,
-            isDark: isDark,
-            textPrimary: textPrimary,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    required bool isDark,
-    required Color textPrimary,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isDark ? AppColors.borderDark : AppColors.borderLight,
-                width: 1,
-              ),
-            ),
-            child: Icon(icon, color: textPrimary, size: 22),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w700,
-              color: textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Custom painter for the camera iris aperture shutter icon from CAPTURE.png
-class _ApertureShutterPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
-
-    final bladePaint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 2.0
-      ..style = PaintingStyle.stroke;
-
-    final outerRingPaint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke;
-
-    // Draw outer circle
-    canvas.drawCircle(center, radius - 1, outerRingPaint);
-
-    // Draw 8 aperture blades around the iris
-    const int blades = 8;
-    for (int i = 0; i < blades; i++) {
-      final angle = (i * 2 * math.pi) / blades;
-      final p1 = Offset(
-        center.dx + (radius - 2) * math.cos(angle),
-        center.dy + (radius - 2) * math.sin(angle),
-      );
-      final p2 = Offset(
-        center.dx + (radius * 0.42) * math.cos(angle + math.pi / 3),
-        center.dy + (radius * 0.42) * math.sin(angle + math.pi / 3),
-      );
-      canvas.drawLine(p1, p2, bladePaint);
-    }
-
-    // Center circular aperture with red & blue accent dot
-    final centerCirclePaint = Paint()
-      ..color = const Color(0xFF0C1E4A)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(center, radius * 0.35, centerCirclePaint);
-
-    final redAccent = Paint()
-      ..color = const Color(0xFFEF4444)
-      ..style = PaintingStyle.fill;
-    final blueAccent = Paint()
-      ..color = const Color(0xFF3B82F6)
-      ..style = PaintingStyle.fill;
-
-    // Split red/blue center iris core
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius * 0.22),
-      -math.pi / 2,
-      math.pi,
-      true,
-      redAccent,
-    );
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius * 0.22),
-      math.pi / 2,
-      math.pi,
-      true,
-      blueAccent,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

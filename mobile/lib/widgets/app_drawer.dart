@@ -28,19 +28,19 @@ class _AppDrawerState extends State<AppDrawer> {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.symmetric(vertical: 18),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -49,7 +49,7 @@ class _AppDrawerState extends State<AppDrawer> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
-                          color: isDark ? Colors.white : AppTheme.navyBrand,
+                          color: isDark ? Colors.white : AppTheme.textDark,
                         ),
                       ),
                       IconButton(
@@ -63,30 +63,32 @@ class _AppDrawerState extends State<AppDrawer> {
                 ...currencies.map((curr) {
                   final isSelected = _api.currency == curr['code'] || _api.currency == curr['symbol'];
                   return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 2),
                     leading: Container(
-                      width: 40,
-                      height: 40,
+                      width: 42,
+                      height: 42,
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? (isDark ? const Color(0xFF0F2B5C) : const Color(0xFFEFF6FF))
-                            : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
-                        borderRadius: BorderRadius.circular(10),
+                            ? (isDark ? const Color(0xFF22352A) : AppTheme.sageLight)
+                            : (isDark ? AppTheme.cardDarkElevated : const Color(0xFFF3F5F0)),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       alignment: Alignment.center,
                       child: Text(
                         curr['symbol']!,
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
-                          fontSize: 14,
-                          color: isSelected ? AppTheme.headerBlue : AppTheme.textMuted,
+                          fontSize: 15,
+                          color: isSelected
+                              ? (isDark ? const Color(0xFF86AB93) : AppTheme.forestPrimary)
+                              : AppTheme.textMuted,
                         ),
                       ),
                     ),
                     title: Text(
                       curr['name']!,
                       style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                         fontSize: 15,
                         color: isDark ? Colors.white : AppTheme.textDark,
                       ),
@@ -96,7 +98,7 @@ class _AppDrawerState extends State<AppDrawer> {
                       style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     ),
                     trailing: isSelected
-                        ? const Icon(Icons.check_circle_rounded, color: AppTheme.headerBlue, size: 22)
+                        ? const Icon(Icons.check_circle_rounded, color: AppTheme.forestPrimary, size: 22)
                         : null,
                     onTap: () {
                       _api.setCurrency(curr['code']!);
@@ -129,18 +131,18 @@ class _AppDrawerState extends State<AppDrawer> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppTheme.headerBlue.withOpacity(0.15),
+                    color: AppTheme.sageLight,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.dns_rounded, color: AppTheme.headerBlue, size: 20),
+                  child: const Icon(Icons.dns_rounded, color: AppTheme.forestPrimary, size: 20),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Text(
                   'Backend Server',
                   style: TextStyle(
-                    fontSize: 17,
+                    fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: isDark ? Colors.white : AppTheme.navyBrand,
+                    color: isDark ? Colors.white : AppTheme.textDark,
                   ),
                 ),
               ],
@@ -150,19 +152,32 @@ class _AppDrawerState extends State<AppDrawer> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Configure FastAPI OCR and parsing endpoint:',
+                  'FastAPI server endpoint running on your laptop:',
                   style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
                 ),
                 const SizedBox(height: 14),
                 TextField(
                   controller: serverCtrl,
                   decoration: InputDecoration(
-                    labelText: 'API URL',
-                    hintText: 'http://192.168.1.100:8000',
+                    labelText: 'Server URL',
+                    hintText: 'http://192.168.100.78:8000',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    prefixIcon: const Icon(Icons.link_rounded),
+                    prefixIcon: const Icon(Icons.wifi_tethering_rounded),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ActionChip(
+                      label: const Text('Preset: 192.168.100.78:8000', style: TextStyle(fontSize: 11)),
+                      backgroundColor: isDark ? AppTheme.cardDarkElevated : AppTheme.sageLight,
+                      onPressed: () {
+                        serverCtrl.text = 'http://192.168.100.78:8000';
+                      },
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 14),
                 OutlinedButton.icon(
@@ -173,14 +188,14 @@ class _AppDrawerState extends State<AppDrawer> {
                           try {
                             _api.setBaseUrl(serverCtrl.text);
                             final health = await _api.checkHealth();
-                            if (!mounted || !context.mounted) return;
+                            if (!mounted) return;
                             setDialogState(() => isTesting = false);
                             AppToast.showSuccess(
                               context,
-                              'Server online! Engine: ${health['ocr_engine'] ?? 'Ready'}',
+                              'Server online! OCR: ${health['ocr_engine'] ?? 'Ready'}',
                             );
                           } catch (e) {
-                            if (!mounted || !context.mounted) return;
+                            if (!mounted) return;
                             setDialogState(() => isTesting = false);
                             AppToast.showError(context, 'Connection failed: ${e.toString()}');
                           }
@@ -194,7 +209,7 @@ class _AppDrawerState extends State<AppDrawer> {
                       : const Icon(Icons.speed_rounded, size: 16),
                   label: Text(isTesting ? 'Pinging...' : 'Test Connection'),
                   style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ],
@@ -212,8 +227,8 @@ class _AppDrawerState extends State<AppDrawer> {
                   AppToast.showSuccess(context, 'Server endpoint saved.');
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.navyBrand,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  backgroundColor: AppTheme.forestPrimary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text('Save', style: TextStyle(color: Colors.white)),
               ),
@@ -236,18 +251,18 @@ class _AppDrawerState extends State<AppDrawer> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppTheme.greenVerified.withOpacity(0.15),
+                  color: AppTheme.sageLight,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.file_download_rounded, color: AppTheme.greenVerified, size: 20),
+                child: const Icon(Icons.file_download_rounded, color: AppTheme.forestPrimary, size: 20),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Text(
                 'Export Reports',
                 style: TextStyle(
-                  fontSize: 17,
+                  fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: isDark ? Colors.white : AppTheme.navyBrand,
+                  color: isDark ? Colors.white : AppTheme.textDark,
                 ),
               ),
             ],
@@ -264,16 +279,16 @@ class _AppDrawerState extends State<AppDrawer> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: isDark ? const Color(0xFF334155) : AppTheme.borderLight),
+                  color: isDark ? AppTheme.cardDarkElevated : const Color(0xFFF3F5F0),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isDark ? AppTheme.borderDark : AppTheme.borderLight),
                 ),
                 child: SelectableText(
                   exportUrl,
                   style: const TextStyle(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                     fontSize: 12,
-                    color: AppTheme.headerBlue,
+                    color: AppTheme.forestPrimary,
                   ),
                 ),
               ),
@@ -297,8 +312,8 @@ class _AppDrawerState extends State<AppDrawer> {
               icon: const Icon(Icons.download_rounded, size: 16, color: Colors.white),
               label: const Text('Download CSV', style: TextStyle(color: Colors.white)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.navyBrand,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                backgroundColor: AppTheme.forestPrimary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ],
@@ -326,7 +341,7 @@ class _AppDrawerState extends State<AppDrawer> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.badgeRed,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: const Text('Log Out', style: TextStyle(color: Colors.white)),
           ),
@@ -338,9 +353,9 @@ class _AppDrawerState extends State<AppDrawer> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final drawerBg = isDark ? const Color(0xFF0F172A) : Colors.white;
-    final cardBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
-    final borderColor = isDark ? const Color(0xFF334155) : AppTheme.borderLight;
+    final drawerBg = isDark ? AppTheme.canvasDark : AppTheme.canvasLight;
+    final cardBg = isDark ? AppTheme.cardDark : Colors.white;
+    final borderColor = isDark ? AppTheme.borderDark : AppTheme.borderLight;
     final primaryText = isDark ? Colors.white : AppTheme.textDark;
 
     return Drawer(
@@ -358,18 +373,18 @@ class _AppDrawerState extends State<AppDrawer> {
               child: Row(
                 children: [
                   Container(
-                    width: 56,
-                    height: 56,
+                    width: 54,
+                    height: 54,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppTheme.avatarGreen,
+                      color: AppTheme.forestPrimary,
                       border: Border.all(
-                        color: isDark ? const Color(0xFF334155) : Colors.white,
+                        color: isDark ? const Color(0xFF3B5646) : Colors.white,
                         width: 2,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withOpacity(0.08),
                           blurRadius: 8,
                           offset: const Offset(0, 3),
                         ),
@@ -408,26 +423,35 @@ class _AppDrawerState extends State<AppDrawer> {
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: isDark ? AppTheme.greenVerifiedBgDark : AppTheme.greenVerifiedBg,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.cloud_done_rounded, size: 12, color: AppTheme.greenVerified),
-                              SizedBox(width: 4),
-                              Text(
-                                'Sync Active',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppTheme.greenVerified,
+                        ValueListenableBuilder<bool>(
+                          valueListenable: _api.backendOnlineNotifier,
+                          builder: (ctx, isOnline, _) => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isOnline
+                                  ? (isDark ? const Color(0xFF142C1F) : AppTheme.greenVerifiedBg)
+                                  : (isDark ? const Color(0xFF241F1A) : const Color(0xFFFBF4EB)),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+                                  size: 12,
+                                  color: isOnline ? AppTheme.greenVerified : AppTheme.amberWarning,
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 4),
+                                Text(
+                                  isOnline ? 'Backend Online' : 'Local Demo',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: isOnline ? AppTheme.greenVerified : AppTheme.amberWarning,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -447,7 +471,7 @@ class _AppDrawerState extends State<AppDrawer> {
                   return Container(
                     height: 48,
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                      color: isDark ? AppTheme.cardDark : const Color(0xFFEBEFEA),
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(color: borderColor),
                     ),
@@ -465,7 +489,9 @@ class _AppDrawerState extends State<AppDrawer> {
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
                               decoration: BoxDecoration(
-                                color: !activeDark ? (isDark ? const Color(0xFF334155) : Colors.white) : Colors.transparent,
+                                color: !activeDark
+                                    ? (isDark ? AppTheme.cardDarkElevated : Colors.white)
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(20),
                                 boxShadow: !activeDark
                                     ? [
@@ -511,7 +537,9 @@ class _AppDrawerState extends State<AppDrawer> {
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
                               decoration: BoxDecoration(
-                                color: activeDark ? (isDark ? const Color(0xFF334155) : Colors.white) : Colors.transparent,
+                                color: activeDark
+                                    ? (isDark ? AppTheme.cardDarkElevated : Colors.white)
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(20),
                                 boxShadow: activeDark
                                     ? [
@@ -530,7 +558,7 @@ class _AppDrawerState extends State<AppDrawer> {
                                   Icon(
                                     Icons.dark_mode_rounded,
                                     size: 16,
-                                    color: activeDark ? AppTheme.headerBlue : AppTheme.textMuted,
+                                    color: activeDark ? const Color(0xFF86AB93) : AppTheme.textMuted,
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
@@ -657,13 +685,13 @@ class _AppDrawerState extends State<AppDrawer> {
                     leading: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppTheme.navyBrand.withOpacity(isDark ? 0.3 : 0.08),
+                        color: isDark ? AppTheme.cardDarkElevated : AppTheme.sageLight,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
                         Icons.fingerprint_rounded,
                         size: 20,
-                        color: isDark ? AppTheme.headerBlue : AppTheme.navyBrand,
+                        color: isDark ? const Color(0xFF86AB93) : AppTheme.forestPrimary,
                       ),
                     ),
                     title: Text(
@@ -680,7 +708,7 @@ class _AppDrawerState extends State<AppDrawer> {
                     ),
                     trailing: Switch(
                       value: _biometricsEnabled,
-                      activeColor: AppTheme.headerBlue,
+                      activeColor: AppTheme.forestPrimary,
                       onChanged: (val) {
                         setState(() => _biometricsEnabled = val);
                         AppToast.showInfo(
@@ -774,13 +802,13 @@ class _AppDrawerState extends State<AppDrawer> {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: AppTheme.navyBrand.withOpacity(isDark ? 0.3 : 0.08),
+          color: isDark ? AppTheme.cardDarkElevated : AppTheme.sageLight,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
           icon,
           size: 20,
-          color: isDark ? AppTheme.headerBlue : AppTheme.navyBrand,
+          color: isDark ? const Color(0xFF86AB93) : AppTheme.forestPrimary,
         ),
       ),
       title: Text(
@@ -801,7 +829,7 @@ class _AppDrawerState extends State<AppDrawer> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+              color: isDark ? AppTheme.cardDarkElevated : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
@@ -809,7 +837,7 @@ class _AppDrawerState extends State<AppDrawer> {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: isDark ? const Color(0xFF94A3B8) : AppTheme.navyBrand,
+                color: isDark ? const Color(0xFF94A3B8) : AppTheme.forestPrimary,
               ),
             ),
           ),

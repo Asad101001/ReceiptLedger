@@ -3,11 +3,11 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/app_theme.dart';
 
 /// Floating Pill Bottom Navigation Bar
-/// Meets specifications:
-/// 1. Floating above the bottom with elevation and margins
-/// 2. Bigger icons (26px)
-/// 3. Text label always visible in smaller font beneath every tab
-/// 4. 3 primary tabs (Settings moved to the Sidebar)
+/// Inspired by the Leafora reference design:
+/// - Floating warm white/card surface with soft rounded corners
+/// - Subtle natural drop shadow
+/// - Active tab highlighted with a soft sage pill container & forest green icons
+/// - Big 26px icons with permanent 10px bold text labels beneath
 class FloatingBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTabSelected;
@@ -24,10 +24,8 @@ class FloatingBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottomInset = MediaQuery.of(context).padding.bottom;
-    final navBg = isDark ? const Color(0xFF1E293B) : AppTheme.headerBlue;
-    final shadowColor = isDark
-        ? Colors.black.withOpacity(0.45)
-        : AppTheme.headerBlue.withOpacity(0.38);
+    final navBg = isDark ? AppTheme.cardDark : Colors.white;
+    final borderColor = isDark ? AppTheme.borderDark : AppTheme.borderLight;
 
     return Container(
       color: Colors.transparent,
@@ -38,15 +36,15 @@ class FloatingBottomNav extends StatelessWidget {
         top: 6,
       ),
       child: Container(
-        height: 68,
+        height: 70,
         decoration: BoxDecoration(
           color: navBg,
-          borderRadius: BorderRadius.circular(34),
-          border: isDark ? Border.all(color: const Color(0xFF334155), width: 1.2) : null,
+          borderRadius: BorderRadius.circular(35),
+          border: Border.all(color: borderColor, width: 1.2),
           boxShadow: [
             BoxShadow(
-              color: shadowColor,
-              blurRadius: 18,
+              color: Colors.black.withOpacity(isDark ? 0.35 : 0.07),
+              blurRadius: 20,
               offset: const Offset(0, 6),
             ),
           ],
@@ -60,7 +58,7 @@ class FloatingBottomNav extends StatelessWidget {
                 index: 0,
                 label: 'Capture',
                 svgPath: 'assets/icons/capture_icon.svg',
-                fallbackIcon: Icons.camera_alt_rounded,
+                fallbackIcon: Icons.camera_alt_outlined,
                 isDark: isDark,
               ),
             ),
@@ -69,7 +67,7 @@ class FloatingBottomNav extends StatelessWidget {
                 index: 1,
                 label: 'Ledger',
                 svgPath: 'assets/icons/ledger_icon.svg',
-                fallbackIcon: Icons.receipt_long_rounded,
+                fallbackIcon: Icons.receipt_long_outlined,
                 isDark: isDark,
               ),
             ),
@@ -78,7 +76,7 @@ class FloatingBottomNav extends StatelessWidget {
                 index: 2,
                 label: 'Review',
                 svgPath: 'assets/icons/review_icon.svg',
-                fallbackIcon: Icons.rate_review_rounded,
+                fallbackIcon: Icons.rate_review_outlined,
                 badge: reviewBadgeCount,
                 isDark: isDark,
               ),
@@ -99,9 +97,16 @@ class FloatingBottomNav extends StatelessWidget {
   }) {
     final isSelected = currentIndex == index;
 
-    final Color activeBg = isDark ? const Color(0xFF0F172A) : Colors.white;
-    final Color activeContent = isDark ? const Color(0xFF93C5FD) : AppTheme.navyBrand;
-    final Color inactiveContent = isDark ? const Color(0xFF94A3B8) : Colors.white.withOpacity(0.85);
+    // Leafora active style: soft sage pill with deep forest green icon & label
+    final Color activePillBg = isDark
+        ? const Color(0xFF22352A)
+        : AppTheme.sageLight;
+    final Color activeContent = isDark
+        ? const Color(0xFF86AB93)
+        : AppTheme.forestPrimary;
+    final Color inactiveContent = isDark
+        ? const Color(0xFF6B8071)
+        : AppTheme.textMutedLight;
 
     return GestureDetector(
       onTap: () => onTabSelected(index),
@@ -110,25 +115,16 @@ class FloatingBottomNav extends StatelessWidget {
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
         margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? activeBg : Colors.transparent,
+          color: isSelected ? activePillBg : Colors.transparent,
           borderRadius: BorderRadius.circular(24),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(isDark ? 0.25 : 0.08),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Bigger Icon with badge
+            // Bigger 26px Icon with badge
             Stack(
               clipBehavior: Clip.none,
               children: [
@@ -147,14 +143,14 @@ class FloatingBottomNav extends StatelessWidget {
                 if (badge > 0)
                   Positioned(
                     top: -4,
-                    right: -9,
+                    right: -10,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                       decoration: BoxDecoration(
                         color: AppTheme.badgeRed,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: isSelected ? activeBg : (isDark ? const Color(0xFF1E293B) : AppTheme.headerBlue),
+                          color: isDark ? AppTheme.cardDark : Colors.white,
                           width: 1.5,
                         ),
                       ),

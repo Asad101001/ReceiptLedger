@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 enum ToastType { success, error, info, warning }
 
@@ -101,32 +102,32 @@ class AppToast {
 
     switch (type) {
       case ToastType.success:
-        bgColor = isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5);
-        borderColor = isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0);
-        iconColor = isDark ? const Color(0xFF34D399) : const Color(0xFF059669);
-        textColor = isDark ? const Color(0xFFECFDF5) : const Color(0xFF065F46);
+        bgColor = isDark ? const Color(0xFF14271D) : const Color(0xFFEAF4EE);
+        borderColor = isDark ? const Color(0xFF2E7D5B) : const Color(0xFFBFE0CE);
+        iconColor = isDark ? const Color(0xFF5DBB8D) : const Color(0xFF2E7D5B);
+        textColor = isDark ? const Color(0xFFEAF4EE) : const Color(0xFF184431);
         iconData = Icons.check_circle_rounded;
         break;
       case ToastType.error:
-        bgColor = isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEF2F2);
-        borderColor = isDark ? const Color(0xFFDC2626) : const Color(0xFFFECACA);
-        iconColor = isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626);
-        textColor = isDark ? const Color(0xFFFEF2F2) : const Color(0xFF991B1B);
+        bgColor = isDark ? const Color(0xFF2B1313) : const Color(0xFFFDF0F0);
+        borderColor = isDark ? const Color(0xFFD9534F) : const Color(0xFFF6C3C1);
+        iconColor = isDark ? const Color(0xFFF28B87) : const Color(0xFFD9534F);
+        textColor = isDark ? const Color(0xFFFDF0F0) : const Color(0xFF8B2522);
         iconData = Icons.error_rounded;
         break;
       case ToastType.warning:
-        bgColor = isDark ? const Color(0xFF78350F) : const Color(0xFFFFFBEB);
+        bgColor = isDark ? const Color(0xFF291F0E) : const Color(0xFFFEF8EC);
         borderColor = isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A);
         iconColor = isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706);
-        textColor = isDark ? const Color(0xFFFFFBEB) : const Color(0xFF92400E);
+        textColor = isDark ? const Color(0xFFFEF8EC) : const Color(0xFF92400E);
         iconData = Icons.warning_amber_rounded;
         break;
       case ToastType.info:
-        bgColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF);
-        borderColor = isDark ? const Color(0xFF3B82F6) : const Color(0xFFBFDBFE);
-        iconColor = isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB);
-        textColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E40AF);
-        iconData = Icons.info_rounded;
+        bgColor = isDark ? const Color(0xFF18241D) : const Color(0xFFF3F6F3);
+        borderColor = isDark ? const Color(0xFF3B5646) : const Color(0xFFD0DDD3);
+        iconColor = isDark ? const Color(0xFF86AB93) : AppTheme.forestPrimary;
+        textColor = isDark ? const Color(0xFFF3F6F4) : AppTheme.textDark;
+        iconData = Icons.info_outline_rounded;
         break;
     }
 
@@ -136,22 +137,22 @@ class AppToast {
         backgroundColor: Colors.transparent,
         elevation: 0,
         margin: const EdgeInsets.only(
-          left: 16,
-          right: 16,
-          bottom: 86, // Floats above the floating navbar
+          left: 18,
+          right: 18,
+          bottom: 92, // Floats comfortably above the floating navbar
         ),
         padding: EdgeInsets.zero,
         duration: const Duration(seconds: 3),
         content: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
           decoration: BoxDecoration(
             color: bgColor,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(color: borderColor, width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.4 : 0.08),
-                blurRadius: 14,
+                color: Colors.black.withOpacity(isDark ? 0.35 : 0.06),
+                blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
             ],
@@ -162,10 +163,10 @@ class AppToast {
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.15),
+                  color: iconColor.withOpacity(0.14),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(iconData, color: iconColor, size: 18),
+                child: Icon(iconData, color: iconColor, size: 17),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -189,7 +190,7 @@ class AppToast {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: iconColor.withOpacity(0.2),
+                      color: iconColor.withOpacity(0.18),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
