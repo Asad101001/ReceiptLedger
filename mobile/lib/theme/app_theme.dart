@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// ReceiptLedger Design System & Theme Tokens
-/// Inspired by modern organic luxury aesthetics (Leafora reference):
+/// Modern Warm Financial Ledger Aesthetics:
 /// - Soft linen / cream background
 /// - Deep forest / spruce green primary accents
 /// - Calming sage secondary tones and pill chips
@@ -11,7 +11,7 @@ class AppTheme {
   static const Color forestPrimary = Color(0xFF1E3A2B); // Deep luxurious pine green
   static const Color forestDark = Color(0xFF14271D);
   static const Color forestLight = Color(0xFF2C533E);
-  static const Color sageAccent = Color(0xFF6B8775); // Calming botanical sage
+  static const Color sageAccent = Color(0xFF6B8775); // Calming sage accent
   static const Color sageLight = Color(0xFFEAF0EB); // Soft sage background for chips
   static const Color sageMuted = Color(0xFFD6E2D8);
 
@@ -31,7 +31,7 @@ class AppTheme {
 
   // Typography Palette
   static const Color textDark = Color(0xFF141E18); // Deep warm charcoal
-  static const Color textMuted = Color(0xFF5A6B60); // Muted botanical slate
+  static const Color textMuted = Color(0xFF5A6B60); // Muted slate green
   static const Color textMutedLight = Color(0xFF8A9E91);
 
   // Status & Badges

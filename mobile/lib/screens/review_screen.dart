@@ -261,9 +261,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
       backgroundColor: AppTheme.canvasLight,
       body: Column(
         children: [
-          // Header matching the reference: "ReceiptLedger / BOTANICAL FINANCE"
+          // Header with subCaption "REVIEW"
           AppHeader(
-            subCaption: 'BOTANICAL FINANCE',
+            subCaption: 'REVIEW',
             onAvatarTap: widget.onOpenDrawer,
           ),
 
@@ -505,7 +505,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
-                            'STORE TICKET',
+                            'RECEIPT SLIP',
                             style: TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w800,
@@ -753,9 +753,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // 6. CATEGORY CLASSIFICATION
+                // 6. EXPENSE CATEGORY
                 const Text(
-                  'CATEGORY CLASSIFICATION',
+                  'EXPENSE CATEGORY',
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w800,

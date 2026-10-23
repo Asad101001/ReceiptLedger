@@ -432,7 +432,7 @@ class ApiService {
         'payment_method': 'VISA ••4921',
         'tax': 380.0,
         'line_items': [
-          {'item_name': 'Ceramic Planter Sage Finish', 'qty': 2, 'price': 2200.0, 'category': 'Shopping'},
+          {'item_name': 'Desk Organizer Leather Finish', 'qty': 2, 'price': 2200.0, 'category': 'Shopping'},
           {'item_name': 'Cotton Kitchen Towels (3-pack)', 'qty': 1, 'price': 950.0, 'category': 'Shopping'},
           {'item_name': 'Glass Storage Jar Set', 'qty': 1, 'price': 1650.0, 'category': 'Shopping'},
           {'item_name': 'Scented Soy Candle Cedarwood', 'qty': 1, 'price': 800.0, 'category': 'Shopping'},
