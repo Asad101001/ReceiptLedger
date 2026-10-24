@@ -1,0 +1,170 @@
+================================================================================
+  RECEIPTLEDGER BACKEND VERIFICATION REPORT — FASTAPI CORE API & OCR PIPELINE
+  Course: SPM-458 | Software Project Management | University of Karachi
+  Sprint: SCRUM Sprint 1 | Ticket: SCRUM-17 / SCRUM-18 / SCRUM-19
+  Lead Architect: Muhammad Asad Khan
+  Project Manager: Syed Aun Shamsi | Risk Lead: Arish Ahmed Khan
+  Timestamp: 2026-10-24 01:20:46 PKT
+================================================================================
+
+EXECUTIVE SUMMARY:
+  Total Test Suites: 35
+  Passed:            35
+  Failed:            0
+  Skipped:           0
+  Exit Code:         0 (ALL PASSED)
+
+DETAILED TEST SUITE EXECUTION LOG:
+--------------------------------------------------------------------------------
+▶  Config: Settings load from .env
+   environment=development, port=8000
+   cloud_vision_enabled=True, supabase_enabled=True
+   ✅  PASSED
+
+▶  Normalizer: Taxonomy loads successfully
+   Loaded 139 local retail taxonomy entries.
+   ✅  PASSED
+
+▶  Normalizer: Fuzzy match – 'chakki atta' → 'Wheat Flour (Atta)'
+   Matched: 'Wheat Flour (Atta)' (category=Groceries & Food)
+   ✅  PASSED
+
+▶  Normalizer: Fuzzy match – 'chki ata' → 'Wheat Flour (Atta)'
+   Matched typo tolerance: 'Wheat Flour (Atta)'
+   ✅  PASSED
+
+▶  Normalizer: Fuzzy match – 'pepsi' → 'Soft Drink'
+   Matched: 'Soft Drink' (category=Snacks & Beverages)
+   ✅  PASSED
+
+▶  Normalizer: Fuzzy match – 'xyzunknown' → None
+   Correctly returned None for unknown item.
+   ✅  PASSED
+
+▶  Normalizer: Price extraction – 'Rs.1450.00'
+   Extracted prices: [1450.0]
+   ✅  PASSED
+
+▶  Normalizer: Price extraction – 'PKR 200'
+   Extracted: [200.0]
+   ✅  PASSED
+
+▶  Normalizer: Qty+unit – '5 kg'
+   Extracted: qty=5.0, unit=kg
+   ✅  PASSED
+
+▶  Normalizer: Qty+unit – '500g'
+   Extracted: qty=500.0, unit=g
+   ✅  PASSED
+
+▶  Normalizer: Item name extraction
+   Extracted item name: 'Chakki Atta kg'
+   ✅  PASSED
+
+▶  Normalizer: Parse line items from OCR tokens
+   Parsed: 'Wheat Flour (Atta)' qty=5.0 total=700.0 cat=Groceries & Food
+   ✅  PASSED
+
+▶  Dedup: Text fingerprint is deterministic
+   Fingerprint: 4711bfda0fc9761d… (SHA-256)
+   ✅  PASSED
+
+▶  Dedup: Different receipts produce different fingerprints
+   Distinct fingerprints generated for distinct receipts.
+   ✅  PASSED
+
+▶  Dedup: check_duplicate returns False for new receipt
+   New receipt correctly identified as non-duplicate.
+   ✅  PASSED
+
+▶  Dedup: check_duplicate returns True for text match
+   Text fingerprint duplicate detected correctly.
+   ✅  PASSED
+
+▶  Store: Insert and retrieve receipt
+   Inserted and retrieved receipt id=531baf57… from Supabase/PostgreSQL.
+   ✅  PASSED
+
+▶  Store: Insert line item and retrieve
+   Line item 'Basmati Rice' stored and retrieved.
+   ✅  PASSED
+
+▶  Store: Review queue insert and resolve
+   Queue item resolved successfully: ACCEPTED.
+   ✅  PASSED
+
+▶  Store: Monthly summary aggregation
+   Period 2026-10: total=7109.0 across 5 categories.
+   ✅  PASSED
+
+▶  Preprocessor: Blur assessment on synthetic image
+   Laplacian blur score: 813.6 (Threshold > 80.0)
+   ✅  PASSED
+
+▶  Preprocessor: Full pipeline on synthetic receipt
+   Preprocessed shape: (400, 200), bytes: 4910. CLAHE & deskew active.
+   ✅  PASSED
+
+▶  Tesseract: is_available() check
+   Tesseract 5 status: installed & responsive.
+   ✅  PASSED
+
+▶  OCR Router: Spatial line reassembly
+   Correctly reassembled 9 tokens into 3 lines.
+   ✅  PASSED
+
+▶  API: GET /api/v1/health
+   Status: 200 OK
+   Engines: cloud_vision=ok, tesseract=ok, easyocr=ok, gemini=ok, database=supabase
+   ✅  PASSED
+
+▶  API: POST /api/v1/receipts/upload (valid receipt)
+   Uploaded receipt_id=bb547b43-5f2c-4616-b68d-15710d166cd2, status=PROCESSED
+   Status: 200 OK
+   ✅  PASSED
+
+▶  API: POST /api/v1/receipts/upload (duplicate detection -> 409)
+   Duplicate correctly rejected with 409 Conflict (matched=bb547b43-5f2c-4616-b68d-15710d166cd2)
+   Status: 409 Conflict
+   ✅  PASSED
+
+▶  API: POST /api/v1/receipts/upload (validation errors: 422 & 415)
+   Validation errors handled properly: empty payload -> 422, non-image MIME -> 415
+   ✅  PASSED
+
+▶  API: GET /api/v1/analytics/monthly & /trends
+   Monthly spend: 7809.0, Trends returned 3 consecutive rolling months
+   Status: 200 OK
+   ✅  PASSED
+
+▶  API: Review Queue flow (GET & PATCH)
+   Review queue item 0a9d58a2-0012-45a0-a383-9c716077a195 successfully resolved via API.
+   Status: 200 OK
+   ✅  PASSED
+
+▶  Store & Analytics: list_receipts join query eliminates N+1 loop
+   Single join query fetched receipts with embedded line_items.
+   GET /analytics/receipts verified: page=1, size=10
+   Status: 200 OK
+   ✅  PASSED
+
+▶  Normalizer: Spatial line_items extraction generates normalized bbox
+   Parsed item 'Basmati Rice' with normalized bbox: {'ymin': 0.125, 'xmin': 0.05, 'ymax': 0.175, 'xmax': 0.95}
+   ✅  PASSED
+
+▶  API: Review Queue crop uses bbox for pixel-perfect image slicing
+   Crop snippet successfully returned: method=bbox, bytes=4160
+   Status: 200 OK
+   ✅  PASSED
+
+▶  Sample Images: Real printed receipt classification & upload
+   Printed sample: blur=2170.8, type=PRINTED, upload=200 OK
+   ✅  PASSED
+
+▶  Sample Images: Real handwritten receipt classification & upload
+   Handwritten sample: blur=2517.0, type=HANDWRITTEN, upload=200 OK
+   ✅  PASSED
+
+────────────────────────────────────────────────────────────────────────────────
+  VERIFICATION RESULT: 35 passed | 0 failed | 0 skipped (100% SUCCESS)
+────────────────────────────────────────────────────────────────────────────────

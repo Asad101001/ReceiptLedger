@@ -5,8 +5,7 @@
 * **Course:** Software Project Management (SPM-458)
 * **Institution:** Department of Computer Science, University of Karachi
 * **Framework:** Agile Scrum (Compressed 3-Week Delivery Cadence)
-* **Team Leadership:** Muhammad Asad Khan (Team Lead)
-* **Team Roles & Ticket Assignment:** *Explicitly unassigned — to be allocated directly by Team Lead.*
+* **Team Leadership:** Syed Aun Shamsi (Project Manager) & Muhammad Asad Khan (Lead Architect)
 
 ---
 
@@ -51,7 +50,7 @@ gantt
 | Issue Key | Subsystem | Story Description | Priority | Assignee |
 |:---|:---|:---|:---:|:---:|
 | `RL-101` | Infrastructure | Configure GitHub repository, branch protection, and Slack webhook alerts | High | Muhammad Asad Khan |
-| `RL-102` | Infrastructure | Configure Jira Scrum board, backlog epics, and burndown chart | High | Arish Ahmed Khan |
+| `RL-102` | Infrastructure | Configure Jira Scrum board, backlog epics, and burndown chart | High | Syed Aun Shamsi (PM) |
 | `RL-103` | Data Collection | Collect and label initial dataset of 50+ printed and handwritten receipts | High | Zainab Hashmi |
 | `RL-104` | Mobile Client | Build mobile receipt camera capture screen & Google Stitch mockups | High | Aazmeer Sarfaraz Faridy |
 | `RL-105` | Ingestion API | Implement multipart image upload endpoint and OpenCV deskewing | High | Muhammad Asad Khan |
@@ -100,8 +99,8 @@ gantt
 | `RL-304` | Dashboard UI | Implement searchable receipt historical ledger with item view | Medium | Iman Hussain |
 | `RL-305` | Review Queue | Build human-in-the-loop review queue for low-confidence scans | High | Iman Hussain |
 | `RL-306` | Integration | Hardening and end-to-end integration (Mobile $\rightarrow$ Pipeline $\rightarrow$ DB $\rightarrow$ Web) | High | Muhammad Asad Khan |
-| `RL-307` | Quality Assurance | Execute UAT testing against acceptance criteria defined in SoW | High | Syed Aun Shamsi |
-| `RL-308` | Project Delivery | Final documentation packaging, demo recording, and submission readiness | High | Arish Ahmed Khan |
+| `RL-307` | Quality & Acceptance | Execute UAT testing against acceptance criteria defined in SoW | High | Syed Aun Shamsi (PM) |
+| `RL-308` | Risk & Governance | Risk register audit, documentation packaging, and submission readiness | High | Arish Ahmed Khan (Risk Lead) |
 
 * **Sprint 3 Exit Criteria:**
   - Complete round-trip workflow verified: Photo taken $\rightarrow$ items digitized $\rightarrow$ visible in dashboard.

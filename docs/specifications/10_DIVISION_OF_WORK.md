@@ -21,8 +21,8 @@ To ensure maximum development velocity under a compressed **3-week sprint cadenc
 | # | Role | Assigned To | Primary Focus & Tooling |
 |:---:|:---|:---|:---|
 | **01** | **Lead Architect & Core Backend** | **Muhammad Asad Khan** | FastAPI gateway, OpenCV pipeline, Dual OCR router, Normalization, Deduplication, Tunnel hosting |
-| **02** | **SPM & Operations Co-Lead** | **Arish Ahmed Khan** | Jira board, sprint planning, burndown tracking, risk register, PMBOK process groups, final reporting |
-| **03** | **QA, Testing & Acceptance** | **Syed Aun Shamsi** | Ground truth benchmarking, accuracy calculation, bug tickets, UAT testing, regression suites |
+| **02** | **Risk Management Lead** | **Arish Ahmed Khan** | Risk Register (`R1`–`R6`), PMBOK risk mitigation, contingency planning, risk auditing, course compliance |
+| **03** | **Project Manager (PM) & QA/Acceptance** | **Syed Aun Shamsi** | Jira Scrum board, sprint orchestration, backlog prioritization, ground truth benchmarking, UAT sign-off |
 | **04** | **Web Dashboard Developer** | **Iman Hussain** | React + Vite client, Chart.js cards, historical ledger table, Review Queue visual interface |
 | **05** | **UI/UX Designer (Google Stitch)** | **Aazmeer Sarfaraz Faridy** | Google Stitch mockups, design system, mobile capture wireframes, slide deck diagrams, presentation graphics |
 | **06** | **Data Collection & Ground Truth** | **Zainab Hashmi** | Field collection of 60+ physical receipts, ground truth spreadsheet transcription, local taxonomy dictionary expansion |
@@ -42,18 +42,20 @@ To ensure maximum development velocity under a compressed **3-week sprint cadenc
 
 ---
 
-### 3.2 SPM & Operations Co-Lead — Arish Ahmed Khan
+### 3.2 Risk Management Lead — Arish Ahmed Khan
 * **Responsibilities:**
-  * Configure and manage the Jira Scrum board, sprint backlogs, story point estimations, and burndown charts.
-  * Track daily standup participation and document sprint retrospectives.
-  * Maintain the living Risk Register (`R1`–`R6`) and ensure compliance with course deliverables.
-  * Lead compilation of the final SPM project report and submission presentation slides.
-* **Why it matters:** Course evaluation by instructor Humera Azam grades PMBOK rigor and Jira tooling; offloads administrative overhead from the technical lead.
+  * Maintain and update the living Project Risk Register (`R1`–`R6`), evaluating qualitative and quantitative probability/impact matrix.
+  * Implement PMBOK Risk Management processes: Risk Identification, Risk Analysis, Risk Response Planning, and Continuous Risk Monitoring.
+  * Monitor project velocity and technical risk triggers (e.g. OCR accuracy degradation, API quota limits), activating pre-planned contingency fallbacks.
+  * Coordinate risk audits with the Project Manager and contribute to the final SPM compliance report.
+* **Why it matters:** Course evaluation by instructor Humera Azam grades PMBOK rigor and systematic risk mitigation, ensuring project delivery risks are proactively controlled.
 
 ---
 
-### 3.3 QA, Testing & Acceptance — Syed Aun Shamsi
+### 3.3 Project Manager (PM) & QA/Acceptance — Syed Aun Shamsi
 * **Responsibilities:**
+  * Configure and manage the Jira Scrum board, sprint backlogs, story point estimations, and burndown charts as official Project Manager.
+  * Facilitate sprint ceremonies (Sprint Planning, Daily Standups, Sprint Review, and Retrospectives).
   * Execute test suites comparing OCR outputs against human-verified ground-truth datasets.
   * Measure and verify the four core SoW acceptance criteria:
     * Printed receipt OCR word accuracy $\ge 90\%$
@@ -61,8 +63,8 @@ To ensure maximum development velocity under a compressed **3-week sprint cadenc
     * Categorization accuracy $\ge 85\%$ without manual correction
     * Duplicate detection: 0 false negatives on re-uploaded test receipts
   * File and track structured bug tickets on Jira with reproduction steps and cropped image samples.
-  * Execute User Acceptance Testing (UAT) and regression passes across extreme edge cases (faded thermal paper, crumpled slips).
-* **Why it matters:** The Statement of Work defines strict measurable success criteria; verifiable metrics are required for project sign-off.
+  * Lead User Acceptance Testing (UAT) and regression passes for formal project sign-off.
+* **Why it matters:** Central project governance keeps all three work streams synchronized, while verifiable quality acceptance metrics guarantee SoW compliance.
 
 ---
 
@@ -110,14 +112,14 @@ To prevent communication bottlenecks, team members work in three synchronized pa
 │ • Frontend builds dashboard views against contracts until live tunnel. │
 ├────────────────────────────────────────────────────────────────────────┤
 │ STREAM B: Empirical Testing & Data Validation                          │
-│ Data Lead (Zainab)   ◄────────────────────────►  QA Lead (Aun)         │
+│ Data Lead (Zainab)   ◄────────────────────────►  PM & Acceptance (Aun) │
 │ • Data supplies physical receipt photos and ground-truth spreadsheets. │
-│ • QA runs OCR test harness and computes mathematical accuracy targets. │
+│ • PM & QA run OCR test harness and verify mathematical acceptance.     │
 ├────────────────────────────────────────────────────────────────────────┤
 │ STREAM C: Operations, Product Design & Governance                      │
-│ UI Designer (Aazmeer)◄────────────────────────►  SPM Co-Lead (Arish)   │
+│ UI Designer (Aazmeer)◄────────────────────────►  Risk Lead (Arish)     │
 │ • Designer produces Google Stitch mockups and presentation visuals.    │
-│ • SPM Co-Lead incorporates assets into Jira tickets, SoW, and reports. │
+│ • Risk Lead monitors scope risk and incorporates PMBOK controls.       │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -136,4 +138,4 @@ To prevent communication bottlenecks, team members work in three synchronized pa
    * Every ticket must carry an Epic link, Story Point estimate, and Acceptance Criteria.
    * Moving a ticket to `Done` requires code review / QA verification.
 3. **Escalation Protocol:**
-   * If any task falls behind schedule by $> 24$ hours, the stream lead flags it immediately to Asad and Arish during daily standup for scope trimming.
+   * If any task falls behind schedule by $> 24$ hours, the stream lead flags it immediately to Asad (Technical Lead) and Aun (Project Manager) during daily standup for scope trimming.

@@ -156,9 +156,9 @@ Master documentation index and governance deliverables are cataloged in [`docs/R
     <td align="center"><a href="https://github.com/Imanh728"><b>Iman Hussain</b></a></td>
   </tr>
   <tr>
-    <td align="center"><a href="https://github.com/Aazmeer30"><img src="https://img.shields.io/badge/Roll-B24110006002-4F46E5?style=flat-square" alt="B24110006002" /></a></td>
-    <td align="center"><a href="https://github.com/Arish026"><img src="https://img.shields.io/badge/Roll-B24110006026-0D9488?style=flat-square" alt="B24110006026" /></a></td>
-    <td align="center"><a href="https://github.com/Imanh728"><img src="https://img.shields.io/badge/Roll-B24110006054-0284C7?style=flat-square" alt="B24110006054" /></a></td>
+    <td align="center"><a href="https://github.com/Aazmeer30"><img src="https://img.shields.io/badge/Roll-B24110006002-4F46E5?style=flat-square" alt="B24110006002" /></a><br/><sub><b>UI/UX Designer</b></sub></td>
+    <td align="center"><a href="https://github.com/Arish026"><img src="https://img.shields.io/badge/Roll-B24110006026-0D9488?style=flat-square" alt="B24110006026" /></a><br/><sub><b>Risk Management Lead</b></sub></td>
+    <td align="center"><a href="https://github.com/Imanh728"><img src="https://img.shields.io/badge/Roll-B24110006054-0284C7?style=flat-square" alt="B24110006054" /></a><br/><sub><b>Web Dashboard Developer</b></sub></td>
   </tr>
   <tr>
     <td align="center" width="33%"><a href="https://github.com/Asad101001"><img src="https://ui-avatars.com/api/?name=Muhammad+Asad&background=2563EB&color=fff&size=100&bold=true&rounded=true" width="56" alt="Muhammad Asad Khan" /></a></td>
@@ -171,9 +171,9 @@ Master documentation index and governance deliverables are cataloged in [`docs/R
     <td align="center"><a href="https://github.com/zainab251251"><b>Zainab Hashmi</b></a></td>
   </tr>
   <tr>
-    <td align="center"><a href="https://github.com/Asad101001"><img src="https://img.shields.io/badge/Roll-B24110006087-2563EB?style=flat-square" alt="B24110006087" /></a></td>
-    <td align="center"><a href="https://github.com/Aun2005"><img src="https://img.shields.io/badge/Roll-B24110006134-7C3AED?style=flat-square" alt="B24110006134" /></a></td>
-    <td align="center"><a href="https://github.com/zainab251251"><img src="https://img.shields.io/badge/Roll-B24110006162-DB2777?style=flat-square" alt="B24110006162" /></a></td>
+    <td align="center"><a href="https://github.com/Asad101001"><img src="https://img.shields.io/badge/Roll-B24110006087-2563EB?style=flat-square" alt="B24110006087" /></a><br/><sub><b>Lead Architect & Core Backend</b></sub></td>
+    <td align="center"><a href="https://github.com/Aun2005"><img src="https://img.shields.io/badge/Roll-B24110006134-7C3AED?style=flat-square" alt="B24110006134" /></a><br/><sub><b>Project Manager (PM) & QA Lead</b></sub></td>
+    <td align="center"><a href="https://github.com/zainab251251"><img src="https://img.shields.io/badge/Roll-B24110006162-DB2777?style=flat-square" alt="B24110006162" /></a><br/><sub><b>Data Collection & Ground Truth</b></sub></td>
   </tr>
 </table>
 </div>
