@@ -151,3 +151,9 @@ async def root() -> dict:
         "review_queue": "/api/v1/review-queue",
     }
 
+
+@app.get("/health", include_in_schema=False)
+async def health_check_alias() -> dict:
+    return {"status": "ok", "service": "ReceiptLedger API", "health": "/api/v1/health"}
+
+

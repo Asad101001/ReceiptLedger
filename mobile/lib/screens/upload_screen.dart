@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
@@ -49,6 +50,17 @@ class _UploadScreenState extends State<UploadScreen> {
   void initState() {
     super.initState();
     _loadReceipts();
+    _api.dataVersionNotifier.addListener(_onDataVersionChanged);
+  }
+
+  void _onDataVersionChanged() {
+    if (mounted) _loadReceipts();
+  }
+
+  @override
+  void dispose() {
+    _api.dataVersionNotifier.removeListener(_onDataVersionChanged);
+    super.dispose();
   }
 
   Future<void> _loadReceipts() async {
@@ -60,12 +72,266 @@ class _UploadScreenState extends State<UploadScreen> {
         });
       }
     } catch (_) {
-      if (mounted && _receipts.isEmpty) {
+      if (mounted) {
         setState(() {
-          _receipts = _api.getSampleReceipts();
+          _receipts = _api.isDemoMode ? _api.getSampleReceipts() : [];
         });
       }
     }
+  }
+
+  // --- Visual Preview Dialog for Gallery and Camera Uploads ---
+  Future<bool> _showImagePreviewModal({
+    required Uint8List bytes,
+    required String filename,
+    required String sourceLabel,
+  }) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sizeKb = (bytes.lengthInBytes / 1024).toStringAsFixed(1);
+    final sizeLabel = bytes.lengthInBytes > 1024 * 1024
+        ? '${(bytes.lengthInBytes / (1024 * 1024)).toStringAsFixed(2)} MB'
+        : '$sizeKb KB';
+
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppTheme.cardDark : AppTheme.cardWhite,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            22,
+            16,
+            22,
+            MediaQuery.of(ctx).padding.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.borderDarkCrisp : AppTheme.borderLight,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Header
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.cardDarkElevated : AppTheme.sageLight,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.image_search_rounded,
+                      color: isDark ? Colors.white : AppTheme.forestPrimary,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Receipt Preview',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : AppTheme.textDark,
+                          ),
+                        ),
+                        Text(
+                          'Verify image legibility before OCR processing',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.close_rounded,
+                      size: 20,
+                      color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
+                    ),
+                    onPressed: () => Navigator.pop(ctx, false),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Thumbnail Card with Border
+              Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(maxHeight: 280),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.black : const Color(0xFFF3F5F0),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? AppTheme.borderDarkCrisp : AppTheme.borderLight,
+                    width: 1.5,
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Center(
+                  child: Image.memory(
+                    bytes,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.broken_image_rounded, size: 40, color: AppTheme.badgeRed),
+                          const SizedBox(height: 8),
+                          Text('Failed to render preview', style: TextStyle(color: isDark ? Colors.white : AppTheme.textDark)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Meta Badges Strip
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.cardDarkElevated : AppTheme.cardSubtle,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: isDark ? AppTheme.borderDark : AppTheme.borderLight),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.insert_drive_file_outlined, size: 14, color: isDark ? Colors.white : AppTheme.forestPrimary),
+                        const SizedBox(width: 5),
+                        Text(
+                          filename.length > 20 ? '${filename.substring(0, 18)}...' : filename,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : AppTheme.textDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.cardDarkElevated : AppTheme.cardSubtle,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: isDark ? AppTheme.borderDark : AppTheme.borderLight),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.data_usage_rounded, size: 14, color: isDark ? Colors.white : AppTheme.forestPrimary),
+                        const SizedBox(width: 5),
+                        Text(
+                          sizeLabel,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : AppTheme.textDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E2822) : AppTheme.greenVerifiedBg,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.auto_awesome_rounded, size: 14, color: AppTheme.greenVerified),
+                        const SizedBox(width: 5),
+                        Text(
+                          'Gemini 3.5 Flash Lite + OCR',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? const Color(0xFF86D9A5) : AppTheme.greenVerified,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Action Buttons Row
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: isDark ? Colors.white : AppTheme.textDark,
+                        side: BorderSide(color: isDark ? AppTheme.borderDarkCrisp : AppTheme.borderLight),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Change Slip', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 3,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDark ? Colors.white : AppTheme.forestPrimary,
+                        foregroundColor: isDark ? Colors.black : Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      icon: Icon(
+                        Icons.document_scanner_rounded,
+                        size: 19,
+                        color: isDark ? Colors.black : Colors.white,
+                      ),
+                      label: const Text(
+                        'Confirm & Process',
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    return result ?? false;
   }
 
   // --- Capture Action: Opens camera on-demand ---
@@ -80,9 +346,19 @@ class _UploadScreenState extends State<UploadScreen> {
 
       if (photo == null) return; // User cancelled camera
 
+      final bytes = await photo.readAsBytes();
+
+      if (!mounted) return;
+      final confirmed = await _showImagePreviewModal(
+        bytes: bytes,
+        filename: photo.name,
+        sourceLabel: 'Camera',
+      );
+
+      if (!confirmed) return;
+
       setState(() => _isCapturing = true);
 
-      final bytes = await photo.readAsBytes();
       final result = await _api.uploadReceipt(
         bytes: bytes,
         filename: photo.name,
@@ -124,9 +400,19 @@ class _UploadScreenState extends State<UploadScreen> {
 
       if (image == null) return;
 
+      final bytes = await image.readAsBytes();
+
+      if (!mounted) return;
+      final confirmed = await _showImagePreviewModal(
+        bytes: bytes,
+        filename: image.name,
+        sourceLabel: 'Gallery',
+      );
+
+      if (!confirmed) return;
+
       setState(() => _isCapturing = true);
 
-      final bytes = await image.readAsBytes();
       final result = await _api.uploadReceipt(
         bytes: bytes,
         filename: image.name,
@@ -983,7 +1269,7 @@ class _UploadScreenState extends State<UploadScreen> {
     final textPrimary = isDark ? AppTheme.textLight : AppTheme.textDark;
     final textMuted = isDark ? AppTheme.textMutedDark : AppTheme.textMuted;
 
-    final receiptsList = _receipts.isNotEmpty ? _receipts : _api.getSampleReceipts();
+    final receiptsList = _receipts;
     final filteredReceipts = _selectedCategory == 'All'
         ? receiptsList
         : receiptsList.where((r) {
@@ -1392,16 +1678,55 @@ class _UploadScreenState extends State<UploadScreen> {
 
                   if (filteredReceipts.isEmpty)
                     Container(
-                      padding: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: cardBg,
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(color: borderColor),
                       ),
-                      child: Text(
-                        'No receipts found in "$_selectedCategory"',
-                        style: TextStyle(fontSize: 13, color: textMuted),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.receipt_long_rounded, size: 36, color: textMuted),
+                          const SizedBox(height: 10),
+                          Text(
+                            _receipts.isEmpty
+                                ? 'No receipts in ledger yet'
+                                : 'No receipts found in "$_selectedCategory"',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _receipts.isEmpty
+                                ? 'Upload a slip above or tap below to seed demo data.'
+                                : 'Try selecting "All" or a different category filter.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 12, color: textMuted),
+                          ),
+                          if (_receipts.isEmpty) ...[
+                            const SizedBox(height: 14),
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: isDark ? Colors.white : AppTheme.forestPrimary),
+                                foregroundColor: isDark ? Colors.white : AppTheme.forestPrimary,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              ),
+                              onPressed: () {
+                                _api.seedDemoData();
+                                _loadReceipts();
+                                AppToast.showSuccess(context, 'Seeded 3 demo receipts');
+                              },
+                              icon: const Icon(Icons.dataset_rounded, size: 16),
+                              label: const Text('Seed Demo Data', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            ),
+                          ],
+                        ],
                       ),
                     )
                   else

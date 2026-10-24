@@ -37,10 +37,16 @@ class _ReviewScreenState extends State<ReviewScreen> {
     _itemController = TextEditingController();
     _amountController = TextEditingController();
     _loadQueue();
+    _api.dataVersionNotifier.addListener(_onDataVersionChanged);
+  }
+
+  void _onDataVersionChanged() {
+    if (mounted) _loadQueue();
   }
 
   @override
   void dispose() {
+    _api.dataVersionNotifier.removeListener(_onDataVersionChanged);
     _itemController.dispose();
     _amountController.dispose();
     super.dispose();
@@ -59,7 +65,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
       });
     } catch (_) {
       setState(() {
-        _queueItems = List.from(_api.getSampleReviewQueue());
+        _queueItems = _api.isDemoMode ? List.from(_api.getSampleReviewQueue()) : [];
         _currentIndex = 0;
         _isLoading = false;
         _populateCurrentItem();
@@ -323,15 +329,20 @@ class _ReviewScreenState extends State<ReviewScreen> {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: () {
-                setState(() {
-                  _queueItems = List.from(_api.getSampleReviewQueue());
-                  _currentIndex = 0;
-                  _populateCurrentItem();
-                });
-                _showFriendlyToast('Loaded fresh review queue sample!');
+                if (_api.isBackendOnline) {
+                  _loadQueue();
+                  _showFriendlyToast('Checking for pending slips...');
+                } else {
+                  _api.seedDemoData();
+                  _loadQueue();
+                  _showFriendlyToast('Seeded demo review slips!');
+                }
               },
               icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Reload Review Slips', style: TextStyle(fontWeight: FontWeight.bold)),
+              label: Text(
+                _api.isBackendOnline ? 'Refresh Review Queue' : 'Seed Demo Slips',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.forestPrimary,
                 foregroundColor: Colors.white,

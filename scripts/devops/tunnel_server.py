@@ -92,9 +92,55 @@ def run_backend_process():
     return proc
 
 
+import socket
+
+
+def get_local_ip() -> str:
+    """Detects local LAN IPv4 address for direct Wi-Fi connections."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
+def start_localtunnel():
+    """Runs localtunnel via npx with zero configuration."""
+    npx_bin = shutil.which("npx") or "npx"
+    print("[2/2] Launching Localtunnel (100% Free, Zero Card, Instant HTTPS)...")
+    cmd = [npx_bin, "--yes", "localtunnel", "--port", "8000"]
+
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        shell=True,
+    )
+
+    url_found = None
+    url_pattern = re.compile(r"https://[a-zA-Z0-9-]+\.loca\.lt")
+
+    start_time = time.time()
+    for line in proc.stdout:
+        match = url_pattern.search(line)
+        if match:
+            url_found = match.group(0)
+            break
+        if time.time() - start_time > 12:
+            break
+
+    return proc, url_found
+
+
 def start_cloudflare_tunnel(bin_path: str):
-    """Runs cloudflared tunnel and captures the trycloudflare.com URL."""
+    """Runs cloudflared tunnel with safe timeout and error detection."""
     print("[2/2] Launching Cloudflare Tunnel (100% Free, Zero Card)...")
+    print("      Connecting to Cloudflare global edge network...")
     cmd = [bin_path, "tunnel", "--url", "http://127.0.0.1:8000"]
 
     proc = subprocess.Popen(
@@ -106,13 +152,31 @@ def start_cloudflare_tunnel(bin_path: str):
     )
 
     url_found = None
-    url_pattern = re.compile(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com")
+    url_pattern = re.compile(r"https://([a-zA-Z0-9-]+)\.trycloudflare\.com")
 
-    for line in proc.stdout:
+    start_time = time.time()
+    # Read with non-blocking check or line-by-line with strict timeout
+    while time.time() - start_time < 12:
+        line = proc.stdout.readline()
+        if not line:
+            if proc.poll() is not None:
+                break
+            time.sleep(0.2)
+            continue
+
+        if "failed to request quick Tunnel" in line or "context deadline exceeded" in line:
+            print("      [!] Cloudflare edge timed out from your ISP network.")
+            break
+
         match = url_pattern.search(line)
         if match:
-            url_found = match.group(0)
-            break
+            subdomain = match.group(1).lower()
+            if subdomain not in ("api", "www", "developers", "blog"):
+                url_found = match.group(0)
+                break
+
+    if not url_found:
+        proc.terminate()
 
     return proc, url_found
 
@@ -141,10 +205,13 @@ def start_pinggy_ssh_tunnel():
     url_found = None
     url_pattern = re.compile(r"https://[a-zA-Z0-9-]+\.a\.pinggy\.link")
 
+    start_time = time.time()
     for line in proc.stdout:
         match = url_pattern.search(line)
         if match:
             url_found = match.group(0)
+            break
+        if time.time() - start_time > 10:
             break
 
     return proc, url_found
@@ -160,24 +227,32 @@ def main():
     backend_proc = run_backend_process()
     time.sleep(2)
 
-    # 2. Try Cloudflare Tunnel first, fallback to Pinggy OpenSSH
-    cf_bin = ensure_cloudflared()
+    local_ip = get_local_ip()
     tunnel_proc = None
     public_url = None
 
+    # Priority 1: Cloudflare Tunnel (fast global edge, if reachable)
+    cf_bin = ensure_cloudflared()
     if cf_bin:
         tunnel_proc, public_url = start_cloudflare_tunnel(cf_bin)
 
+    # Priority 2: Localtunnel (blazing fast, unblocked fallback via Node/npx)
+    if not public_url and shutil.which("npx"):
+        print("[*] Switching to Localtunnel fallback...")
+        tunnel_proc, public_url = start_localtunnel()
+
+    # Priority 3: Pinggy SSH Tunnel
     if not public_url:
-        print("[!] Cloudflare tunnel did not yield a URL. Attempting Pinggy SSH fallback...")
+        print("[*] Switching to Pinggy SSH fallback...")
         tunnel_proc, public_url = start_pinggy_ssh_tunnel()
 
     if public_url:
         print("\n" + "=" * 70)
         print(f" SUCCESS: BACKEND IS LIVE & SECURELY TUNNELED!")
         print(f" Public HTTPS URL:  {public_url}")
+        print(f" Local Wi-Fi URL:   http://{local_ip}:8000")
         print(f" Interactive Docs:  {public_url}/docs")
-        print(f" Health Check:      {public_url}/health")
+        print(f" Health Check:      {public_url}/api/v1/health")
         print("=" * 70 + "\n")
 
         update_mobile_env(public_url)

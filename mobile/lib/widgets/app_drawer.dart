@@ -325,6 +325,112 @@ class _AppDrawerState extends State<AppDrawer> {
     );
   }
 
+  void _confirmSeedDemoData() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.cardDarkElevated : AppTheme.sageLight,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.dataset_rounded, color: isDark ? Colors.white : AppTheme.forestPrimary, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Text('Seed Demo Data', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+            ],
+          ),
+          content: const Text(
+            'Populate the app with demo receipts and review queue items for demonstration and testing purposes?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isDark ? Colors.white : AppTheme.forestPrimary,
+                foregroundColor: isDark ? Colors.black : Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _api.seedDemoData();
+                Navigator.pop(context); // close drawer
+                AppToast.showSuccess(context, 'Demo dataset seeded (3 receipts, 5 review items)');
+              },
+              child: const Text('Seed Data'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _confirmClearAllData() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.badgeRedBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.delete_sweep_rounded, color: AppTheme.badgeRed, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Clear All Data',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 17,
+                  color: isDark ? Colors.white : AppTheme.textDark,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'Reset ledger and clear all local demo receipts and review queue items? This gives you a clean slate.',
+            style: TextStyle(color: isDark ? AppTheme.textMutedDark : AppTheme.textDark),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.badgeRed,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _api.clearAllData();
+                Navigator.pop(context); // close drawer
+                AppToast.showInfo(context, 'Ledger cleared. Clean slate active.');
+              },
+              child: const Text('Clear All'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showLogoutDialog() {
     showDialog(
       context: context,
@@ -550,7 +656,7 @@ class _AppDrawerState extends State<AppDrawer> {
                     primaryText: primaryText,
                   ),
 
-                  // Dark Theme Toggle
+                  // Harsh Minimalist Black & White Theme Toggle
                   ValueListenableBuilder<ThemeMode>(
                     valueListenable: AppTheme.themeModeNotifier,
                     builder: (ctx, mode, _) {
@@ -565,13 +671,13 @@ class _AppDrawerState extends State<AppDrawer> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(
-                            isDarkActive ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                            isDarkActive ? Icons.contrast_rounded : Icons.light_mode_rounded,
                             size: 20,
-                            color: isDark ? const Color(0xFF86AB93) : AppTheme.forestPrimary,
+                            color: isDark ? Colors.white : AppTheme.forestPrimary,
                           ),
                         ),
                         title: Text(
-                          'Dark Obsidian Theme',
+                          'Harsh Minimalist B&W',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -579,16 +685,52 @@ class _AppDrawerState extends State<AppDrawer> {
                           ),
                         ),
                         subtitle: Text(
-                          isDarkActive ? 'Obsidian Pine surface active' : 'Warm Organic Linen active',
+                          isDarkActive ? 'Pitch black & stark white active' : 'Warm Organic Linen active',
                           style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
                         ),
                         trailing: Switch(
                           value: isDarkActive,
-                          activeColor: AppTheme.forestPrimary,
+                          activeColor: isDark ? Colors.white : AppTheme.forestPrimary,
                           onChanged: (_) => AppTheme.toggleTheme(),
                         ),
                       );
                     },
+                  ),
+
+                  const SizedBox(height: 10),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 12, top: 8, bottom: 4),
+                    child: Text(
+                      'DATA & DEMO MODE',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textMuted,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+
+                  // Seed Demo Data Tile
+                  _buildDrawerTile(
+                    icon: Icons.dataset_rounded,
+                    title: 'Seed Demo Data',
+                    subtitle: 'Populate demo receipts & review slips',
+                    value: 'Seed',
+                    onTap: _confirmSeedDemoData,
+                    isDark: isDark,
+                    primaryText: primaryText,
+                  ),
+
+                  // Clear All Data Tile
+                  _buildDrawerTile(
+                    icon: Icons.delete_sweep_rounded,
+                    title: 'Clear All Data',
+                    subtitle: 'Reset ledger to clean empty slate',
+                    value: 'Reset',
+                    onTap: _confirmClearAllData,
+                    isDark: isDark,
+                    primaryText: primaryText,
                   ),
 
                   const SizedBox(height: 10),

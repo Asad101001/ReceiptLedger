@@ -36,6 +36,17 @@ class _LedgerScreenState extends State<LedgerScreen> {
   void initState() {
     super.initState();
     _loadData();
+    _api.dataVersionNotifier.addListener(_onDataVersionChanged);
+  }
+
+  void _onDataVersionChanged() {
+    if (mounted) _loadData();
+  }
+
+  @override
+  void dispose() {
+    _api.dataVersionNotifier.removeListener(_onDataVersionChanged);
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -55,7 +66,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
       });
     } catch (_) {
       setState(() {
-        _receipts = _api.getSampleReceipts();
+        _receipts = _api.isDemoMode ? _api.getSampleReceipts() : [];
         _isLoading = false;
       });
     }

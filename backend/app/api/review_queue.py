@@ -230,7 +230,13 @@ async def get_review_crop(
         y_min = max(0, int((item_center_frac - band_half) * h))
         y_max = min(h, int((item_center_frac + band_half) * h))
 
+    if y_max <= y_min:
+        y_min = 0
+        y_max = max(h, 1)
+
     crop = img[y_min:y_max, 0:w]
+    if crop is None or crop.size == 0 or crop.shape[0] == 0 or crop.shape[1] == 0:
+        crop = img
 
     # ── 4. Encode and stream as JPEG ─────────────────────────────────────────
     ok, buf = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 88])

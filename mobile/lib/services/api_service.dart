@@ -51,22 +51,48 @@ class ApiService {
   String _baseUrl = 'http://192.168.100.78:8000';
   String? _authToken;
   final ValueNotifier<String> currencyNotifier = ValueNotifier<String>('Rs.');
-  final ValueNotifier<int> reviewCountNotifier = ValueNotifier<int>(5);
+  final ValueNotifier<int> reviewCountNotifier = ValueNotifier<int>(0);
   final ValueNotifier<bool> backendOnlineNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<bool> demoModeNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<int> dataVersionNotifier = ValueNotifier<int>(0);
   final ValueNotifier<UserSession?> currentUserNotifier = ValueNotifier<UserSession?>(UserSession.demo);
   final ValueNotifier<bool> isLoggedInNotifier = ValueNotifier<bool>(true);
+
+  // Explicit seed storage for demo mode
+  List<Map<String, dynamic>>? _seededReceipts;
+  List<Map<String, dynamic>>? _seededReviewQueue;
 
   String get baseUrl => _baseUrl;
   String get currency => currencyNotifier.value;
   bool get isBackendOnline => backendOnlineNotifier.value;
+  bool get isDemoMode => demoModeNotifier.value;
   UserSession? get currentUser => currentUserNotifier.value;
   bool get isLoggedIn => isLoggedInNotifier.value;
   String? get authToken => _authToken;
 
   Map<String, String> get authHeaders => {
     'Content-Type': 'application/json',
+    'Bypass-Tunnel-Reminder': 'true',
     if (_authToken != null) 'Authorization': 'Bearer $_authToken',
   };
+
+  /// Explicitly seeds demo sample data
+  void seedDemoData() {
+    demoModeNotifier.value = true;
+    _seededReceipts = getSampleReceipts();
+    _seededReviewQueue = getSampleReviewQueue();
+    reviewCountNotifier.value = _seededReviewQueue!.length;
+    dataVersionNotifier.value++;
+  }
+
+  /// Clears all dummy data and resets ledger to clean slate
+  void clearAllData() {
+    demoModeNotifier.value = false;
+    _seededReceipts = [];
+    _seededReviewQueue = [];
+    reviewCountNotifier.value = 0;
+    dataVersionNotifier.value++;
+  }
 
   void setCurrency(String newCurrency) {
     currencyNotifier.value = newCurrency;
@@ -216,9 +242,18 @@ class ApiService {
   Future<bool> checkHealthSilently() async {
     try {
       final url = Uri.parse('$_baseUrl/api/v1/health');
-      final response = await http.get(url).timeout(const Duration(milliseconds: 2500));
+      final response = await http.get(url, headers: {'Bypass-Tunnel-Reminder': 'true'}).timeout(const Duration(milliseconds: 2500));
       final online = response.statusCode == 200;
       backendOnlineNotifier.value = online;
+      if (online) {
+        // As soon as live API is detected, clear all dummy demo data
+        if (_seededReceipts != null || demoModeNotifier.value) {
+          _seededReceipts = null;
+          _seededReviewQueue = null;
+          demoModeNotifier.value = false;
+          dataVersionNotifier.value++;
+        }
+      }
       return online;
     } catch (_) {
       backendOnlineNotifier.value = false;
@@ -231,8 +266,8 @@ class ApiService {
       final list = await getReviewQueue();
       reviewCountNotifier.value = list.length;
     } catch (_) {
-      if (reviewCountNotifier.value == 0) {
-        reviewCountNotifier.value = 5;
+      if (!isDemoMode) {
+        reviewCountNotifier.value = 0;
       }
     }
   }
@@ -241,9 +276,16 @@ class ApiService {
   Future<Map<String, dynamic>> checkHealth() async {
     final url = Uri.parse('$_baseUrl/api/v1/health');
     try {
-      final response = await http.get(url).timeout(const Duration(seconds: 4));
+      final response = await http.get(url, headers: {'Bypass-Tunnel-Reminder': 'true'}).timeout(const Duration(seconds: 4));
       if (response.statusCode == 200) {
         backendOnlineNotifier.value = true;
+        // As soon as live API is detected, clear all dummy demo data
+        if (_seededReceipts != null || demoModeNotifier.value) {
+          _seededReceipts = null;
+          _seededReviewQueue = null;
+          demoModeNotifier.value = false;
+          dataVersionNotifier.value++;
+        }
         return jsonDecode(response.body) as Map<String, dynamic>;
       }
       backendOnlineNotifier.value = false;
@@ -264,6 +306,10 @@ class ApiService {
   }) async {
     final url = Uri.parse('$_baseUrl/api/v1/receipts/upload');
     final request = http.MultipartRequest('POST', url);
+    request.headers['Bypass-Tunnel-Reminder'] = 'true';
+    if (_authToken != null) {
+      request.headers['Authorization'] = 'Bearer $_authToken';
+    }
 
     final ext = filename.toLowerCase();
     String mimeSubtype = 'jpeg';
@@ -316,40 +362,61 @@ class ApiService {
   Future<List<Map<String, dynamic>>> getReceipts({int page = 1, int pageSize = 50}) async {
     final url = Uri.parse('$_baseUrl/api/v1/analytics/receipts?page=$page&page_size=$pageSize');
     try {
-      final response = await http.get(url).timeout(const Duration(seconds: 8));
+      final response = await http.get(url, headers: {'Bypass-Tunnel-Reminder': 'true'}).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
+        backendOnlineNotifier.value = true;
+        // As soon as live API is detected, clear demo state
+        if (demoModeNotifier.value || _seededReceipts != null) {
+          demoModeNotifier.value = false;
+          _seededReceipts = null;
+          _seededReviewQueue = null;
+        }
         final data = jsonDecode(response.body);
         final list = data['receipts'] as List<dynamic>? ?? [];
-        // Always return what the backend gave us, even if empty
         return list.cast<Map<String, dynamic>>();
       }
     } catch (_) {}
 
-    // Only use sample data when backend is completely unreachable
-    return getSampleReceipts();
+    // Only return dummy data if in Demo Mode and explicitly seeded
+    if (isDemoMode && _seededReceipts != null && _seededReceipts!.isNotEmpty) {
+      return _seededReceipts!;
+    }
+
+    // Fully free clean state
+    return [];
   }
 
   /// Fetches monthly analytics summary GET /api/v1/analytics/monthly
   Future<Map<String, dynamic>> getMonthlySummary({required int year, required int month}) async {
     final url = Uri.parse('$_baseUrl/api/v1/analytics/monthly?year=$year&month=$month');
     try {
-      final response = await http.get(url).timeout(const Duration(seconds: 6));
+      final response = await http.get(url, headers: {'Bypass-Tunnel-Reminder': 'true'}).timeout(const Duration(seconds: 6));
       if (response.statusCode == 200) {
+        backendOnlineNotifier.value = true;
         return jsonDecode(response.body) as Map<String, dynamic>;
       }
     } catch (_) {}
 
+    if (isDemoMode) {
+      return {
+        'period': '$year-${month.toString().padLeft(2, '0')}',
+        'total_spend': 42850.0,
+        'receipt_count': 24,
+        'categories': {
+          'Groceries & Food': 18400.0,
+          'Bakeries & Confectionery': 9200.0,
+          'Fuel & Transport': 7500.0,
+          'Utilities & Bills': 4600.0,
+          'Healthcare & Pharmacy': 3150.0,
+        },
+      };
+    }
+
     return {
       'period': '$year-${month.toString().padLeft(2, '0')}',
-      'total_spend': 42850.0,
-      'receipt_count': 24,
-      'categories': {
-        'Groceries & Food': 18400.0,
-        'Bakeries & Confectionery': 9200.0,
-        'Fuel & Transport': 7500.0,
-        'Utilities & Bills': 4600.0,
-        'Healthcare & Pharmacy': 3150.0,
-      },
+      'total_spend': 0.0,
+      'receipt_count': 0,
+      'categories': <String, double>{},
     };
   }
 
@@ -357,17 +424,23 @@ class ApiService {
   Future<List<Map<String, dynamic>>> getReviewQueue() async {
     final url = Uri.parse('$_baseUrl/api/v1/review-queue');
     try {
-      final response = await http.get(url).timeout(const Duration(seconds: 8));
+      final response = await http.get(url, headers: {'Bypass-Tunnel-Reminder': 'true'}).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
+        backendOnlineNotifier.value = true;
         final list = jsonDecode(response.body) as List<dynamic>? ?? [];
         reviewCountNotifier.value = list.length;
-        // Return real data even if empty — empty is valid (all caught up)
         return list.cast<Map<String, dynamic>>();
       }
     } catch (_) {}
 
-    // Only fall back to sample when server is unreachable
-    return getSampleReviewQueue();
+    // Only fall back to sample when demo mode is active and seeded
+    if (isDemoMode && _seededReviewQueue != null && _seededReviewQueue!.isNotEmpty) {
+      reviewCountNotifier.value = _seededReviewQueue!.length;
+      return _seededReviewQueue!;
+    }
+
+    reviewCountNotifier.value = 0;
+    return [];
   }
 
   /// Resolves an item in the review queue PATCH /api/v1/review-queue/{id}

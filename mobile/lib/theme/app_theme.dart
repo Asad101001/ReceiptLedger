@@ -54,13 +54,14 @@ class AppTheme {
   static const Color amberWarningBg = Color(0xFFFEF3C7);
   static const Color avatarGreen = Color(0xFF1E3A2B);
 
-  // Dark Theme Palette
-  static const Color canvasDark = Color(0xFF0F1713); // Deep obsidian forest
-  static const Color cardDark = Color(0xFF18241D); // Dark pine surface
-  static const Color cardDarkElevated = Color(0xFF213027);
-  static const Color borderDark = Color(0xFF293B31);
-  static const Color textLight = Color(0xFFF3F6F4);
-  static const Color textMutedDark = Color(0xFF8FA597);
+  // Harsh Minimalist Black & White Dark Palette (Brutalist Monochrome)
+  static const Color canvasDark = Color(0xFF000000); // Pure pitch black
+  static const Color cardDark = Color(0xFF0C0C0C); // Stark jet black surface
+  static const Color cardDarkElevated = Color(0xFF171717); // Crisp elevated black
+  static const Color borderDark = Color(0xFF262626); // High-contrast stark border
+  static const Color borderDarkCrisp = Color(0xFF404040);
+  static const Color textLight = Color(0xFFFFFFFF); // Pure stark white
+  static const Color textMutedDark = Color(0xFFA3A3A3); // Crisp neutral monochrome gray
 
   // Light Theme
   static ThemeData get lightTheme {
@@ -112,46 +113,50 @@ class AppTheme {
     );
   }
 
-  // Dark Theme
+  // Plain Harsh Minimalist Black & White Dark Theme
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: canvasDark,
       colorScheme: const ColorScheme.dark(
-        primary: Color(0xFF86AB93),
-        secondary: Color(0xFF6B8775),
+        primary: Colors.white,
+        secondary: Color(0xFFD4D4D8),
         surface: cardDark,
-        error: badgeRed,
-        onPrimary: forestDark,
-        onSecondary: Colors.white,
-        onSurface: textLight,
+        error: Color(0xFFFF453A),
+        onPrimary: Colors.black,
+        onSecondary: Colors.black,
+        onSurface: Colors.white,
       ),
       fontFamily: 'Roboto',
       appBarTheme: const AppBarTheme(
         backgroundColor: canvasDark,
         elevation: 0,
         scrolledUnderElevation: 0,
-        iconTheme: IconThemeData(color: textLight),
+        iconTheme: IconThemeData(color: Colors.white),
       ),
       cardTheme: CardThemeData(
         color: cardDark,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: borderDark, width: 1.2),
         ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: cardDark,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: borderDarkCrisp, width: 1.2),
+        ),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: cardDark,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          side: BorderSide(color: borderDark, width: 1.2),
         ),
       ),
       dividerTheme: const DividerThemeData(
