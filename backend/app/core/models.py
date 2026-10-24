@@ -199,8 +199,11 @@ class ReviewQueueItem(BaseModel):
 
 class ReviewQueueItemDetail(BaseModel):
     id: str
+    queue_id: Optional[str] = None
     line_item_id: str
     candidate_text: Optional[str] = ""
+    candidate_name: Optional[str] = None
+    raw_text: Optional[str] = None
     model_confidence: float = 0.0
     review_status: ReviewStatus = ReviewStatus.UNRESOLVED
     flagged_at: Optional[str] = None
@@ -210,6 +213,16 @@ class ReviewQueueItemDetail(BaseModel):
     line_item: Optional[Dict[str, Any]] = None
 
     model_config = {"extra": "allow"}
+
+    def model_post_init(self, __context: Any) -> None:
+        if not self.queue_id:
+            self.queue_id = self.id
+        if not self.candidate_name:
+            self.candidate_name = self.candidate_text
+        if not self.raw_text and self.line_item:
+            self.raw_text = self.line_item.get("raw_text") or self.candidate_text
+        elif not self.raw_text:
+            self.raw_text = self.candidate_text
 
 
 class ReviewQueueResolveResponse(BaseModel):
