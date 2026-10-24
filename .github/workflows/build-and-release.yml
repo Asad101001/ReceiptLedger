@@ -41,6 +41,13 @@ jobs:
       - name: Install Mobile Dependencies
         run: |
           cd mobile
+          if [ ! -f .env ]; then
+            if [ -f .env.example ]; then
+              cp .env.example .env
+            else
+              echo "API_BASE_URL=http://10.0.2.2:8000" > .env
+            fi
+          fi
           flutter pub get
 
       - name: Run Quality Gate (Analyze & Test)
