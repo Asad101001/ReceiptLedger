@@ -94,6 +94,16 @@ class ApiService {
     dataVersionNotifier.value++;
   }
 
+  /// Clears local state and sends reset command to backend database if online
+  Future<void> resetBackendLedger() async {
+    clearAllData();
+    try {
+      final url = Uri.parse('$_baseUrl/api/v1/dashboard/reset');
+      await http.post(url, headers: authHeaders).timeout(const Duration(seconds: 8));
+    } catch (_) {}
+    dataVersionNotifier.value++;
+  }
+
   void setCurrency(String newCurrency) {
     currencyNotifier.value = newCurrency;
   }

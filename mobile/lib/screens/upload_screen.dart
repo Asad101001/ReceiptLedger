@@ -379,6 +379,7 @@ class _UploadScreenState extends State<UploadScreen> {
             : widget.onNavigateToReview?.call(),
       );
       _api.refreshReviewCount();
+      _api.dataVersionNotifier.value++;
       await _loadReceipts();
     } catch (e) {
       if (!mounted) return;
@@ -433,6 +434,7 @@ class _UploadScreenState extends State<UploadScreen> {
             : widget.onNavigateToReview?.call(),
       );
       _api.refreshReviewCount();
+      _api.dataVersionNotifier.value++;
       await _loadReceipts();
     } catch (e) {
       if (!mounted) return;

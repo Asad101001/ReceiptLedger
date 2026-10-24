@@ -419,9 +419,9 @@ class _AppDrawerState extends State<AppDrawer> {
               ),
               onPressed: () {
                 Navigator.pop(ctx);
-                _api.clearAllData();
+                _api.resetBackendLedger();
                 Navigator.pop(context); // close drawer
-                AppToast.showInfo(context, 'Ledger cleared. Clean slate active.');
+                AppToast.showInfo(context, 'Ledger & database cleared. Clean slate active.');
               },
               child: const Text('Clear All'),
             ),

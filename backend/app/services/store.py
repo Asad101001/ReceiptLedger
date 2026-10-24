@@ -1387,3 +1387,23 @@ def get_supabase_image_url(receipt_id: str, expires_in: int = 3600) -> Optional[
 
     return None
 
+
+def reset_store() -> None:
+    """Purges all receipt records, line items, hashes, and review items from Supabase and in-memory."""
+    global _receipts, _line_items, _review_queue, _hashes
+    _receipts.clear()
+    _line_items.clear()
+    _review_queue.clear()
+    _hashes.clear()
+
+    client = get_supabase_client()
+    if client:
+        try:
+            client.table("review_queue").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+            client.table("line_items").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+            client.table("receipt_hashes").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+            client.table("receipts").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+            logger.info("Purged all receipts, line items, and review queue items from Supabase database.")
+        except Exception as e:
+            logger.error("Error purging Supabase tables: %s", e)
+
