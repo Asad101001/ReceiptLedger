@@ -230,11 +230,11 @@ class ReviewQueueResolveResponse(BaseModel):
 
 class ReviewQueueResolveRequest(BaseModel):
     """Payload for PATCH /api/v1/review-queue/{id}"""
-    confirmed_name: str
-    confirmed_quantity: Optional[float] = None
+    confirmed_name: Optional[str] = None
+    confirmed_quantity: Optional[float] = Field(default=None, ge=0.0)
     confirmed_unit: Optional[str] = None
-    confirmed_unit_price: Optional[float] = None
-    confirmed_total_price: Optional[float] = None
+    confirmed_unit_price: Optional[float] = Field(default=None, ge=0.0)
+    confirmed_total_price: Optional[float] = Field(default=None, ge=0.0)
     action: ReviewStatus = ReviewStatus.ACCEPTED
 
     @field_validator("action")
@@ -277,10 +277,18 @@ class DashboardStatCard(BaseModel):
 class CategorySpendDetail(BaseModel):
     category_name: str
     color_hex: str
+    color: Optional[str] = None
+    name: Optional[str] = None
     description: Optional[str] = None
     total_spend: float
     item_count: int
     percentage_of_total: float
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.color is None:
+            self.color = self.color_hex
+        if self.name is None:
+            self.name = self.category_name
 
 
 class DashboardOverviewResponse(BaseModel):

@@ -18,12 +18,13 @@ import hashlib
 import hmac
 import json
 import logging
+import re
 import time
 import uuid
 from typing import Any, Dict, Optional
 
 from fastapi import Depends, Header, HTTPException, Request, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.core.config import settings
 
@@ -44,15 +45,32 @@ class UserSession(BaseModel):
     created_at: Optional[str] = None
 
 
+_EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
 class LoginRequest(BaseModel):
     email: str = Field(..., description="User email address")
     password: str = Field(..., min_length=4, description="User password")
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_format(cls, v: str) -> str:
+        if not _EMAIL_REGEX.match(v):
+            raise ValueError("Invalid email address format.")
+        return v.lower().strip()
 
 
 class RegisterRequest(BaseModel):
     email: str = Field(..., description="User email address")
     password: str = Field(..., min_length=6, description="User password (min 6 chars)")
     full_name: Optional[str] = Field("User", description="Display name")
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_format(cls, v: str) -> str:
+        if not _EMAIL_REGEX.match(v):
+            raise ValueError("Invalid email address format.")
+        return v.lower().strip()
 
 
 class AuthResponse(BaseModel):

@@ -102,24 +102,24 @@ _TAXONOMY = _load_taxonomy()
 
 # Quantity with explicit unit (e.g. "5kg", "2.5 ltr", "500g", "1 dozen")
 _QTY_WITH_UNIT_RE = re.compile(
-    r"\b(?P<qty>\d+(?:\.\d+)?)\s*(?P<unit>kg|k9|ke|kq|k|g|gm|gram|ltr|liter|litre|l|ml|pkt|packet|pcs|pc|dzn|dozen|dz)\b",
+    r"\b(?P<qty>\d+(?:\.\d+)?)\s*(?P<unit>kg|k9|ke|kq|k|g|gm|gram|ltr|liter|litre|l|ml|pkt|packet|pack|pk|pcs|pc|dzn|dozen|dz)\b",
     re.IGNORECASE,
 )
 
 # Structured Qty + Unit + Price (e.g. "10kg 1400", "5KG 700.00", "2k 450", "1L 520.00")
 _QTY_UNIT_PRICE_RE = re.compile(
     r"(?P<qty>\d+(?:\.\d+)?)\s*"
-    r"(?P<unit>kg|k9|ke|kq|k|g|gm|gram|ltr|liter|litre|l|ml|pkt|packet|pcs|pc|dzn|dozen|dz)\s*"
+    r"(?P<unit>kg|k9|ke|kq|k|g|gm|gram|ltr|liter|litre|l|ml|pkt|packet|pack|pk|pcs|pc|dzn|dozen|dz)\s*"
     r"(?:[xX@=:>\-]\s*)?"
     r"(?P<price>\d{2,5}(?:\.\d{1,2})?)"
-    r"(?!\s*(?:kg|k9|ke|kq|k|g|gm|gram|ltr|liter|litre|l|ml|pkt|packet|pcs|pc|dzn|dozen|dz)\b)",
+    r"(?!\s*(?:kg|k9|ke|kq|k|g|gm|gram|ltr|liter|litre|l|ml|pkt|packet|pack|pk|pcs|pc|dzn|dozen|dz)\b)",
     re.IGNORECASE,
 )
 
 # Generic quantity + optional unit
 _QTY_UNIT_RE = re.compile(
     r"(?P<qty>\d+(?:\.\d+)?)\s*"
-    r"(?P<unit>kg|k9|ke|kq|k|g|gm|gram|ltr|liter|litre|l|ml|pkt|packet|pcs|pc|dzn|dozen|dz)?",
+    r"(?P<unit>kg|k9|ke|kq|k|g|gm|gram|ltr|liter|litre|l|ml|pkt|packet|pack|pk|pcs|pc|dzn|dozen|dz)?",
     re.IGNORECASE,
 )
 
@@ -671,14 +671,14 @@ def _extract_prices(text: str) -> List[float]:
         raw = match.group("price").replace(",", "")
         try:
             val = float(raw)
-            if 0 < val <= 50000.0:
+            if 0.0 <= val <= 50000.0:
                 results.append(val)
         except ValueError:
             continue
 
     if len(results) >= 2:
         # Prefer decimal formatted prices (e.g. 180.00, 340.00) or values >= 20 over single integers (1, 4)
-        decimal_or_realistic = [p for p in results if (not p.is_integer() or p >= 20.0)]
+        decimal_or_realistic = [p for p in results if (not p.is_integer() or p >= 20.0 or p == 0.0)]
         if decimal_or_realistic:
             return decimal_or_realistic
     return results
@@ -764,7 +764,7 @@ def _normalise_unit(unit: str) -> str:
     mapping = {
         "gram": "g", "gm": "g",
         "liter": "ltr", "litre": "ltr", "l": "ltr",
-        "packet": "pkt",
+        "packet": "pkt", "pack": "pkt", "pk": "pkt",
         "dozen": "dzn", "dz": "dzn",
         "pc": "pcs",
         "k9": "kg", "ke": "kg", "kq": "kg", "k": "kg",

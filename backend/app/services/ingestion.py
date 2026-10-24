@@ -76,11 +76,15 @@ async def ingest_receipt(
         raise ValueError(f"Image preprocessing failed: {exc}") from exc
 
     # Dimensions check (zero extra image decode)
-    if not validate_dimensions((h_orig, w_orig)):
+    if w_orig < 50 or h_orig < 50:
+        raise ValueError(f"Image resolution ({w_orig}x{h_orig}) is too small to be a legible receipt.")
+    elif not validate_dimensions((h_orig, w_orig)):
         logger.warning("Image below minimum resolution threshold (%dx%d).", w_orig, h_orig)
 
     # Blur assessment (zero extra image decode)
-    if blur_score < _BLUR_THRESHOLD:
+    if blur_score < 5.0:
+        raise ValueError(f"Image is too blurry or featureless (Laplacian variance={blur_score:.1f}). Please provide a clear receipt photo.")
+    elif blur_score < _BLUR_THRESHOLD:
         logger.warning("Image may be blurry (Laplacian variance=%.1f).", blur_score)
 
     # ── Step 2: Early Visual Deduplication Check (Layer 1) ───────────────────

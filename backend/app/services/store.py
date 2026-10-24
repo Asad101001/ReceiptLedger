@@ -966,7 +966,9 @@ def get_categories_detailed() -> List[Dict]:
         pct = round((spend / total_all_spend * 100.0), 1) if total_all_spend > 0 else 0.0
         results.append({
             "category_name": name,
+            "name": name,
             "color_hex": cat["color_hex"],
+            "color": cat["color_hex"],
             "description": cat["description"],
             "total_spend": spend,
             "item_count": count,
