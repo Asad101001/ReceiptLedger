@@ -91,3 +91,7 @@ backend/data/images/*.jpeg
 backend/data/images/*.png
 backend/data/images/*.webp
 !backend/data/images/.gitkeep
+
+# Tunnel binaries
+scripts/devops/bin/
+*.exe

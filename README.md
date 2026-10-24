@@ -103,11 +103,49 @@ flowchart LR
 
 | Module | Purpose | Stack |
 |:---|:---|:---:|
-| [`backend/`](backend/) | Core OCR routing, OpenCV deskewing, normalization, and API gateway | FastAPI • OpenCV • EasyOCR |
-| [`mobile/`](mobile/) | Camera capture client, edge alignment preview, and image upload | Flutter • Dart • Google Stitch |
+| [`backend/`](backend/) | Core OCR routing, OpenCV deskewing, normalization, and API gateway | FastAPI • SQLite • EasyOCR • Gemini |
+| [`mobile/`](mobile/) | Capture client, animated splash, auth login/signup, and ledger UI | Flutter • Dart • Material 3 |
 | [`web/`](web/) | Analytics dashboard, monthly trend charts, and review queue | React • Vite • Chart.js |
+| [`design_assets/`](design_assets/) | Design specifications, vector SVG icon tokens, and UI mockups | SVG • Figma Specs • PNG Wireframes |
+| [`scripts/`](scripts/) | End-to-end stress tests, zero-cost HTTPS tunnels, and data tools | Python • PowerShell • Bash |
 | [`docs/`](docs/) | Complete engineering specifications, IEEE 830 SRS, and course governance | Markdown • Mermaid |
 | [`data/`](data/) | Sample receipt collection repository and local item taxonomy dictionary | Dataset • JSON |
+
+---
+
+## Zero-Cost Backend Setup & Tunneling (No Credit Cards)
+
+The ReceiptLedger backend is fully functional with **zero server costs ($0.00/mo)** and requires **no credit card registration**.
+
+### Option 1: 1-Click Free Public HTTPS Tunnel (Recommended)
+Exposes your local backend to mobile devices or remote reviewers over a secure public HTTPS URL backed by Cloudflare's global edge or native OpenSSH Pinggy:
+```bash
+# Windows 1-Click:
+run_tunneled_backend.bat
+
+# Or via Python:
+python scripts/devops/tunnel_server.py
+```
+- **Cost**: $0.00 / month forever.
+- **Credit Card**: None required.
+- Automatically generates a public HTTPS URL (`https://*.trycloudflare.com` or `https://*.a.pinggy.link`).
+- Automatically updates `mobile/.env` with the active tunnel URL.
+
+### Option 2: Localhost / LAN Server
+```bash
+# Windows 1-Click:
+run_backend.bat
+
+# Or manually:
+cd backend
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+- Interactive Swagger API docs: `http://localhost:8000/docs`
+- Health check: `http://localhost:8000/api/v1/health`
+
+### Option 3: Free Cloud Hosting (Zero Credit Card)
+- **Hugging Face Spaces (Docker/FastAPI)**: 100% Free with 16 GB RAM and persistent HTTPS URL without entering a credit card.
+- **Render.com Free Web Service**: Standard Free Tier web service using GitHub OAuth without requiring credit card details.
 
 ---
 
