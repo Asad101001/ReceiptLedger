@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'screens/splash_screen.dart';
 import 'screens/upload_screen.dart';
 import 'screens/ledger_screen.dart';
 import 'screens/review_screen.dart';
@@ -21,15 +22,30 @@ Future<void> main() async {
 }
 
 class ReceiptLedgerApp extends StatelessWidget {
-  const ReceiptLedgerApp({super.key});
+  final bool showSplash;
+  final Widget? homeOverride;
+
+  const ReceiptLedgerApp({
+    super.key,
+    this.showSplash = true,
+    this.homeOverride,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ReceiptLedger',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      home: const MainNavigationScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AppTheme.themeModeNotifier,
+      builder: (context, currentMode, _) {
+        return MaterialApp(
+          title: 'ReceiptLedger',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: currentMode,
+          home: homeOverride ??
+              (showSplash ? const SplashScreen() : const MainNavigationScreen()),
+        );
+      },
     );
   }
 }

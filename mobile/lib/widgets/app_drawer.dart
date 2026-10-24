@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import '../screens/auth_screen.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import 'app_toast.dart';
+import 'fade_slide_transition.dart';
+import 'hoverable.dart';
 
 /// Improved Sidebar Drawer with Theme Toggle & Integrated Settings
 class AppDrawer extends StatefulWidget {
@@ -337,7 +340,12 @@ class _AppDrawerState extends State<AppDrawer> {
             onPressed: () {
               Navigator.pop(ctx);
               Navigator.pop(context); // close drawer
-              AppToast.showInfo(context, 'Logged out of local session.');
+              _api.logout();
+              AppToast.showInfo(context, 'Logged out of session.');
+              Navigator.of(context).pushAndRemoveUntil(
+                AppPageTransition(page: const AuthScreen()),
+                (route) => false,
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.badgeRed,
@@ -370,94 +378,103 @@ class _AppDrawerState extends State<AppDrawer> {
                 color: cardBg,
                 border: Border(bottom: BorderSide(color: borderColor)),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppTheme.forestPrimary,
-                      border: Border.all(
-                        color: isDark ? const Color(0xFF3B5646) : Colors.white,
-                        width: 2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
+              child: ValueListenableBuilder<UserSession?>(
+                valueListenable: _api.currentUserNotifier,
+                builder: (ctx, session, _) {
+                  final name = session?.fullName ?? 'Asad Khan';
+                  final email = session?.email ?? 'user@receiptledger.com';
+                  final initials = name.trim().split(' ').map((p) => p.isNotEmpty ? p[0].toUpperCase() : '').take(2).join();
+
+                  return Row(
+                    children: [
+                      Container(
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppTheme.forestPrimary,
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF3B5646) : Colors.white,
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    alignment: Alignment.center,
-                    child: const Text(
-                      'AK',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Asad Khan',
-                          style: TextStyle(
-                            fontSize: 17,
+                        alignment: Alignment.center,
+                        child: Text(
+                          initials.isNotEmpty ? initials : 'RL',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
                             fontWeight: FontWeight.w800,
-                            color: primaryText,
-                            letterSpacing: -0.3,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          'user@receiptledger.com',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.textMuted,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        ValueListenableBuilder<bool>(
-                          valueListenable: _api.backendOnlineNotifier,
-                          builder: (ctx, isOnline, _) => Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: isOnline
-                                  ? (isDark ? const Color(0xFF142C1F) : AppTheme.greenVerifiedBg)
-                                  : (isDark ? const Color(0xFF241F1A) : const Color(0xFFFBF4EB)),
-                              borderRadius: BorderRadius.circular(12),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: primaryText,
+                                letterSpacing: -0.3,
+                              ),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
-                                  size: 12,
-                                  color: isOnline ? AppTheme.greenVerified : AppTheme.amberWarning,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  isOnline ? 'Backend Online' : 'Local Demo',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: isOnline ? AppTheme.greenVerified : AppTheme.amberWarning,
-                                  ),
-                                ),
-                              ],
+                            const SizedBox(height: 2),
+                            Text(
+                              email,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.textMuted,
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 6),
+                            ValueListenableBuilder<bool>(
+                              valueListenable: _api.backendOnlineNotifier,
+                              builder: (ctx, isOnline, _) => Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: isOnline
+                                      ? (isDark ? const Color(0xFF142C1F) : AppTheme.greenVerifiedBg)
+                                      : (isDark ? const Color(0xFF241F1A) : const Color(0xFFFBF4EB)),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+                                      size: 12,
+                                      color: isOnline ? AppTheme.greenVerified : AppTheme.amberWarning,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      isOnline ? 'Backend Online' : 'Local Demo',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: isOnline ? AppTheme.greenVerified : AppTheme.amberWarning,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-                ],
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
 
@@ -531,6 +548,47 @@ class _AppDrawerState extends State<AppDrawer> {
                     onTap: _showExportDataDialog,
                     isDark: isDark,
                     primaryText: primaryText,
+                  ),
+
+                  // Dark Theme Toggle
+                  ValueListenableBuilder<ThemeMode>(
+                    valueListenable: AppTheme.themeModeNotifier,
+                    builder: (ctx, mode, _) {
+                      final isDarkActive = mode == ThemeMode.dark;
+                      return ListTile(
+                        dense: true,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppTheme.cardDarkElevated : AppTheme.sageLight,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            isDarkActive ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                            size: 20,
+                            color: isDark ? const Color(0xFF86AB93) : AppTheme.forestPrimary,
+                          ),
+                        ),
+                        title: Text(
+                          'Dark Obsidian Theme',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: primaryText,
+                          ),
+                        ),
+                        subtitle: Text(
+                          isDarkActive ? 'Obsidian Pine surface active' : 'Warm Organic Linen active',
+                          style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                        ),
+                        trailing: Switch(
+                          value: isDarkActive,
+                          activeColor: AppTheme.forestPrimary,
+                          onChanged: (_) => AppTheme.toggleTheme(),
+                        ),
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 10),
@@ -618,21 +676,26 @@ class _AppDrawerState extends State<AppDrawer> {
             // Logout Action
             Padding(
               padding: const EdgeInsets.all(16),
-              child: OutlinedButton.icon(
-                onPressed: _showLogoutDialog,
-                icon: const Icon(Icons.logout_rounded, size: 18, color: AppTheme.badgeRed),
-                label: const Text(
-                  'Log Out',
-                  style: TextStyle(
-                    color: AppTheme.badgeRed,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
+              child: Hoverable(
+                scale: 1.02,
+                borderRadius: BorderRadius.circular(20),
+                onTap: _showLogoutDialog,
+                child: OutlinedButton.icon(
+                  onPressed: _showLogoutDialog,
+                  icon: const Icon(Icons.logout_rounded, size: 18, color: AppTheme.badgeRed),
+                  label: const Text(
+                    'Log Out',
+                    style: TextStyle(
+                      color: AppTheme.badgeRed,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
                   ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.5),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  minimumSize: const Size(double.infinity, 46),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    minimumSize: const Size(double.infinity, 46),
+                  ),
                 ),
               ),
             ),

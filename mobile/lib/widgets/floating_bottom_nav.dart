@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/app_theme.dart';
+import 'hoverable.dart';
 
 /// Floating Pill Bottom Navigation Bar
 /// Inspired by the Leafora reference design:
@@ -102,9 +103,10 @@ class FloatingBottomNav extends StatelessWidget {
     const Color activeContent = Colors.white;
     const Color inactiveContent = AppTheme.textMuted;
 
-    return GestureDetector(
+    return Hoverable(
+      scale: 1.04,
+      cursor: SystemMouseCursors.click,
       onTap: () => onTabSelected(index),
-      behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,

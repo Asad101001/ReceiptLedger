@@ -3,6 +3,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_header.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/hoverable.dart';
 
 class LedgerScreen extends StatefulWidget {
   final VoidCallback? onOpenDrawer;
@@ -574,7 +575,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                             },
                           ),
 
-                          const SizedBox(height: 84), // Padding above bottom nav
+                          const SizedBox(height: 110), // Padding above bottom nav
                         ],
                       ),
                     ),
@@ -610,7 +611,9 @@ class _LedgerScreenState extends State<LedgerScreen> {
   Widget _buildCategoryCard(IconData icon, String name, String amount) {
     final isSelected = _selectedCategoryFilter == name;
 
-    return GestureDetector(
+    return Hoverable(
+      scale: 1.03,
+      cursor: SystemMouseCursors.click,
       onTap: () {
         setState(() {
           _selectedCategoryFilter = isSelected ? null : name;
@@ -680,7 +683,9 @@ class _LedgerScreenState extends State<LedgerScreen> {
     final lineItems = (r['line_items'] as List<dynamic>?) ?? [];
     final isExpanded = _expandedReceiptId == id;
 
-    return Container(
+    return Hoverable(
+      scale: 1.012,
+      child: Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -821,6 +826,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
             ),
           ],
         ],
+      ),
       ),
     );
   }

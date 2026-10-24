@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_header.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/hoverable.dart';
 
 class UploadScreen extends StatefulWidget {
   final VoidCallback? onOpenDrawer;
@@ -1148,7 +1149,9 @@ class _UploadScreenState extends State<UploadScreen> {
                             const SizedBox(width: 10),
 
                             // Discreet Gear / Tune Button (Addresses user's request to hide clunky controls)
-                            GestureDetector(
+                            Hoverable(
+                              scale: 1.08,
+                              cursor: SystemMouseCursors.click,
                               onTap: _showCaptureSettingsModal,
                               child: Container(
                                 width: 50,
@@ -1409,7 +1412,9 @@ class _UploadScreenState extends State<UploadScreen> {
                       final category = r['category_name'] ?? r['category'] ?? 'General';
                       final count = r['items_count'] ?? (r['line_items'] as List?)?.length ?? 1;
 
-                      return Container(
+                      return Hoverable(
+                        scale: 1.012,
+                        child: Container(
                         margin: const EdgeInsets.only(bottom: 10),
                         decoration: BoxDecoration(
                           color: cardBg,
@@ -1483,6 +1488,7 @@ class _UploadScreenState extends State<UploadScreen> {
                           ),
                         ),
                       ),
+                    ),
                     );
                     }),
                   const SizedBox(height: 16),

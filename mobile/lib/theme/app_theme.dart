@@ -5,8 +5,19 @@ import 'package:flutter/material.dart';
 /// - Soft linen / cream background
 /// - Deep forest / spruce green primary accents
 /// - Calming sage secondary tones and pill chips
-/// - Warm white elevated surfaces with natural shadows
 class AppTheme {
+  static final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier<ThemeMode>(ThemeMode.light);
+
+  static void toggleTheme() {
+    themeModeNotifier.value = themeModeNotifier.value == ThemeMode.dark
+        ? ThemeMode.light
+        : ThemeMode.dark;
+  }
+
+  static void setThemeMode(ThemeMode mode) {
+    themeModeNotifier.value = mode;
+  }
+
   // Brand Forest & Sage Palette (Light Mode)
   static const Color forestPrimary = Color(0xFF1E3A2B); // Deep luxurious pine green
   static const Color forestDark = Color(0xFF14271D);
