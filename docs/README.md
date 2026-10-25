@@ -42,6 +42,9 @@ docs/
 │   ├── ReceiptLedger_SoW_v3.pdf                  # Latest baseline (6 compressed sprints)
 │   └── ReceiptLedger_Division_of_Work.pdf        # Approved team work division
 │
+├── reports/                       # Formal QA, benchmark & test verification reports
+│   └── VIGOROUS_BACKEND_STRESS_TEST_REPORT.md    # 28-vector adversarial stress & security report
+│
 └── specifications/                # IEEE 830 & Technical Specification Suite
     ├── 01_PRD.md                  # Product Requirements Document
     ├── 02_SRS.md                  # Software Requirements Specification (IEEE 830)
@@ -98,7 +101,29 @@ Hands-on manuals for setting up cloud infrastructure, running local verification
 
 ---
 
-## 4. Project Governance Deliverables
+## 4. Quality Assurance & Test Verification Reports
+
+Formal QA test evidence and adversarial stress test documentation:
+
+| Report | Document ID | Scope | Metrics / Results |
+|:---|:---:|:---|:---|
+| [**Backend Adversarial Stress Test Report**](reports/VIGOROUS_BACKEND_STRESS_TEST_REPORT.md) | `RL-QA-RPT-2026-003` | 28 adversarial vectors across ingestion, deduplication, NLP parsing, SQL/XSS injections, and review triage | **100% Pass** (28/28 adversarial, 35/35 core CLI); 6 boundary defects identified & mitigated |
+
+---
+
+## 5. Automated CI/CD & Android Release Distribution
+
+Automated build, test, and release delivery pipeline:
+
+| Component | Path / Location | Scope |
+|:---|:---|:---|
+| **GitHub Actions Pipeline** | [`.github/workflows/build-and-release.yml`](../.github/workflows/build-and-release.yml) | Automated Flutter test/analyze quality gate, release APK compilation, and GitHub Release drafting on push to `main` |
+| **Android Release Binary** | [`ReceiptLedger-v1.0.0-release.apk`](../ReceiptLedger-v1.0.0-release.apk) | Production release APK signed for direct sideloading and Android device evaluation |
+| **Zero-Cost HTTPS Tunnel** | [`scripts/devops/tunnel_server.py`](../scripts/devops/tunnel_server.py) / `run_tunneled_backend.bat` | Dual Cloudflare Quick Tunnel and Pinggy OpenSSH tunnel exposing backend securely at $0/mo |
+
+---
+
+## 6. Project Governance Deliverables
 
 Formal Software Project Management (SPM-458) approved artifacts:
 
@@ -111,7 +136,7 @@ Formal Software Project Management (SPM-458) approved artifacts:
 
 ---
 
-## 5. Course Reference Materials
+## 7. Course Reference Materials
 
 Academic course assignments and lecture slides for SPM-458:
 
@@ -124,3 +149,4 @@ Academic course assignments and lecture slides for SPM-458:
   * `Week 02.pdf`
   * `Week 03.pdf`
   * `Week 04.pdf`
+

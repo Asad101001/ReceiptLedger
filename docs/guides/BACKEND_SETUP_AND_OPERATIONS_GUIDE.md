@@ -198,7 +198,14 @@ From the `backend/` directory:
 .\.venv\Scripts\python.exe -m app.cli_test
 ```
 
-### What Is Tested (32 Test Cases):
+### Running the Adversarial Stress Test Suite
+To test all 28 hostile edge cases and boundary conditions (zero-byte files, SQL/XSS injection attempts, negative price updates, calendar boundaries, and micro-resolutions):
+```powershell
+python scripts/testing/vigorous_backend_stress_test.py
+```
+> See [`docs/reports/VIGOROUS_BACKEND_STRESS_TEST_REPORT.md`](../reports/VIGOROUS_BACKEND_STRESS_TEST_REPORT.md) for full audit results and mitigation history.
+
+### What Is Tested (32 Core CLI + 28 Adversarial Vectors):
 1. **Config:** `.env` loading and feature flag resolution
 2. **Normalizer:** Taxonomy loading, English/Urdu fuzzy matching, price/quantity regex extractors
 3. **Deduplication:** pHash computation, Hamming distance, SHA-256 metadata fingerprinting
@@ -215,6 +222,8 @@ From the `backend/` directory:
 8. **Sample Receipts Dataset:**
    - Classification and upload of authentic printed thermal receipt
    - Classification and upload of authentic handwritten grocery slip
+9. **Adversarial & Boundary Defense:**
+   - File injection, malicious payloads, negative pricing guardrails, and calendar bounds.
 
 ---
 
@@ -293,6 +302,17 @@ curl -X PATCH http://localhost:8000/api/v1/review-queue/<QUEUE_ID> \
     "confirmed_unit_price": 700.0,
     "confirmed_total_price": 700.0
   }'
+```
+
+### 6.5 System Maintenance & Database Reset Endpoints
+Used for automated test cleanup and the mobile client's "Reset Database / Ledger" drawer action:
+
+```bash
+# 1. Reset/Purge entire ledger for clean slate (receipts, line items, hashes, review queue):
+curl -X POST http://localhost:8000/api/v1/system/reset-ledger
+
+# 2. Seed realistic demo receipts into empty store:
+curl -X POST http://localhost:8000/api/v1/system/seed-demo-data
 ```
 
 ---

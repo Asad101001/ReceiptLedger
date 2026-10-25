@@ -61,7 +61,15 @@ cd ReceiptLedger
    uvicorn app.main:app --reload --port 8000
    ```
 
-### Option B: Dockerized Environment
+### Option B: 1-Click Fast Launcher (Windows Recommended)
+From the repository root:
+* **Standard LAN/Local Server**: Run `run_backend.bat` (Boots on `http://localhost:8000`).
+* **100% Free Public HTTPS Tunnel**: Run `run_tunneled_backend.bat` or `python scripts/devops/tunnel_server.py`.
+  * Generates a live public HTTPS URL (`*.trycloudflare.com` or `*.a.pinggy.link`).
+  * Automatically updates `mobile/.env` with the active tunnel URL.
+  * Zero cost ($0.00/mo) and requires no credit cards.
+
+### Option C: Dockerized Environment
 
 From the project root:
 ```bash
@@ -103,11 +111,15 @@ The dashboard will be available at `http://localhost:5173`.
    ```bash
    flutter pub get
    ```
-3. Verify connected devices or emulator:
+3. Configure environment (`mobile/.env`):
+   * When using the tunnel launcher (`run_tunneled_backend.bat`), `API_BASE_URL` is automatically set to your live HTTPS tunnel.
+   * If testing on Android Emulator manually: `API_BASE_URL=http://10.0.2.2:8000`
+   * If testing on Windows Desktop / Web: `API_BASE_URL=http://127.0.0.1:8000`
+4. Verify connected devices or emulator:
    ```bash
    flutter devices
    ```
-4. Launch the application:
+5. Launch the application:
    ```bash
    flutter run
    ```
@@ -119,3 +131,18 @@ The dashboard will be available at `http://localhost:5173`.
 Drop collected physical receipt photos into the respective directories:
 * Clean printed retail slips $\rightarrow$ `data/samples/printed/`
 * Informal handwritten slips $\rightarrow$ `data/samples/handwritten/`
+
+---
+
+## 7. Automated CI/CD & Release APK Building
+
+Automated builds and quality gates run on every push to `main` via GitHub Actions:
+* **Pipeline Configuration**: [`.github/workflows/build-and-release.yml`](../../.github/workflows/build-and-release.yml)
+* **Local Release APK Build**:
+  ```bash
+  cd mobile
+  flutter build apk --release
+  ```
+  Output generated at `mobile/build/app/outputs/flutter-apk/app-release.apk`.
+* **Download Prebuilt APK**: Direct access to production-ready [**`ReceiptLedger-v1.0.0-release.apk`**](../../ReceiptLedger-v1.0.0-release.apk) located in the repository root.
+

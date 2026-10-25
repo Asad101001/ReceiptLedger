@@ -97,3 +97,12 @@ backend/data/images/*.webp
 # Tunnel binaries
 scripts/devops/bin/
 *.exe
+
+# Large Compressed Archives
+*.rar
+*.zip
+*.7z
+*.tar
+*.gz
+*.tar.gz
+

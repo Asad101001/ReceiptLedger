@@ -168,14 +168,24 @@ Master documentation index and governance deliverables are cataloged in [`docs/R
 | [**Development Plan**](docs/specifications/09_DEVELOPMENT_PLAN.md) | In-depth engineering implementation roadmap and algorithmic specs |
 | [**Division of Work**](docs/specifications/10_DIVISION_OF_WORK.md) | Official 6-role allocations, responsibilities, and pairing streams |
 
-### Engineering Guides & UI/UX Briefs
+### Engineering Guides, Reports & UI/UX Briefs
 
 | Document | Summary | Artifacts |
 |:---|:---|:---:|
+| [**Adversarial Stress Test Report**](docs/reports/VIGOROUS_BACKEND_STRESS_TEST_REPORT.md) | 28 boundary stress vectors, 100% pass rate, security audits & 6 mitigations | Markdown |
 | [**Backend Operations Guide**](docs/guides/BACKEND_SETUP_AND_OPERATIONS_GUIDE.md) | Cloud Vision, Supabase, Tesseract setup, test suite & cURL reference | Markdown |
 | [**Dashboard Integration Guide**](docs/guides/DASHBOARD_BACKEND_INTEGRATION.md) | Monorepo API wiring, CORS rules, and development server guide | Markdown |
 | [**Mobile UI/UX Design Brief**](docs/design/MOBILE_DESIGN_BRIEF.md) | Stitch prompts, mobile screen wireframes, themes & design rules | [PDF](docs/design/ReceiptLedger_UI_UX_Design_Brief.pdf) |
 | [**Dashboard Design Brief**](docs/design/DASHBOARD_DESIGN_BRIEF.md) | Desktop triage desk layout, keyboard ergonomics, API schemas | [PDF](docs/design/ReceiptLedger_Dashboard_Design_Brief.pdf) |
+
+---
+
+## Automated CI/CD & Android Release
+
+Every commit to `main` executes an automated quality gate and builds the production Android APK using GitHub Actions:
+* **Workflow**: [`.github/workflows/build-and-release.yml`](.github/workflows/build-and-release.yml) (Runs `flutter test`, `flutter analyze`, and builds release binary).
+* **Direct Download**: Sideloadable [**`ReceiptLedger-v1.0.0-release.apk`**](ReceiptLedger-v1.0.0-release.apk) ready for physical device testing.
+
 
 ---
 
