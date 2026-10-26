@@ -800,7 +800,7 @@ class _UploadScreenState extends State<UploadScreen> {
       ),
       builder: (ctx) {
         return StatefulBuilder(
-          builder: (context, setModalState) {
+          builder: (modalCtx, setModalState) {
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
@@ -916,7 +916,7 @@ class _UploadScreenState extends State<UploadScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       elevation: 0,
                     ),
-                    onPressed: () {
+                    onPressed: () async {
                       final merchant = merchantCtrl.text.trim();
                       final amount = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
                       if (merchant.isEmpty || amount <= 0) {
@@ -924,10 +924,23 @@ class _UploadScreenState extends State<UploadScreen> {
                         return;
                       }
                       Navigator.pop(ctx);
-                      AppToast.success(context, 'Receipt "$merchant" added to review queue!');
-                      _api.refreshReviewCount();
+                      try {
+                        await _api.createManualReceipt(
+                          merchantName: merchant,
+                          totalAmount: amount,
+                          category: category,
+                        );
+                        if (mounted) {
+                          AppToast.success(context, 'Receipt "$merchant" recorded in ledger!');
+                          _loadReceipts();
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          AppToast.error(context, 'Error saving receipt: $e');
+                        }
+                      }
                     },
-                    child: const Text('Save to Review Queue', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    child: const Text('Save to Ledger', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                   ),
                 ],
               ),
@@ -1161,6 +1174,53 @@ class _UploadScreenState extends State<UploadScreen> {
                     onPressed: () {
                       Navigator.pop(ctx);
                       _viewReceiptImage(receiptId, merchant);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (receiptId.isNotEmpty) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.errorRed,
+                      side: BorderSide(color: AppTheme.errorRed.withOpacity(0.5)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: const Text('Delete Receipt', style: TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: () async {
+                      final nav = Navigator.of(ctx);
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (c) => AlertDialog(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          title: const Text('Delete Receipt'),
+                          content: Text('Are you sure you want to delete "$merchant" from the ledger? This action cannot be undone.'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.errorRed,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: () => Navigator.pop(c, true),
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        nav.pop();
+                        await _api.deleteReceipt(receiptId);
+                        if (mounted) {
+                          AppToast.success(context, 'Receipt "$merchant" deleted');
+                          _loadReceipts();
+                        }
+                      }
                     },
                   ),
                 ),

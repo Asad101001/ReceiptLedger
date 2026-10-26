@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field, field_validator
 class ReceiptType(str, Enum):
     PRINTED = "PRINTED"
     HANDWRITTEN = "HANDWRITTEN"
+    MANUAL = "MANUAL"
 
 
 class ReceiptStatus(str, Enum):
@@ -183,6 +184,31 @@ class PaginatedReceiptsResponse(BaseModel):
     page_size: int
     total_pages: int
     receipts: List[ReceiptDetailResponse]
+
+
+class ManualReceiptItem(BaseModel):
+    item_name: str
+    quantity: float = 1.0
+    unit: str = "pcs"
+    unit_price: float = 0.0
+    total_price: float = 0.0
+    category: Optional[str] = "Miscellaneous"
+
+
+class ManualReceiptCreate(BaseModel):
+    merchant_name: str = Field(..., min_length=1, description="Merchant or store name")
+    receipt_date: Optional[str] = Field(None, description="ISO-8601 date, e.g. 2026-10-26")
+    total_amount: float = Field(..., ge=0.0, description="Total transaction amount in PKR")
+    category: Optional[str] = Field("Miscellaneous", description="Primary category name")
+    items: Optional[List[ManualReceiptItem]] = Field(None, description="Optional line item breakdown")
+    notes: Optional[str] = Field(None, description="Optional notes or memos")
+
+
+class ReceiptUpdateRequest(BaseModel):
+    merchant_name: Optional[str] = None
+    receipt_date: Optional[str] = None
+    total_amount: Optional[float] = None
+    status: Optional[ReceiptStatus] = None
 
 
 # ── Review Queue ──────────────────────────────────────────────────────────────

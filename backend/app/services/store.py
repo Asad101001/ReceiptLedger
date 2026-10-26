@@ -36,6 +36,7 @@ _hashes: Dict[str, Dict] = {}
 
 # Supabase Client Singleton
 _supabase_client = None
+_supabase_has_bbox_column: Optional[bool] = None
 
 
 def _safe_uuid(val: Optional[str]) -> Optional[str]:
@@ -212,13 +213,14 @@ def insert_receipt(
     status: str,
     ocr_confidence: float,
     user_id: Optional[str] = None,
+    receipt_id: Optional[str] = None,
 ) -> Dict:
-    receipt_id = str(uuid.uuid4())
+    r_id = receipt_id or str(uuid.uuid4())
     safe_user = _safe_uuid(user_id)
     r_date = receipt_date or date.today().isoformat()
 
     row = {
-        "id": receipt_id,
+        "id": r_id,
         "user_id": user_id or "anonymous",
         "merchant_name": merchant_name,
         "receipt_date": r_date,
@@ -228,14 +230,14 @@ def insert_receipt(
         "ocr_confidence": float(ocr_confidence),
         "created_at": datetime.utcnow().isoformat(),
     }
-    _receipts[receipt_id] = row
+    _receipts[r_id] = row
 
     # Persist to Supabase if enabled
     client = get_supabase_client()
     if client:
         try:
             db_payload = {
-                "id": receipt_id,
+                "id": r_id,
                 "user_id": safe_user,
                 "merchant_name": merchant_name,
                 "receipt_date": r_date,
@@ -268,6 +270,182 @@ def get_receipt(receipt_id: str) -> Optional[Dict]:
             logger.warning("Supabase get_receipt error: %s", exc)
 
     return None
+
+
+def get_receipt_with_items(receipt_id: str) -> Optional[Dict]:
+    """Fetch single receipt by ID with its line items embedded."""
+    receipt = get_receipt(receipt_id)
+    if not receipt:
+        return None
+    r_copy = dict(receipt)
+    r_copy["line_items"] = get_line_items_for_receipt(receipt_id)
+    return r_copy
+
+
+def delete_receipt(receipt_id: str) -> bool:
+    """
+    Completely delete a receipt and all associated records:
+    - review queue items
+    - line items
+    - receipt hashes (DB and memory)
+    - the receipt record itself
+    - local preprocessed image file
+    - Supabase storage image file
+    """
+    global _receipts, _line_items, _review_queue, _hashes
+    from app.services import dedup
+    from pathlib import Path
+
+    found = False
+    if receipt_id in _receipts:
+        found = True
+        del _receipts[receipt_id]
+
+    # Delete in-memory line items
+    item_ids_to_del = [li_id for li_id, li in list(_line_items.items()) if li.get("receipt_id") == receipt_id]
+    for li_id in item_ids_to_del:
+        _line_items.pop(li_id, None)
+
+    # Delete in-memory review queue items
+    rq_to_del = [q_id for q_id, q in list(_review_queue.items()) if q.get("receipt_id") == receipt_id or q.get("line_item_id") in item_ids_to_del]
+    for q_id in rq_to_del:
+        _review_queue.pop(q_id, None)
+
+    # Delete in-memory hash record
+    _hashes.pop(receipt_id, None)
+    dedup.remove_hashes(receipt_id)
+
+    # Delete local image file
+    local_img = get_receipt_image_path(receipt_id)
+    if local_img:
+        try:
+            Path(local_img).unlink(missing_ok=True)
+            logger.debug("Deleted local image file for receipt: %s", receipt_id)
+        except Exception as exc:
+            logger.warning("Failed to delete local image: %s", exc)
+
+    # Delete from Supabase if connected
+    client = get_supabase_client()
+    if client and _safe_uuid(receipt_id):
+        try:
+            # Delete review queue
+            if item_ids_to_del:
+                client.table("review_queue").delete().in_("line_item_id", item_ids_to_del).execute()
+            # Delete hashes
+            client.table("receipt_hashes").delete().eq("receipt_id", receipt_id).execute()
+            # Delete line items
+            client.table("line_items").delete().eq("receipt_id", receipt_id).execute()
+            # Delete receipt
+            res = client.table("receipts").delete().eq("id", receipt_id).execute()
+            if res.data:
+                found = True
+
+            # Delete from Supabase storage bucket
+            for ext in ("jpg", "jpeg", "png", "webp"):
+                try:
+                    client.storage.from_(settings.supabase_storage_bucket).remove([f"{receipt_id}.{ext}"])
+                except Exception:
+                    pass
+            logger.info("Successfully deleted receipt %s from Supabase and local storage.", receipt_id)
+        except Exception as exc:
+            logger.error("Error deleting receipt %s from Supabase: %s", receipt_id, exc)
+
+    return found
+
+
+def update_receipt(receipt_id: str, updates: Dict[str, Any]) -> Optional[Dict]:
+    """Update fields on a receipt record."""
+    clean_updates = {k: v for k, v in updates.items() if v is not None}
+    if not clean_updates:
+        return get_receipt(receipt_id)
+
+    if receipt_id in _receipts:
+        _receipts[receipt_id].update(clean_updates)
+
+    client = get_supabase_client()
+    if client and _safe_uuid(receipt_id):
+        try:
+            db_updates = dict(clean_updates)
+            if "status" in db_updates and hasattr(db_updates["status"], "value"):
+                db_updates["status"] = db_updates["status"].value
+            res = client.table("receipts").update(db_updates).eq("id", receipt_id).execute()
+            if res.data and len(res.data) > 0:
+                _receipts[receipt_id] = res.data[0]
+                return _receipts[receipt_id]
+        except Exception as exc:
+            logger.warning("Supabase update_receipt error: %s", exc)
+
+    return _receipts.get(receipt_id)
+
+
+def create_manual_receipt(
+    merchant_name: str,
+    total_amount: float,
+    receipt_date: Optional[str] = None,
+    category: str = "Miscellaneous",
+    items: Optional[List[Dict[str, Any]]] = None,
+    user_id: Optional[str] = None,
+    notes: Optional[str] = None,
+) -> Dict:
+    """Create a manually entered receipt record with line items."""
+    receipt_id = str(uuid.uuid4())
+    r_date = receipt_date or date.today().isoformat()
+    safe_user = _safe_uuid(user_id)
+
+    # 1. Insert parent receipt
+    receipt_row = insert_receipt(
+        receipt_id=receipt_id,
+        merchant_name=merchant_name,
+        receipt_date=r_date,
+        total_amount=total_amount,
+        receipt_type="MANUAL",
+        status="PROCESSED",
+        ocr_confidence=1.0,
+        user_id=safe_user,
+    )
+
+    # 2. Insert line items
+    inserted_items = []
+    if items and len(items) > 0:
+        for it in items:
+            it_name = it.get("item_name") or "General Item"
+            it_qty = float(it.get("quantity", 1.0))
+            it_unit = str(it.get("unit", "pcs"))
+            it_total = float(it.get("total_price", 0.0))
+            it_unit_price = float(it.get("unit_price", it_total / max(it_qty, 1.0)))
+            it_cat = it.get("category") or category or "Miscellaneous"
+
+            li = insert_line_item(
+                receipt_id=receipt_id,
+                raw_text=f"{it_name} {it_qty}{it_unit} {it_total}",
+                item_name=it_name,
+                quantity=it_qty,
+                unit=it_unit,
+                unit_price=it_unit_price,
+                total_price=it_total,
+                confidence_score=1.0,
+                category=it_cat,
+                is_verified=True,
+            )
+            inserted_items.append(li)
+    else:
+        # Default single summary line item
+        li = insert_line_item(
+            receipt_id=receipt_id,
+            raw_text=f"{merchant_name} payment",
+            item_name=merchant_name,
+            quantity=1.0,
+            unit="pcs",
+            unit_price=total_amount,
+            total_price=total_amount,
+            confidence_score=1.0,
+            category=category or "Miscellaneous",
+            is_verified=True,
+        )
+        inserted_items.append(li)
+
+    receipt_row["line_items"] = inserted_items
+    return receipt_row
 
 
 def list_receipts(user_id: Optional[str] = None, include_items: bool = False) -> List[Dict]:
@@ -323,41 +501,70 @@ def get_paginated_receipts(
     page: int = 1,
     page_size: int = 20,
     search: Optional[str] = None,
+    category: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     user_id: Optional[str] = None,
     include_items: bool = True,
 ) -> Tuple[List[Dict], int]:
     """
     Fetch a paginated slice of receipts with exact total count directly from Supabase or local store.
-    Uses database-level .range() and .ilike() filtering to avoid loading the entire table into memory.
+    Supports filtering by merchant search, category, and date range.
     """
     offset = max(0, (page - 1) * page_size)
+    cat_id_filter = get_category_id(category) if category and category.lower() != "all" else None
+    cat_name_clean = category.strip().lower() if category and category.lower() != "all" else None
+
     client = get_supabase_client()
     if client:
         try:
-            select_cols = "*, line_items(*)" if include_items else "*"
+            select_cols = "*, line_items(*)" if (include_items or cat_name_clean) else "*"
             q = client.table("receipts").select(select_cols, count="exact")
             safe_user = _safe_uuid(user_id)
             if safe_user:
                 q = q.eq("user_id", safe_user)
             if search and search.strip():
                 q = q.ilike("merchant_name", f"%{search.strip()}%")
+            if start_date:
+                q = q.gte("receipt_date", start_date)
+            if end_date:
+                q = q.lte("receipt_date", end_date)
+
             q = q.order("created_at", desc=True)
-            q = q.range(offset, offset + page_size - 1)
+
+            # If category filtering is required, filter after join
+            if not cat_name_clean:
+                q = q.range(offset, offset + page_size - 1)
+
             res = q.execute()
 
             if res.data is not None:
-                total_count = res.count if res.count is not None else len(res.data)
-                for r in res.data:
+                filtered_rows = res.data
+                for r in filtered_rows:
                     _receipts[r["id"]] = r
-                    if include_items:
-                        items = r.get("line_items") or []
-                        for li in items:
-                            li["category_name"] = get_category_name(li.get("category_id", ""))
-                            cached = _line_items.get(li["id"])
-                            if cached and "bbox" in cached and not li.get("bbox"):
-                                li["bbox"] = cached["bbox"]
-                            _line_items[li["id"]] = li
-                return res.data, total_count
+                    items = r.get("line_items") or []
+                    for li in items:
+                        li["category_name"] = get_category_name(li.get("category_id", ""))
+                        cached = _line_items.get(li["id"])
+                        if cached and "bbox" in cached and not li.get("bbox"):
+                            li["bbox"] = cached["bbox"]
+                        _line_items[li["id"]] = li
+
+                if cat_name_clean:
+                    filtered_rows = [
+                        r for r in filtered_rows
+                        if any(
+                            (li.get("category_name", "").lower() == cat_name_clean) or
+                            (cat_id_filter and li.get("category_id") == cat_id_filter)
+                            for li in (r.get("line_items") or [])
+                        )
+                    ]
+                    total_count = len(filtered_rows)
+                    paged_rows = filtered_rows[offset:offset + page_size]
+                    return paged_rows, total_count
+
+                total_count = res.count if res.count is not None else len(res.data)
+                return filtered_rows, total_count
         except Exception as exc:
             logger.warning("Supabase get_paginated_receipts query error: %s", exc)
 
@@ -368,6 +575,21 @@ def get_paginated_receipts(
     if search and search.strip():
         s_lower = search.strip().lower()
         rows = [r for r in rows if s_lower in (r.get("merchant_name") or "").lower()]
+    if start_date:
+        rows = [r for r in rows if (r.get("receipt_date") or "") >= start_date]
+    if end_date:
+        rows = [r for r in rows if (r.get("receipt_date") or "") <= end_date]
+
+    if cat_name_clean:
+        rows = [
+            r for r in rows
+            if any(
+                li.get("category_name", "").lower() == cat_name_clean
+                for li in _line_items.values()
+                if li.get("receipt_id") == r.get("id")
+            )
+        ]
+
     sorted_rows = sorted(rows, key=lambda r: r.get("created_at", ""), reverse=True)
     total_count = len(sorted_rows)
     paged_rows = sorted_rows[offset:offset + page_size]
@@ -436,14 +658,18 @@ def insert_line_item(
             "confidence_score": float(confidence_score),
             "is_verified": is_verified,
         }
-        if bbox is not None:
+        global _supabase_has_bbox_column
+        if bbox is not None and _supabase_has_bbox_column is not False:
             db_payload["bbox"] = bbox
 
         try:
             client.table("line_items").insert(db_payload).execute()
+            if bbox is not None:
+                _supabase_has_bbox_column = True
         except Exception as exc:
             err_msg = str(exc)
             if "bbox" in err_msg or "PGRST204" in err_msg:
+                _supabase_has_bbox_column = False
                 # Column 'bbox' pending migration in Supabase schema cache; retry without bbox
                 try:
                     db_payload.pop("bbox", None)

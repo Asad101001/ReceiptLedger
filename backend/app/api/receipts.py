@@ -27,7 +27,13 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Resp
 
 from app.core.auth import UserSession, get_current_user
 from app.core.config import settings
-from app.core.models import ReceiptStatus, UploadReceiptResponse
+from app.core.models import (
+    ManualReceiptCreate,
+    ReceiptDetailResponse,
+    ReceiptStatus,
+    ReceiptUpdateRequest,
+    UploadReceiptResponse,
+)
 from app.services import store
 from app.services.ingestion import ingest_receipt
 
@@ -215,3 +221,87 @@ async def get_receipt_image(
             "Cache-Control": "public, max-age=86400",
         },
     )
+
+
+@router.get(
+    "/receipts/{receipt_id}",
+    response_model=ReceiptDetailResponse,
+    summary="Get single receipt details with line items",
+    tags=["Receipts"],
+)
+async def get_receipt_detail(
+    receipt_id: str = FPath(..., description="UUID of the receipt"),
+) -> ReceiptDetailResponse:
+    """Fetch complete details of a single receipt including line items."""
+    row = store.get_receipt_with_items(receipt_id)
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Receipt '{receipt_id}' not found.",
+        )
+    return ReceiptDetailResponse(**row)
+
+
+@router.post(
+    "/receipts/manual",
+    response_model=ReceiptDetailResponse,
+    summary="Create a receipt manually without OCR",
+    tags=["Receipts"],
+)
+async def create_manual_receipt(
+    payload: ManualReceiptCreate,
+    current_user: UserSession = Depends(get_current_user),
+) -> ReceiptDetailResponse:
+    """Manually record a cash or paper transaction with optional item breakdown."""
+    items_dict = [it.model_dump() for it in payload.items] if payload.items else None
+    row = store.create_manual_receipt(
+        merchant_name=payload.merchant_name,
+        total_amount=payload.total_amount,
+        receipt_date=payload.receipt_date,
+        category=payload.category or "Miscellaneous",
+        items=items_dict,
+        user_id=current_user.user_id,
+        notes=payload.notes,
+    )
+    return ReceiptDetailResponse(**row)
+
+
+@router.patch(
+    "/receipts/{receipt_id}",
+    response_model=ReceiptDetailResponse,
+    summary="Update receipt metadata",
+    tags=["Receipts"],
+)
+async def update_receipt(
+    payload: ReceiptUpdateRequest,
+    receipt_id: str = FPath(..., description="UUID of the receipt"),
+) -> ReceiptDetailResponse:
+    """Update editable attributes of a receipt (merchant, date, amount, status)."""
+    existing = store.get_receipt(receipt_id)
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Receipt '{receipt_id}' not found.",
+        )
+    updated = store.update_receipt(receipt_id, payload.model_dump(exclude_unset=True))
+    with_items = store.get_receipt_with_items(receipt_id) or updated
+    return ReceiptDetailResponse(**with_items)
+
+
+@router.delete(
+    "/receipts/{receipt_id}",
+    summary="Delete a receipt and associated line items, images, and review queue entries",
+    tags=["Receipts"],
+)
+async def delete_receipt(
+    receipt_id: str = FPath(..., description="UUID of the receipt"),
+) -> dict:
+    """Permanently delete a receipt and all corresponding line items and storage objects."""
+    success = store.delete_receipt(receipt_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Receipt '{receipt_id}' not found.",
+        )
+    return {"status": "deleted", "id": receipt_id}
+

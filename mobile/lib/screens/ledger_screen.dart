@@ -173,7 +173,43 @@ class _LedgerScreenState extends State<LedgerScreen> {
           ),
         ),
         actions: [
-          if (receiptId.isNotEmpty)
+          if (receiptId.isNotEmpty) ...[
+            TextButton.icon(
+              style: TextButton.styleFrom(foregroundColor: AppTheme.errorRed),
+              onPressed: () async {
+                final nav = Navigator.of(ctx);
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (c) => AlertDialog(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    title: const Text('Delete Receipt'),
+                    content: Text('Are you sure you want to delete "$merchant" from the ledger?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.errorRed,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () => Navigator.pop(c, true),
+                        child: const Text('Delete'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  nav.pop();
+                  await _api.deleteReceipt(receiptId);
+                  if (mounted) {
+                    AppToast.success(context, 'Receipt "$merchant" deleted');
+                    _loadData();
+                  }
+                }
+              },
+              icon: const Icon(Icons.delete_outline, size: 16),
+              label: const Text('Delete'),
+            ),
             TextButton.icon(
               onPressed: () {
                 Navigator.pop(ctx);
@@ -182,6 +218,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
               icon: const Icon(Icons.image_outlined, size: 16),
               label: const Text('View Slip Image'),
             ),
+          ],
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
             style: ElevatedButton.styleFrom(

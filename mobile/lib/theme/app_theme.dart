@@ -49,6 +49,7 @@ class AppTheme {
   static const Color greenVerified = Color(0xFF2E7D5B);
   static const Color greenVerifiedBg = Color(0xFFE7F3EC);
   static const Color badgeRed = Color(0xFFD9534F); // Muted terracotta red
+  static const Color errorRed = Color(0xFFD9534F);
   static const Color badgeRedBg = Color(0xFFFDE8E8);
   static const Color amberWarning = Color(0xFFD97706);
   static const Color amberWarningBg = Color(0xFFFEF3C7);

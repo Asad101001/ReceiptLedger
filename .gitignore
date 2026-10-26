@@ -106,3 +106,6 @@ scripts/devops/bin/
 *.gz
 *.tar.gz
 
+# Deployment & Hugging Face temporary worktrees
+hf_space_temp/
+

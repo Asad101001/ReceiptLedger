@@ -126,10 +126,13 @@ async def get_receipts(
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Records per page"),
     search: Optional[str] = Query(default=None, description="Filter by merchant name"),
+    category: Optional[str] = Query(default=None, description="Filter by category name"),
+    start_date: Optional[str] = Query(default=None, description="ISO start date (inclusive)"),
+    end_date: Optional[str] = Query(default=None, description="ISO end date (inclusive)"),
 ) -> PaginatedReceiptsResponse:
     """
     Paginated, searchable historical receipt ledger.
-    Supports filtering by merchant name substring.
+    Supports filtering by merchant name substring, category, and date range.
     Uses database-level .range() and .ilike() filtering with relational join
     (select("*, line_items(*)")) to optimize database reads and eliminate N+1 queries.
     """
@@ -137,6 +140,9 @@ async def get_receipts(
         page=page,
         page_size=page_size,
         search=search,
+        category=category,
+        start_date=start_date,
+        end_date=end_date,
         include_items=True,
     )
     total_pages = max(1, (total + page_size - 1) // page_size) if total > 0 else 1

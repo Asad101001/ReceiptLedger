@@ -63,8 +63,19 @@ async def lifespan(app: FastAPI):
     if settings.supabase_enabled:
         store.init_supabase()
 
-    # Pre-warm: Set Google credentials env var if configured
-    if settings.google_application_credentials:
+    # Support inline GOOGLE_CREDENTIALS_JSON in cloud container environments
+    raw_cred_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
+    if raw_cred_json and not settings.google_application_credentials:
+        try:
+            cred_file = Path("credentials/google_vision_key.json")
+            cred_file.parent.mkdir(parents=True, exist_ok=True)
+            cred_file.write_text(raw_cred_json.strip(), encoding="utf-8")
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(cred_file.resolve())
+            settings.google_application_credentials = str(cred_file.resolve())
+            logger.info("Wrote inline GOOGLE_CREDENTIALS_JSON to %s", cred_file)
+        except Exception as exc:
+            logger.warning("Could not write inline GOOGLE_CREDENTIALS_JSON: %s", exc)
+    elif settings.google_application_credentials:
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = settings.google_application_credentials
         logger.info("Google credentials path set.")
 
@@ -108,7 +119,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$",
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|.*\.vercel\.app)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

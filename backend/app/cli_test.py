@@ -809,6 +809,94 @@ def test_sample_handwritten_receipt():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# TEST 36: Manual Receipt CRUD (POST, GET, PATCH, DELETE)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@register("API: Manual receipt creation, GET detail, PATCH, and DELETE")
+def test_manual_receipt_crud():
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+    payload = {
+        "merchant_name": "Rahim Store Manual",
+        "receipt_date": "2026-10-25",
+        "total_amount": 1550.0,
+        "category": "Groceries & Food",
+        "items": [
+            {
+                "item_name": "Brown Eggs (Dozen)",
+                "quantity": 2.0,
+                "unit": "pcs",
+                "unit_price": 400.0,
+                "total_price": 800.0,
+                "category": "Groceries & Food",
+            },
+            {
+                "item_name": "Full Cream Milk 1L",
+                "quantity": 3.0,
+                "unit": "pcs",
+                "unit_price": 250.0,
+                "total_price": 750.0,
+                "category": "Groceries & Food",
+            },
+        ],
+        "notes": "Manual purchase test entry",
+    }
+
+    # 1. Create
+    resp = client.post("/api/v1/receipts/manual", json=payload)
+    assert resp.status_code == 200, f"Manual creation failed: {resp.text}"
+    data = resp.json()
+    receipt_id = data["id"]
+    assert data["merchant_name"] == "Rahim Store Manual"
+    assert data["total_amount"] == 1550.0
+    assert len(data.get("line_items", [])) == 2
+
+    # 2. Get detail
+    get_resp = client.get(f"/api/v1/receipts/{receipt_id}")
+    assert get_resp.status_code == 200
+    assert get_resp.json()["id"] == receipt_id
+
+    # 3. Patch
+    patch_resp = client.patch(
+        f"/api/v1/receipts/{receipt_id}",
+        json={"merchant_name": "Rahim Store Updated"},
+    )
+    assert patch_resp.status_code == 200
+    assert patch_resp.json()["merchant_name"] == "Rahim Store Updated"
+
+    # 4. Delete
+    del_resp = client.delete(f"/api/v1/receipts/{receipt_id}")
+    assert del_resp.status_code == 200
+    assert del_resp.json()["status"] == "deleted"
+
+    # 5. Verify deleted
+    get_after = client.get(f"/api/v1/receipts/{receipt_id}")
+    assert get_after.status_code == 404
+
+    print(f"   Successfully created, verified, updated, and deleted receipt: {receipt_id}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TEST 37: Analytics filtering (category and date range)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@register("API: GET /analytics/receipts category & date filtering")
+def test_analytics_receipts_filtering():
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+    resp = client.get("/api/v1/analytics/receipts?page=1&page_size=5&category=Groceries%20%26%20Food")
+    assert resp.status_code == 200, f"Failed: {resp.text}"
+    data = resp.json()
+    assert "receipts" in data
+    assert "total" in data
+    print(f"   Category filter returned total={data['total']}, page_size={len(data['receipts'])}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Runner
 # ─────────────────────────────────────────────────────────────────────────────
 

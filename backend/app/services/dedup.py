@@ -209,3 +209,8 @@ def load_hashes_from_db(records: List[Dict]) -> None:
             text_sha256=r["text_fingerprint_sha256"],
         )
     logger.info("Loaded %d hash records from database into memory.", len(records))
+
+
+def remove_hashes(receipt_id: str) -> None:
+    """Remove a receipt's deduplication hashes from memory upon deletion."""
+    _hash_store.pop(receipt_id, None)

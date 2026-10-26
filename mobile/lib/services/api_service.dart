@@ -368,11 +368,30 @@ class ApiService {
     }
   }
 
-  /// Fetches paginated ledger receipts GET /api/v1/analytics/receipts
-  Future<List<Map<String, dynamic>>> getReceipts({int page = 1, int pageSize = 50}) async {
-    final url = Uri.parse('$_baseUrl/api/v1/analytics/receipts?page=$page&page_size=$pageSize');
+  /// Fetches paginated ledger receipts GET /api/v1/analytics/receipts with filtering
+  Future<List<Map<String, dynamic>>> getReceipts({
+    int page = 1,
+    int pageSize = 50,
+    String? search,
+    String? category,
+    String? startDate,
+    String? endDate,
+  }) async {
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'page_size': pageSize.toString(),
+      if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+      if (category != null && category.trim().isNotEmpty && category.toLowerCase() != 'all')
+        'category': category.trim(),
+      if (startDate != null) 'start_date': startDate,
+      if (endDate != null) 'end_date': endDate,
+    };
+    final uri = Uri.parse('$_baseUrl/api/v1/analytics/receipts').replace(queryParameters: queryParams);
     try {
-      final response = await http.get(url, headers: {'Bypass-Tunnel-Reminder': 'true'}).timeout(const Duration(seconds: 8));
+      final response = await http.get(uri, headers: {
+        'Bypass-Tunnel-Reminder': 'true',
+        if (_authToken != null) 'Authorization': 'Bearer $_authToken',
+      }).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
         backendOnlineNotifier.value = true;
         // As soon as live API is detected, clear demo state
@@ -389,12 +408,143 @@ class ApiService {
 
     // Only return dummy data if in Demo Mode and explicitly seeded
     if (isDemoMode && _seededReceipts != null && _seededReceipts!.isNotEmpty) {
-      return _seededReceipts!;
+      var filtered = List<Map<String, dynamic>>.from(_seededReceipts!);
+      if (category != null && category.toLowerCase() != 'all') {
+        filtered = filtered.where((r) =>
+          (r['category_name']?.toString().toLowerCase() == category.toLowerCase())
+        ).toList();
+      }
+      return filtered;
     }
 
     // Fully free clean state
     return [];
   }
+
+  /// Create a manual receipt record POST /api/v1/receipts/manual
+  Future<Map<String, dynamic>> createManualReceipt({
+    required String merchantName,
+    required double totalAmount,
+    String? receiptDate,
+    String category = 'Miscellaneous',
+    List<Map<String, dynamic>>? items,
+    String? notes,
+  }) async {
+    final payload = {
+      'merchant_name': merchantName,
+      'total_amount': totalAmount,
+      'receipt_date': receiptDate ?? DateTime.now().toIso8601String().substring(0, 10),
+      'category': category,
+      if (items != null) 'items': items,
+      if (notes != null) 'notes': notes,
+    };
+
+    final url = Uri.parse('$_baseUrl/api/v1/receipts/manual');
+    try {
+      final response = await http.post(
+        url,
+        headers: authHeaders,
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        backendOnlineNotifier.value = true;
+        dataVersionNotifier.value++;
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else {
+        final decoded = jsonDecode(response.body);
+        throw Exception(decoded['detail'] ?? 'Failed to create manual receipt');
+      }
+    } catch (e) {
+      // Offline fallback
+      final mockRecord = {
+        'id': 'rec-${DateTime.now().millisecondsSinceEpoch}',
+        'merchant_name': merchantName,
+        'total_amount': totalAmount,
+        'receipt_date': receiptDate ?? DateTime.now().toIso8601String().substring(0, 10),
+        'status': 'PROCESSED',
+        'category_name': category,
+        'receipt_type': 'MANUAL',
+        'line_items': items ?? [
+          {
+            'item_name': merchantName,
+            'quantity': 1,
+            'total_price': totalAmount,
+            'category_name': category,
+          }
+        ],
+      };
+      _seededReceipts ??= [];
+      _seededReceipts!.insert(0, mockRecord);
+      dataVersionNotifier.value++;
+      return mockRecord;
+    }
+  }
+
+  /// Delete a receipt DELETE /api/v1/receipts/{receipt_id}
+  Future<bool> deleteReceipt(String receiptId) async {
+    final url = Uri.parse('$_baseUrl/api/v1/receipts/$receiptId');
+    try {
+      final response = await http.delete(
+        url,
+        headers: authHeaders,
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        backendOnlineNotifier.value = true;
+        if (_seededReceipts != null) {
+          _seededReceipts!.removeWhere((r) => r['id'] == receiptId);
+        }
+        dataVersionNotifier.value++;
+        refreshReviewCount();
+        return true;
+      }
+    } catch (_) {}
+
+    // Offline removal
+    if (_seededReceipts != null) {
+      _seededReceipts!.removeWhere((r) => r['id'] == receiptId);
+    }
+    dataVersionNotifier.value++;
+    return true;
+  }
+
+  /// Update receipt metadata PATCH /api/v1/receipts/{receipt_id}
+  Future<Map<String, dynamic>?> updateReceipt(String receiptId, Map<String, dynamic> updates) async {
+    final url = Uri.parse('$_baseUrl/api/v1/receipts/$receiptId');
+    try {
+      final response = await http.patch(
+        url,
+        headers: authHeaders,
+        body: jsonEncode(updates),
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        backendOnlineNotifier.value = true;
+        dataVersionNotifier.value++;
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Get single receipt details GET /api/v1/receipts/{receipt_id}
+  Future<Map<String, dynamic>?> getReceiptDetails(String receiptId) async {
+    final url = Uri.parse('$_baseUrl/api/v1/receipts/$receiptId');
+    try {
+      final response = await http.get(
+        url,
+        headers: authHeaders,
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        backendOnlineNotifier.value = true;
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return null;
+  }
+
 
   /// Fetches monthly analytics summary GET /api/v1/analytics/monthly
   Future<Map<String, dynamic>> getMonthlySummary({required int year, required int month}) async {
