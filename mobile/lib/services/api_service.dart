@@ -48,7 +48,7 @@ class ApiService {
   factory ApiService() => _instance;
   ApiService._internal();
 
-  String _baseUrl = 'http://192.168.100.78:8000';
+  String _baseUrl = 'https://atom-prepared-alumni-environmental.trycloudflare.com';
   String? _authToken;
   final ValueNotifier<String> currencyNotifier = ValueNotifier<String>('Rs.');
   final ValueNotifier<int> reviewCountNotifier = ValueNotifier<int>(0);

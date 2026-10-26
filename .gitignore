@@ -11,6 +11,9 @@ credentials/
 backend/credentials/
 *.json.key
 google_vision_key.json
+hf_space_temp/
+scripts/tunnel.log
+scripts/current_tunnel_url.txt
 
 # Python
 __pycache__/
