@@ -364,7 +364,7 @@ class _AppDrawerState extends State<AppDrawer> {
                 Navigator.pop(ctx);
                 _api.seedDemoData();
                 Navigator.pop(context); // close drawer
-                AppToast.showSuccess(context, 'Demo dataset seeded (3 receipts, 5 review items)');
+                AppToast.showSuccess(context, 'Demo dataset seeded (10 receipts, 7 review items)');
               },
               child: const Text('Seed Data'),
             ),

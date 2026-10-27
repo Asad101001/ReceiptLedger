@@ -169,5 +169,155 @@ class AppTheme {
   }
 }
 
+/// Style definition for a financial category badge, chart accent, and card theme
+class CategoryStyle {
+  final String label;
+  final Color primary;
+  final Color backgroundLight;
+  final Color backgroundDark;
+  final Color borderLight;
+  final Color borderDark;
+  final IconData icon;
+
+  const CategoryStyle({
+    required this.label,
+    required this.primary,
+    required this.backgroundLight,
+    required this.backgroundDark,
+    required this.borderLight,
+    required this.borderDark,
+    required this.icon,
+  });
+
+  Color backgroundColor(bool isDark) => isDark ? backgroundDark : backgroundLight;
+  Color borderColor(bool isDark) => isDark ? borderDark : borderLight;
+}
+
+/// Curated, executive financial category palette
+/// Cohesive with forest green and linen canvas; tasteful, elegant, and non-garish.
+class CategoryTheme {
+  static const CategoryStyle groceries = CategoryStyle(
+    label: 'Groceries',
+    primary: Color(0xFF2E7D5B), // Fresh leaf emerald
+    backgroundLight: Color(0xFFEAF5EE),
+    backgroundDark: Color(0xFF142E20),
+    borderLight: Color(0xFFC7E6D3),
+    borderDark: Color(0xFF204832),
+    icon: Icons.local_grocery_store_outlined,
+  );
+
+  static const CategoryStyle bakery = CategoryStyle(
+    label: 'Bakeries',
+    primary: Color(0xFFC26E00), // Warm toasted caramel
+    backgroundLight: Color(0xFFFEF4E6),
+    backgroundDark: Color(0xFF2B1C0B),
+    borderLight: Color(0xFFFBDDB8),
+    borderDark: Color(0xFF452E13),
+    icon: Icons.bakery_dining_outlined,
+  );
+
+  static const CategoryStyle fuel = CategoryStyle(
+    label: 'Fuel & Auto',
+    primary: Color(0xFFD97706), // Petroleum warm amber
+    backgroundLight: Color(0xFFFEF8EC),
+    backgroundDark: Color(0xFF2B1F0A),
+    borderLight: Color(0xFFFDE68A),
+    borderDark: Color(0xFF453210),
+    icon: Icons.local_gas_station_outlined,
+  );
+
+  static const CategoryStyle healthcare = CategoryStyle(
+    label: 'Healthcare',
+    primary: Color(0xFF0F766E), // Clinical calming teal
+    backgroundLight: Color(0xFFE8F7F5),
+    backgroundDark: Color(0xFF0E2724),
+    borderLight: Color(0xFFBCE7E3),
+    borderDark: Color(0xFF163E3A),
+    icon: Icons.local_pharmacy_outlined,
+  );
+
+  static const CategoryStyle utilities = CategoryStyle(
+    label: 'Utilities',
+    primary: Color(0xFF4338CA), // Electric cobalt violet
+    backgroundLight: Color(0xFFEEF2FF),
+    backgroundDark: Color(0xFF161536),
+    borderLight: Color(0xFFC7D2FE),
+    borderDark: Color(0xFF232254),
+    icon: Icons.bolt_outlined,
+  );
+
+  static const CategoryStyle household = CategoryStyle(
+    label: 'Household',
+    primary: Color(0xFF7C3AED), // Muted royal lavender
+    backgroundLight: Color(0xFFF5F3FF),
+    backgroundDark: Color(0xFF221338),
+    borderLight: Color(0xFFDDD6FE),
+    borderDark: Color(0xFF341E55),
+    icon: Icons.home_outlined,
+  );
+
+  static const CategoryStyle personalCare = CategoryStyle(
+    label: 'Personal Care',
+    primary: Color(0xFFBE185D), // Subtle rosewood berry
+    backgroundLight: Color(0xFFFDF2F8),
+    backgroundDark: Color(0xFF2E0E1B),
+    borderLight: Color(0xFFFBCFE8),
+    borderDark: Color(0xFF471629),
+    icon: Icons.spa_outlined,
+  );
+
+  static const CategoryStyle dining = CategoryStyle(
+    label: 'Dining & Cafe',
+    primary: Color(0xFFB45309), // Warm terracotta
+    backgroundLight: Color(0xFFFFF7ED),
+    backgroundDark: Color(0xFF2B1709),
+    borderLight: Color(0xFFFED7AA),
+    borderDark: Color(0xFF45260F),
+    icon: Icons.restaurant_outlined,
+  );
+
+  static const CategoryStyle miscellaneous = CategoryStyle(
+    label: 'Miscellaneous',
+    primary: Color(0xFF475569), // Muted slate charcoal
+    backgroundLight: Color(0xFFF1F5F9),
+    backgroundDark: Color(0xFF1E293B),
+    borderLight: Color(0xFFCBD5E1),
+    borderDark: Color(0xFF334155),
+    icon: Icons.receipt_long_outlined,
+  );
+
+  /// Resolves matching CategoryStyle from any raw category string or label
+  static CategoryStyle getStyle(String? categoryName) {
+    if (categoryName == null || categoryName.trim().isEmpty) return miscellaneous;
+    final cat = categoryName.toLowerCase().trim();
+
+    if (cat.contains('groc') || cat.contains('food') || cat.contains('super')) {
+      return groceries;
+    }
+    if (cat.contains('bak') || cat.contains('sweet') || cat.contains('confec')) {
+      return bakery;
+    }
+    if (cat.contains('fuel') || cat.contains('gas') || cat.contains('petrol') || cat.contains('transp')) {
+      return fuel;
+    }
+    if (cat.contains('pharm') || cat.contains('health') || cat.contains('med') || (cat.contains('care') && cat.contains('health'))) {
+      return healthcare;
+    }
+    if (cat.contains('util') || cat.contains('bill') || cat.contains('elect') || cat.contains('power') || cat.contains('water') || cat.contains('gas bill')) {
+      return utilities;
+    }
+    if (cat.contains('house') || cat.contains('clean') || cat.contains('home')) {
+      return household;
+    }
+    if (cat.contains('person') || cat.contains('cosmetic') || cat.contains('beauty') || cat.contains('care')) {
+      return personalCare;
+    }
+    if (cat.contains('din') || cat.contains('rest') || cat.contains('cafe') || cat.contains('coffee')) {
+      return dining;
+    }
+    return miscellaneous;
+  }
+}
+
 /// Compatibility alias
 typedef AppColors = AppTheme;

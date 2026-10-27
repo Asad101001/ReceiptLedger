@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../widgets/app_header.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/hoverable.dart';
+import '../widgets/category_badge.dart';
 
 class LedgerScreen extends StatefulWidget {
   final VoidCallback? onOpenDrawer;
@@ -76,6 +77,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
     final merchant = r['merchant_name'] ?? r['merchant'] ?? 'Receipt';
     final total = r['total_amount'] ?? 0.0;
     final date = r['receipt_date'] ?? r['date'] ?? 'Recent';
+    final category = r['category_name'] ?? r['category'] ?? 'Groceries';
     final lineItems = (r['line_items'] as List<dynamic>?) ?? [];
     final receiptId = r['id']?.toString() ?? '';
 
@@ -113,9 +115,18 @@ class _LedgerScreenState extends State<LedgerScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                date,
-                style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+              Row(
+                children: [
+                  Text(
+                    date,
+                    style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                  ),
+                  const SizedBox(width: 8),
+                  CategoryBadge(
+                    category: category,
+                    size: CategoryBadgeSize.small,
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               const Divider(),
@@ -361,7 +372,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                 : RefreshIndicator(
                     onRefresh: _loadData,
                     child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
+                      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -484,9 +495,11 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                 // Trend line & Sparkline Chart
                                 SizedBox(
                                   height: 40,
-                                  child: CustomPaint(
-                                    painter: _WeeklyActivityTrendPainter(selectedDayIndex: _selectedDayIndex),
-                                    size: Size.infinite,
+                                  child: RepaintBoundary(
+                                    child: CustomPaint(
+                                      painter: _WeeklyActivityTrendPainter(selectedDayIndex: _selectedDayIndex),
+                                      size: Size.infinite,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -505,7 +518,12 @@ class _LedgerScreenState extends State<LedgerScreen> {
                             ),
                           ),
 
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 18),
+
+                          // Category Spend Velocity & Color Metric Chart
+                          _buildCategoryDistributionBar(),
+
+                          const SizedBox(height: 18),
 
                           // Spending Categories Section
                           Row(
@@ -520,7 +538,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                 ),
                               ),
                               Text(
-                                'Oct 2023',
+                                'Oct 2026',
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
@@ -531,16 +549,18 @@ class _LedgerScreenState extends State<LedgerScreen> {
                           ),
                           const SizedBox(height: 12),
 
-                          // 4 Category Cards Row from LEDGER.png (Interactive tap to filter)
+                          // 5 Category Cards Row with distinctive, tasteful color coding
                           Row(
                             children: [
                               Expanded(child: _buildCategoryCard(Icons.shopping_bag_outlined, 'Groceries', '18.4k')),
-                              const SizedBox(width: 10),
-                              Expanded(child: _buildCategoryCard(Icons.storefront_outlined, 'Bakeries', '9.2k')),
-                              const SizedBox(width: 10),
-                              Expanded(child: _buildCategoryCard(Icons.local_gas_station_outlined, 'Fuel', '7.5k')),
-                              const SizedBox(width: 10),
-                              Expanded(child: _buildCategoryCard(Icons.bolt_outlined, 'Utilities', '4.6k')),
+                              const SizedBox(width: 8),
+                              Expanded(child: _buildCategoryCard(Icons.local_gas_station_outlined, 'Fuel', '11.0k')),
+                              const SizedBox(width: 8),
+                              Expanded(child: _buildCategoryCard(Icons.storefront_outlined, 'Bakeries', '8.4k')),
+                              const SizedBox(width: 8),
+                              Expanded(child: _buildCategoryCard(Icons.bolt_outlined, 'Utilities', '7.2k')),
+                              const SizedBox(width: 8),
+                              Expanded(child: _buildCategoryCard(Icons.local_pharmacy_outlined, 'Healthcare', '3.8k')),
                             ],
                           ),
 
@@ -656,8 +676,165 @@ class _LedgerScreenState extends State<LedgerScreen> {
     );
   }
 
+  Widget _buildCategoryDistributionBar() {
+    final categories = _monthlySummary?['categories'] as Map<String, dynamic>? ?? {
+      'Groceries & Food': 18400.0,
+      'Fuel & Transport': 11000.0,
+      'Bakeries & Confectionery': 8350.0,
+      'Utilities & Bills': 7240.0,
+      'Healthcare & Pharmacy': 3820.0,
+    };
+
+    final double total = categories.values.fold<double>(
+      0.0,
+      (sum, val) => sum + ((val as num?)?.toDouble() ?? 0.0),
+    );
+    if (total <= 0) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.borderLight),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(5),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'SPENDING VELOCITY BREAKDOWN',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                  color: AppTheme.textMuted,
+                ),
+              ),
+              Text(
+                '${categories.length} Streams',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.navyBrand,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Multi-color segmented metric bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              height: 10,
+              child: Row(
+                children: categories.entries.map((entry) {
+                  final catStyle = CategoryTheme.getStyle(entry.key);
+                  final amount = (entry.value as num).toDouble();
+                  final double pct = amount / total;
+                  final isSelected = _selectedCategoryFilter == catStyle.label ||
+                      _selectedCategoryFilter == entry.key;
+
+                  return Expanded(
+                    flex: (pct * 1000).toInt().clamp(1, 1000),
+                    child: Tooltip(
+                      message: '${entry.key}: ${(pct * 100).toStringAsFixed(1)}%',
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedCategoryFilter = isSelected ? null : catStyle.label;
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          margin: const EdgeInsets.symmetric(horizontal: 0.8),
+                          decoration: BoxDecoration(
+                            color: catStyle.primary,
+                            borderRadius: BorderRadius.circular(4),
+                            border: isSelected ? Border.all(color: Colors.black, width: 1.5) : null,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Interactive category legend chips with colorful pill dots and percentage
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: categories.entries.map((entry) {
+              final catStyle = CategoryTheme.getStyle(entry.key);
+              final amount = (entry.value as num).toDouble();
+              final double pct = amount / total;
+              final isSelected = _selectedCategoryFilter == catStyle.label ||
+                  _selectedCategoryFilter == entry.key;
+
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedCategoryFilter = isSelected ? null : catStyle.label;
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? catStyle.primary
+                        : catStyle.backgroundColor(false),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected ? catStyle.primary : catStyle.borderColor(false),
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSelected ? Colors.white : catStyle.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        '${catStyle.label} ${(pct * 100).toStringAsFixed(0)}%',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: isSelected ? Colors.white : catStyle.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCategoryCard(IconData icon, String name, String amount) {
     final isSelected = _selectedCategoryFilter == name;
+    final catStyle = CategoryTheme.getStyle(name);
 
     return Hoverable(
       scale: 1.03,
@@ -667,13 +844,14 @@ class _LedgerScreenState extends State<LedgerScreen> {
           _selectedCategoryFilter = isSelected ? null : name;
         });
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.navyBrand.withAlpha(15) : Colors.white,
+          color: isSelected ? catStyle.primary.withAlpha(22) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? AppTheme.navyBrand : AppTheme.borderLight,
+            color: isSelected ? catStyle.primary : AppTheme.borderLight,
             width: isSelected ? 1.8 : 1.0,
           ),
           boxShadow: [
@@ -687,33 +865,35 @@ class _LedgerScreenState extends State<LedgerScreen> {
         child: Column(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: isSelected ? AppTheme.navyBrand : const Color(0xFFF1F5F9),
+                color: isSelected ? catStyle.primary : catStyle.backgroundColor(false),
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                icon,
-                size: 18,
-                color: isSelected ? Colors.white : AppTheme.navyBrand,
+                catStyle.icon,
+                size: 16,
+                color: isSelected ? Colors.white : catStyle.primary,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               name,
               style: TextStyle(
-                fontSize: 11,
-                color: isSelected ? AppTheme.navyBrand : AppTheme.textMuted,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                fontSize: 10.0,
+                color: isSelected ? catStyle.primary : AppTheme.textMuted,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 2),
             Text(
               amount,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 12.0,
                 fontWeight: FontWeight.w800,
-                color: isSelected ? AppTheme.navyBrand : AppTheme.textDark,
+                color: isSelected ? catStyle.primary : AppTheme.textDark,
               ),
             ),
           ],
@@ -729,6 +909,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
     final itemsCount = r['items_count'] ?? (r['line_items'] as List?)?.length ?? 1;
     final total = (r['total_amount'] ?? 0.0) as num;
     final lineItems = (r['line_items'] as List<dynamic>?) ?? [];
+    final category = r['category_name'] ?? r['category'] ?? 'Groceries';
     final isExpanded = _expandedReceiptId == id;
 
     return Hoverable(
@@ -759,19 +940,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Row(
                 children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.assignment_outlined,
-                      color: AppTheme.navyBrand,
-                      size: 22,
-                    ),
-                  ),
+                  CategoryAvatar(category: category, size: 44, iconSize: 22),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -786,12 +955,22 @@ class _LedgerScreenState extends State<LedgerScreen> {
                           ),
                         ),
                         const SizedBox(height: 3),
-                        Text(
-                          '$date • $itemsCount items',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.textMuted,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              '$date • $itemsCount items',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.textMuted,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            CategoryBadge(
+                              category: category,
+                              size: CategoryBadgeSize.small,
+                              showIcon: false,
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -881,6 +1060,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
 }
 
 /// Custom painter for the subtle sparkline trend in Weekly Activity card
+/// Enhanced with gradient fill area and anti-aliased Bézier curve
 class _WeeklyActivityTrendPainter extends CustomPainter {
   final int selectedDayIndex;
 
@@ -888,50 +1068,89 @@ class _WeeklyActivityTrendPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final linePaint = Paint()
-      ..color = const Color(0xFF334155)
-      ..strokeWidth = 2.0
-      ..style = PaintingStyle.stroke;
+    const strokeColor = AppTheme.forestPrimary;
+    final w = size.width;
+    final h = size.height;
 
-    final dotPaint = Paint()
-      ..color = AppTheme.navyBrand
+    // Control points for smooth curve
+    final p0 = Offset(w * 0.04, h * 0.78);
+    final p1 = Offset(w * 0.35, h * 0.62);
+    final p2 = Offset(w * 0.68, h * 0.40);
+    final p3 = Offset(w * 0.96, h * 0.32);
+
+    final linePath = Path();
+    linePath.moveTo(p0.dx, p0.dy);
+    linePath.cubicTo(
+      w * 0.18, h * 0.72,
+      w * 0.25, h * 0.64,
+      p1.dx, p1.dy,
+    );
+    linePath.cubicTo(
+      w * 0.48, h * 0.58,
+      w * 0.55, h * 0.46,
+      p2.dx, p2.dy,
+    );
+    linePath.cubicTo(
+      w * 0.78, h * 0.36,
+      w * 0.88, h * 0.34,
+      p3.dx, p3.dy,
+    );
+
+    // Gradient area below curve
+    final fillPath = Path.from(linePath);
+    fillPath.lineTo(p3.dx, h);
+    fillPath.lineTo(p0.dx, h);
+    fillPath.close();
+
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          strokeColor.withOpacity(0.22),
+          strokeColor.withOpacity(0.0),
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, w, h))
       ..style = PaintingStyle.fill;
 
+    canvas.drawPath(fillPath, fillPaint);
+
+    final linePaint = Paint()
+      ..color = strokeColor
+      ..strokeWidth = 2.4
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..isAntiAlias = true;
+
+    canvas.drawPath(linePath, linePaint);
+
+    // Determine dynamic marker offset based on selected day
+    Offset center = switch (selectedDayIndex) {
+      0 => p0,
+      1 => p1,
+      2 => p2,
+      3 => p3,
+      _ => p2,
+    };
+
+    // Outer glow halo
+    final haloPaint = Paint()
+      ..color = strokeColor.withOpacity(0.18)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, 9.0, haloPaint);
+
+    // Dynamic marker with white border
+    final dotPaint = Paint()
+      ..color = strokeColor
+      ..style = PaintingStyle.fill;
     final dotBorderPaint = Paint()
       ..color = Colors.white
-      ..strokeWidth = 2.5
+      ..strokeWidth = 2.4
       ..style = PaintingStyle.stroke;
 
-    final path = Path();
-    path.moveTo(size.width * 0.05, size.height * 0.75);
-    path.lineTo(size.width * 0.35, size.height * 0.65);
-    path.lineTo(size.width * 0.68, size.height * 0.45);
-    path.lineTo(size.width * 0.95, size.height * 0.38);
-
-    canvas.drawPath(path, linePaint);
-
-    // Dynamic marker based on selected day
-    Offset center;
-    switch (selectedDayIndex) {
-      case 0:
-        center = Offset(size.width * 0.05, size.height * 0.75);
-        break;
-      case 1:
-        center = Offset(size.width * 0.35, size.height * 0.65);
-        break;
-      case 2:
-        center = Offset(size.width * 0.68, size.height * 0.45);
-        break;
-      case 3:
-        center = Offset(size.width * 0.95, size.height * 0.38);
-        break;
-      default:
-        center = Offset(size.width * 0.68, size.height * 0.45);
-        break;
-    }
-
-    canvas.drawCircle(center, 5.5, dotPaint);
-    canvas.drawCircle(center, 5.5, dotBorderPaint);
+    canvas.drawCircle(center, 5.0, dotPaint);
+    canvas.drawCircle(center, 5.0, dotBorderPaint);
   }
 
   @override

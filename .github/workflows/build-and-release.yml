@@ -61,11 +61,15 @@ jobs:
         run: |
           VERSION=$(grep '^version:' mobile/pubspec.yaml | sed 's/version: //;s/+.*//' | tr -d '[:space:]')
           BUILD_NUM=${{ github.run_number }}
-          TAG_NAME="v${VERSION}-b${BUILD_NUM}"
-          RELEASE_TITLE="ReceiptLedger v${VERSION} (Build ${BUILD_NUM})"
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          DATE_CODE=$(date -u +"%Y%m%d")
           DATE_STR=$(date -u +"%Y-%m-%d %H:%M UTC")
+          TAG_NAME="v${VERSION}-preview.${BUILD_NUM}.${SHORT_SHA}"
+          RELEASE_TITLE="ReceiptLedger v${VERSION} • Preview Build #${BUILD_NUM} (${SHORT_SHA})"
           
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "build_num=${BUILD_NUM}" >> $GITHUB_OUTPUT
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "tag=${TAG_NAME}" >> $GITHUB_OUTPUT
           echo "title=${RELEASE_TITLE}" >> $GITHUB_OUTPUT
           echo "date=${DATE_STR}" >> $GITHUB_OUTPUT
@@ -73,19 +77,23 @@ jobs:
       - name: Build Android Release APK
         run: |
           cd mobile
-          flutter build apk --release
+          flutter build apk --release --build-name="${{ steps.meta.outputs.version }}" --build-number="${{ steps.meta.outputs.build_num }}"
 
       - name: Prepare Release Artifacts & Checksums
         id: artifacts
         run: |
           SRC_APK="mobile/build/app/outputs/flutter-apk/app-release.apk"
-          DEST_APK="ReceiptLedger-v${{ steps.meta.outputs.version }}-release.apk"
-          cp "$SRC_APK" "$DEST_APK"
+          BUILD_APK="ReceiptLedger-v${{ steps.meta.outputs.version }}-b${{ steps.meta.outputs.build_num }}-${{ steps.meta.outputs.short_sha }}.apk"
+          RELEASE_APK="ReceiptLedger-v${{ steps.meta.outputs.version }}-release.apk"
           
-          FILE_SIZE=$(du -h "$DEST_APK" | cut -f1)
-          SHA256_HASH=$(sha256sum "$DEST_APK" | cut -d' ' -f1)
+          cp "$SRC_APK" "$BUILD_APK"
+          cp "$SRC_APK" "$RELEASE_APK"
           
-          echo "apk_path=${DEST_APK}" >> $GITHUB_OUTPUT
+          FILE_SIZE=$(du -h "$BUILD_APK" | cut -f1)
+          SHA256_HASH=$(sha256sum "$BUILD_APK" | cut -d' ' -f1)
+          
+          echo "apk_path=${BUILD_APK}" >> $GITHUB_OUTPUT
+          echo "release_apk_path=${RELEASE_APK}" >> $GITHUB_OUTPUT
           echo "file_size=${FILE_SIZE}" >> $GITHUB_OUTPUT
           echo "sha256=${SHA256_HASH}" >> $GITHUB_OUTPUT
 
@@ -103,11 +111,12 @@ jobs:
           | Specification | Value |
           | :--- | :--- |
           | **Application Name** | **ReceiptLedger Mobile** |
-          | **Version** | `v${{ steps.meta.outputs.version }}` |
-          | **Build Run** | `#${{ github.run_number }}` |
+          | **Semantic Version** | `v${{ steps.meta.outputs.version }}` |
+          | **Build Run** | `#${{ steps.meta.outputs.build_num }}` |
+          | **Commit Reference** | `${{ steps.meta.outputs.short_sha }}` (`${{ github.sha }}`) |
           | **Build Date** | `${{ steps.meta.outputs.date }}` |
-          | **Commit SHA** | `${{ github.sha }}` |
           | **Package ID** | `com.receiptledger.receipt_ledger_mobile` |
+          | **Primary Artifact** | `${{ steps.artifacts.outputs.apk_path }}` |
           | **Target Architectures** | Universal (`arm64-v8a`, `armeabi-v7a`, `x86_64`) |
           | **Minimum Android OS** | Android 6.0 Marshmallow (API Level 23) |
           | **Target Android OS** | Android 14 Upside Down Cake (API Level 34) |
@@ -118,30 +127,28 @@ jobs:
           
           ### ✨ Key Features in this Build
           
-          - **Cohesive Animated Splash Screen**:
-            - Concentric ambient pulse rings matching the organic financial ledger theme (`#1E3A2B` forest pine and linen canvas).
-            - Real-time backend telemetry ticker and animated linear progress bar.
-            - Intelligent auto-handoff into authentication or main dashboard, with manual skip button.
-          - **Complete Authentication & Session Management**:
-            - Sliding pill tab switcher between **Sign In** and **Create Account**.
-            - **1-Click Instant Demo Credentials** (`user@receiptledger.com` / `demo1234`) for instant exploration.
-            - Robust client-side validation, currency selection, and biometric quick-login toggle.
-            - Full keyboard overflow protection with adaptive scrolling.
-          - **Organic Financial Ledger UI & Layout Refinements**:
-            - Floating pill navigation with desktop & web hover scaling.
-            - Interactive spend aggregation with dynamic sparkline charts and daily transaction drill-down.
-            - Optimized 110px bottom clearance preventing any floating navbar occlusion.
-          - **Receipt OCR & Verification Review Queue**:
-            - Dual OCR processing path (Gemini 3.5 Flash Lite + Local Tesseract/EasyOCR fallback).
-            - Human-in-the-loop review queue with split cropped slip snippets and multi-category reclassification.
-          - **Zero-Cost Tunneling Architecture**:
-            - Seamless connectivity with local, Cloudflare, or Pinggy tunneled backends without requiring cloud billing.
+          - **Cohesive Categorization Palette & Visual Flavor**:
+            - Distinctive, executive color-coded labels across all transaction streams (Groceries, Fuel, Bakeries, Utilities, Healthcare, Household).
+            - Custom category badges and avatars with tasteful pastel tints, matching borders, and icons.
+          - **Spending Velocity Distribution Metric Bar**:
+            - Multi-segment interactive category velocity breakdown chart on the Ledger dashboard.
+            - Interactive filter tabs linking category distributions directly to transaction history.
+          - **60 FPS / High-Refresh-Rate Fluidity**:
+            - Bouncing scroll physics enabled across all mobile screens for buttery inertia flinging.
+            - Isolated RepaintBoundary sparkline rendering with anti-aliased Bézier curves and subtle linear gradient fills.
+          - **Persistent & Dismissible App Toasts**:
+            - Extended 5-second persistent duration with interactive close button and animated countdown progress bar.
+          - **High-Fidelity Seed Demo Data**:
+            - 10 realistic Pakistani retail receipts covering Imtiaz, Shell, Rahat, Servaid, K-Electric, Metro, Espresso, Total Parco, and D.Watson.
+            - 7 diverse OCR verification review queue items with multi-category reclassification.
+          - **Production-Grade Version Numbering**:
+            - Git commit-tagged semantic versioning with embedded Android build names and numbers.
           
           ---
           
           ### 📥 Installation Instructions
           
-          1. Download the attached APK: **[`${{ steps.artifacts.outputs.apk_path }}`](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.artifacts.outputs.apk_path }})**.
+          1. Download the attached APK: **[`${{ steps.artifacts.outputs.apk_path }}`](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.artifacts.outputs.apk_path }})** (or the release mirror: **[`${{ steps.artifacts.outputs.release_apk_path }}`](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.artifacts.outputs.release_apk_path }})**).
           2. Transfer or open the file on your Android device.
           3. When prompted, permit your browser or file manager to *"Install unknown apps"*.
           4. Complete installation and launch **ReceiptLedger**.
@@ -154,7 +161,9 @@ jobs:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.title }}
           body_path: release_notes.md
-          files: ${{ steps.artifacts.outputs.apk_path }}
+          files: |
+            ${{ steps.artifacts.outputs.apk_path }}
+            ${{ steps.artifacts.outputs.release_apk_path }}
           draft: false
           prerelease: false
         env:

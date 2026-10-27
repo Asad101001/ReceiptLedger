@@ -13,6 +13,7 @@ backend/credentials/
 google_vision_key.json
 hf_space_temp/
 scripts/tunnel.log
+scripts/localtunnel.log
 scripts/current_tunnel_url.txt
 
 # Python

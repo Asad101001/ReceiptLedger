@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../widgets/app_header.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/hoverable.dart';
+import '../widgets/category_badge.dart';
 
 class UploadScreen extends StatefulWidget {
   final VoidCallback? onOpenDrawer;
@@ -38,10 +39,11 @@ class _UploadScreenState extends State<UploadScreen> {
     'All',
     'Groceries',
     'Fuel',
-    'Dining',
+    'Bakeries',
     'Pharmacy',
     'Utilities',
-    'Shopping',
+    'Household',
+    'Dining',
   ];
 
   List<Map<String, dynamic>> _receipts = [];
@@ -991,18 +993,7 @@ class _UploadScreenState extends State<UploadScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isDark ? AppTheme.cardDarkElevated : AppTheme.sageLight,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(
-                      _getCategoryIcon(category),
-                      color: isDark ? AppTheme.textLight : AppTheme.forestPrimary,
-                      size: 24,
-                    ),
-                  ),
+                  CategoryAvatar(category: category, size: 48, iconSize: 24),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
@@ -1016,13 +1007,19 @@ class _UploadScreenState extends State<UploadScreen> {
                             color: isDark ? AppTheme.textLight : AppTheme.textDark,
                           ),
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '$date • $category',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
-                          ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Text(
+                              date,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            CategoryBadge(category: category, size: CategoryBadgeSize.small),
+                          ],
                         ),
                       ],
                     ),
@@ -1311,18 +1308,6 @@ class _UploadScreenState extends State<UploadScreen> {
     );
   }
 
-  IconData _getCategoryIcon(String category) {
-    final cat = category.toLowerCase();
-    if (cat.contains('groc')) return Icons.local_grocery_store_outlined;
-    if (cat.contains('fuel')) return Icons.local_gas_station_outlined;
-    if (cat.contains('din') || cat.contains('cafe')) return Icons.restaurant_outlined;
-    if (cat.contains('bak')) return Icons.bakery_dining_outlined;
-    if (cat.contains('pharm') || cat.contains('health')) return Icons.local_pharmacy_outlined;
-    if (cat.contains('util')) return Icons.flash_on_outlined;
-    if (cat.contains('shop')) return Icons.shopping_bag_outlined;
-    return Icons.receipt_long_outlined;
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1360,6 +1345,7 @@ class _UploadScreenState extends State<UploadScreen> {
                 await _loadReceipts();
               },
               child: ListView(
+                physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                 padding: const EdgeInsets.fromLTRB(18, 12, 18, 110), // Clears floating bottom nav
                 children: [
                   // --- HERO SCAN CARD (Leafora Organic Luxury Aesthetic) ---
@@ -1663,31 +1649,48 @@ class _UploadScreenState extends State<UploadScreen> {
                       itemBuilder: (context, idx) {
                         final cat = _categories[idx];
                         final isSelected = _selectedCategory == cat;
+                        final isAll = cat == 'All';
+                        final style = isAll ? null : CategoryTheme.getStyle(cat);
+
+                        final bgColor = isSelected
+                            ? (isAll ? AppTheme.forestPrimary : style!.primary)
+                            : (isAll
+                                ? (isDark ? AppTheme.cardDark : AppTheme.cardWhite)
+                                : style!.backgroundColor(isDark));
+
+                        final borderColor = isSelected
+                            ? (isAll ? AppTheme.forestPrimary : style!.primary)
+                            : (isAll
+                                ? (isDark ? AppTheme.borderDark : AppTheme.borderLight)
+                                : style!.borderColor(isDark));
+
+                        final fgColor = isSelected
+                            ? Colors.white
+                            : (isAll
+                                ? (isDark ? AppTheme.textLight : AppTheme.textDark)
+                                : style!.primary);
+
+                        final iconColor = isSelected
+                            ? Colors.white
+                            : (isAll ? AppTheme.forestPrimary : style!.primary);
+
                         return GestureDetector(
                           onTap: () => setState(() => _selectedCategory = cat),
                           child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
+                            duration: const Duration(milliseconds: 180),
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                             decoration: BoxDecoration(
-                              color: isSelected
-                                  ? AppTheme.forestPrimary
-                                  : (isDark ? AppTheme.cardDark : AppTheme.cardWhite),
+                              color: bgColor,
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: isSelected
-                                    ? AppTheme.forestPrimary
-                                    : (isDark ? AppTheme.borderDark : AppTheme.borderLight),
-                              ),
+                              border: Border.all(color: borderColor, width: 1.1),
                             ),
                             child: Row(
                               children: [
-                                if (cat != 'All') ...[
+                                if (!isAll) ...[
                                   Icon(
-                                    _getCategoryIcon(cat),
-                                    size: 15,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : (isDark ? AppTheme.textLight : AppTheme.forestPrimary),
+                                    style!.icon,
+                                    size: 14,
+                                    color: iconColor,
                                   ),
                                   const SizedBox(width: 6),
                                 ],
@@ -1696,9 +1699,7 @@ class _UploadScreenState extends State<UploadScreen> {
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : (isDark ? AppTheme.textLight : AppTheme.textDark),
+                                    color: fgColor,
                                   ),
                                 ),
                               ],
@@ -1782,7 +1783,7 @@ class _UploadScreenState extends State<UploadScreen> {
                               onPressed: () {
                                 _api.seedDemoData();
                                 _loadReceipts();
-                                AppToast.showSuccess(context, 'Seeded 3 demo receipts');
+                                AppToast.showSuccess(context, 'Seeded 10 demo receipts (PKR 48,810 ledger)');
                               },
                               icon: const Icon(Icons.dataset_rounded, size: 16),
                               label: const Text('Seed Demo Data', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
@@ -1815,19 +1816,7 @@ class _UploadScreenState extends State<UploadScreen> {
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                             onTap: () => _showReceiptDetail(r),
-                          leading: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: isDark ? AppTheme.cardDarkElevated : AppTheme.sageLight,
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Icon(
-                              _getCategoryIcon(category),
-                              color: isDark ? AppTheme.textLight : AppTheme.forestPrimary,
-                              size: 22,
-                            ),
-                          ),
+                          leading: CategoryAvatar(category: category, size: 44, iconSize: 22),
                           title: Text(
                             merchant,
                             style: TextStyle(
@@ -1836,12 +1825,22 @@ class _UploadScreenState extends State<UploadScreen> {
                               color: textPrimary,
                             ),
                           ),
-                          subtitle: Text(
-                            '$date • $count items',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: textMuted,
-                            ),
+                          subtitle: Row(
+                            children: [
+                              Text(
+                                '$date • $count items',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: textMuted,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              CategoryBadge(
+                                category: category,
+                                size: CategoryBadgeSize.small,
+                                showIcon: false,
+                              ),
+                            ],
                           ),
                           trailing: Column(
                             mainAxisAlignment: MainAxisAlignment.center,

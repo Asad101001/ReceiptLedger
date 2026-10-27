@@ -3,6 +3,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_header.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/category_badge.dart';
 
 class ReviewScreen extends StatefulWidget {
   final VoidCallback? onOpenDrawer;
@@ -23,12 +24,15 @@ class _ReviewScreenState extends State<ReviewScreen> {
   late TextEditingController _amountController;
   String _selectedCategory = 'Groceries';
 
-  final List<Map<String, dynamic>> _categoryOptions = [
-    {'name': 'Groceries', 'icon': Icons.local_grocery_store_outlined},
-    {'name': 'Pharmacy', 'icon': Icons.local_pharmacy_outlined},
-    {'name': 'Household', 'icon': Icons.home_outlined},
-    {'name': 'Bakery', 'icon': Icons.bakery_dining_outlined},
-    {'name': 'Fuel', 'icon': Icons.local_gas_station_outlined},
+  final List<String> _categoryOptions = [
+    'Groceries',
+    'Fuel',
+    'Bakeries',
+    'Healthcare',
+    'Utilities',
+    'Household',
+    'Personal Care',
+    'Dining',
   ];
 
   @override
@@ -84,7 +88,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
       _amountController.text = total.toStringAsFixed(0);
 
       final cat = (li['category'] ?? li['category_name'] ?? item['category'] ?? 'Groceries').toString();
-      _selectedCategory = _categoryOptions.any((c) => c['name'] == cat) ? cat : 'Groceries';
+      _selectedCategory = _categoryOptions.contains(cat) ? cat : 'Groceries';
     }
   }
 
@@ -377,7 +381,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
     final progressValue = (_currentIndex + 1) / totalCount;
 
     return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
+      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 130), // Ample bottom clearance for navbar
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -655,19 +659,10 @@ class _ReviewScreenState extends State<ReviewScreen> {
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppTheme.borderLight),
-                        ),
-                        child: const Icon(
-                          Icons.storefront_outlined,
-                          color: AppTheme.forestPrimary,
-                          size: 20,
-                        ),
+                      CategoryAvatar(
+                        category: _selectedCategory,
+                        size: 38,
+                        iconSize: 20,
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -820,30 +815,31 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: _categoryOptions.map((opt) {
-                    final name = opt['name'] as String;
-                    final icon = opt['icon'] as IconData;
+                  children: _categoryOptions.map((name) {
+                    final style = CategoryTheme.getStyle(name);
                     final isSelected = _selectedCategory == name;
+
+                    final bgColor = isSelected ? style.primary : style.backgroundColor(false);
+                    final borderColor = isSelected ? style.primary : style.borderColor(false);
+                    final fgColor = isSelected ? Colors.white : style.primary;
 
                     return GestureDetector(
                       onTap: () => setState(() => _selectedCategory = name),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8.5),
                         decoration: BoxDecoration(
-                          color: isSelected ? AppTheme.forestPrimary : const Color(0xFFF3F5F0),
+                          color: bgColor,
                           borderRadius: BorderRadius.circular(22),
-                          border: Border.all(
-                            color: isSelected ? AppTheme.forestPrimary : AppTheme.borderLight,
-                          ),
+                          border: Border.all(color: borderColor, width: 1.1),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              icon,
+                              style.icon,
                               size: 15,
-                              color: isSelected ? Colors.white : AppTheme.forestPrimary,
+                              color: fgColor,
                             ),
                             const SizedBox(width: 6),
                             Text(
@@ -851,7 +847,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                                color: isSelected ? Colors.white : AppTheme.textDark,
+                                color: fgColor,
                               ),
                             ),
                           ],

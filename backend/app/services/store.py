@@ -1383,6 +1383,27 @@ def seed_demo_data() -> Dict[str, int]:
                 ("Ambiguous Herbal Balm", 1.0, "box", 190.0, 190.0, 0.69, "Personal Care", False),
             ],
         },
+        {
+            "merchant": "Shell V-Power Fuel Station",
+            "date": f"{this_month_str}-05",
+            "type": "PRINTED",
+            "confidence": 0.95,
+            "items": [
+                ("V-Power High Octane Fuel (20.5L)", 1.0, "ltr", 5900.0, 5900.0, 0.95, "Fuel & Transport", True),
+                ("Helix Engine Oil Top-up", 1.0, "bottle", 900.0, 900.0, 0.93, "Fuel & Transport", True),
+            ],
+        },
+        {
+            "merchant": "Rahat Bakers & Sweets",
+            "date": f"{this_month_str}-09",
+            "type": "PRINTED",
+            "confidence": 0.92,
+            "items": [
+                ("Chicken Patties (Spicy)", 4.0, "pcs", 150.0, 600.0, 0.94, "Bakeries & Confectionery", True),
+                ("Fresh Bran Sandwich Bread", 2.0, "loaf", 210.0, 420.0, 0.92, "Bakeries & Confectionery", True),
+                ("Special Gulab Jamun (500g)", 1.0, "box", 680.0, 680.0, 0.90, "Bakeries & Confectionery", True),
+            ],
+        },
         # --- Previous Month Receipts ---
         {
             "merchant": "Imtiaz Super Market",
