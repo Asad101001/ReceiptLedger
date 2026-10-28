@@ -19,17 +19,17 @@ class _LedgerScreenState extends State<LedgerScreen> {
   final ApiService _api = ApiService();
   bool _isLoading = true;
   List<Map<String, dynamic>> _receipts = [];
-  Map<String, dynamic>? _monthlySummary;
-  String _selectedPeriod = 'Monthly';
+  String _selectedPeriod = 'Monthly'; // 'Monthly', 'Weekly', 'All-Time'
 
   String? _selectedCategoryFilter;
-  int _selectedDayIndex = 2; // 0=Mon, 1=Wed, 2=Today, 3=Sun
-  final Map<int, String> _dayAmounts = {
-    0: '8,200',
-    1: '14,350',
-    2: '42,850',
-    3: '42,850',
-  };
+  int? _selectedDayIndex; // null = all days of week, 0..6 = Monday..Sunday
+
+  static const List<String> _months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  static const List<String> _dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   String? _expandedReceiptId;
 
@@ -38,16 +38,28 @@ class _LedgerScreenState extends State<LedgerScreen> {
     super.initState();
     _loadData();
     _api.dataVersionNotifier.addListener(_onDataVersionChanged);
+    _api.currencyNotifier.addListener(_onCurrencyChanged);
   }
 
   void _onDataVersionChanged() {
     if (mounted) _loadData();
   }
 
+  void _onCurrencyChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     _api.dataVersionNotifier.removeListener(_onDataVersionChanged);
+    _api.currencyNotifier.removeListener(_onCurrencyChanged);
     super.dispose();
+  }
+
+  DateTime? _parseDate(dynamic val) {
+    if (val == null) return null;
+    if (val is DateTime) return val;
+    return DateTime.tryParse(val.toString());
   }
 
   Future<void> _loadData() async {
@@ -56,26 +68,27 @@ class _LedgerScreenState extends State<LedgerScreen> {
     });
 
     try {
-      final now = DateTime.now();
-      final summary = await _api.getMonthlySummary(year: now.year, month: now.month);
       final receipts = await _api.getReceipts();
 
-      setState(() {
-        _monthlySummary = summary;
-        _receipts = receipts;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _receipts = receipts;
+          _isLoading = false;
+        });
+      }
     } catch (_) {
-      setState(() {
-        _receipts = _api.isDemoMode ? _api.getSampleReceipts() : [];
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _receipts = [];
+          _isLoading = false;
+        });
+      }
     }
   }
 
   void _showReceiptDetailDialog(Map<String, dynamic> r) {
     final merchant = r['merchant_name'] ?? r['merchant'] ?? 'Receipt';
-    final total = r['total_amount'] ?? 0.0;
+    final total = ((r['total_amount'] ?? 0.0) as num).toDouble();
     final date = r['receipt_date'] ?? r['date'] ?? 'Recent';
     final category = r['category_name'] ?? r['category'] ?? 'Groceries';
     final lineItems = (r['line_items'] as List<dynamic>?) ?? [];
@@ -150,7 +163,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                     itemBuilder: (ctx, i) {
                       final item = lineItems[i] as Map<String, dynamic>;
                       final qty = item['quantity'] ?? item['qty'] ?? 1;
-                      final price = (item['total_price'] ?? item['price'] ?? 0.0) as num;
+                      final price = ((item['total_price'] ?? item['price'] ?? 0.0) as num).toDouble();
                       return Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -161,7 +174,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                             ),
                           ),
                           Text(
-                            '${_api.currency} ${price.toStringAsFixed(0)}',
+                            _api.formatCurrency(price),
                             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                           ),
                         ],
@@ -175,7 +188,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                 children: [
                   const Text('Total Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   Text(
-                    '${_api.currency} ${total.toStringAsFixed(0)}',
+                    _api.formatCurrency(total),
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.navyBrand),
                   ),
                 ],
@@ -305,6 +318,9 @@ class _LedgerScreenState extends State<LedgerScreen> {
   }
 
   void _showPeriodPicker() {
+    final now = DateTime.now();
+    final monthName = _months[now.month - 1];
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -313,26 +329,35 @@ class _LedgerScreenState extends State<LedgerScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              title: const Text('Monthly (October 2023)', style: TextStyle(fontWeight: FontWeight.bold)),
+              title: Text('Monthly ($monthName ${now.year})', style: const TextStyle(fontWeight: FontWeight.bold)),
               trailing: _selectedPeriod == 'Monthly' ? const Icon(Icons.check, color: AppTheme.navyBrand) : null,
               onTap: () {
-                setState(() => _selectedPeriod = 'Monthly');
+                setState(() {
+                  _selectedPeriod = 'Monthly';
+                  _selectedDayIndex = null;
+                });
                 Navigator.pop(ctx);
               },
             ),
             ListTile(
-              title: const Text('Weekly'),
+              title: const Text('Weekly (This Week)', style: TextStyle(fontWeight: FontWeight.bold)),
               trailing: _selectedPeriod == 'Weekly' ? const Icon(Icons.check, color: AppTheme.navyBrand) : null,
               onTap: () {
-                setState(() => _selectedPeriod = 'Weekly');
+                setState(() {
+                  _selectedPeriod = 'Weekly';
+                  _selectedDayIndex = null;
+                });
                 Navigator.pop(ctx);
               },
             ),
             ListTile(
-              title: const Text('All-Time Ledger'),
+              title: const Text('All-Time Ledger', style: TextStyle(fontWeight: FontWeight.bold)),
               trailing: _selectedPeriod == 'All-Time' ? const Icon(Icons.check, color: AppTheme.navyBrand) : null,
               onTap: () {
-                setState(() => _selectedPeriod = 'All-Time');
+                setState(() {
+                  _selectedPeriod = 'All-Time';
+                  _selectedDayIndex = null;
+                });
                 Navigator.pop(ctx);
               },
             ),
@@ -344,16 +369,87 @@ class _LedgerScreenState extends State<LedgerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final totalSpend = _monthlySummary?['total_spend'] ?? 42850.0;
+    final now = DateTime.now();
+    final currentWeekday = now.weekday; // 1 = Monday, 7 = Sunday
+    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: currentWeekday - 1));
+    final endOfWeek = startOfWeek.add(const Duration(days: 7));
+
+    // Calculate weekly 7-day spending distribution
+    final weeklyDayAmounts = List<double>.filled(7, 0.0);
+    for (final r in _receipts) {
+      final d = _parseDate(r['receipt_date'] ?? r['date']);
+      if (d != null) {
+        if (d.isAfter(startOfWeek.subtract(const Duration(seconds: 1))) && d.isBefore(endOfWeek)) {
+          final dayIdx = (d.weekday - 1).clamp(0, 6);
+          weeklyDayAmounts[dayIdx] += ((r['total_amount'] ?? 0.0) as num).toDouble();
+        }
+      }
+    }
+    final weekTotal = weeklyDayAmounts.fold(0.0, (sum, v) => sum + v);
+
+    // Period filter
+    List<Map<String, dynamic>> periodReceipts;
+    String periodTitle;
+
+    if (_selectedPeriod == 'Weekly') {
+      periodTitle = "THIS WEEK'S TOTAL";
+      periodReceipts = _receipts.where((r) {
+        final d = _parseDate(r['receipt_date'] ?? r['date']);
+        if (d == null) return false;
+        return d.isAfter(startOfWeek.subtract(const Duration(seconds: 1))) && d.isBefore(endOfWeek);
+      }).toList();
+    } else if (_selectedPeriod == 'All-Time') {
+      periodTitle = "ALL-TIME TOTAL";
+      periodReceipts = List.from(_receipts);
+    } else {
+      // Monthly default
+      final curMonth = now.month;
+      final curYear = now.year;
+      final monthName = _months[curMonth - 1].toUpperCase();
+      periodTitle = "$monthName TOTAL";
+      periodReceipts = _receipts.where((r) {
+        final d = _parseDate(r['receipt_date'] ?? r['date']);
+        if (d == null) return true;
+        return d.year == curYear && d.month == curMonth;
+      }).toList();
+    }
+
+    final periodTotal = periodReceipts.fold<double>(
+      0.0,
+      (sum, r) => sum + ((r['total_amount'] ?? 0.0) as num).toDouble(),
+    );
+
+    // Compute dynamic categories breakdown from period receipts
+    final Map<String, double> categorySums = {};
+    for (final r in periodReceipts) {
+      final cat = (r['category_name'] ?? r['category'] ?? 'Other').toString();
+      final amt = ((r['total_amount'] ?? 0.0) as num).toDouble();
+      categorySums[cat] = (categorySums[cat] ?? 0.0) + amt;
+    }
+    final sortedCategories = categorySums.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    // Filter by selected day (if selected from Weekly Activity)
+    List<Map<String, dynamic>> displayReceipts = List.from(periodReceipts);
+    if (_selectedDayIndex != null) {
+      final targetDay = startOfWeek.add(Duration(days: _selectedDayIndex!));
+      displayReceipts = displayReceipts.where((r) {
+        final d = _parseDate(r['receipt_date'] ?? r['date']);
+        if (d == null) return false;
+        return d.year == targetDay.year && d.month == targetDay.month && d.day == targetDay.day;
+      }).toList();
+    }
 
     // Filter receipts if a category chip is selected
-    final filteredReceipts = _selectedCategoryFilter == null
-        ? _receipts
-        : _receipts.where((r) {
-            final cat = (r['category_name'] ?? r['category'] ?? '').toString().toLowerCase();
-            final filter = _selectedCategoryFilter!.toLowerCase();
-            return cat.contains(filter) || filter.contains(cat);
-          }).toList();
+    if (_selectedCategoryFilter != null) {
+      final filter = _selectedCategoryFilter!.toLowerCase();
+      displayReceipts = displayReceipts.where((r) {
+        final cat = (r['category_name'] ?? r['category'] ?? '').toString().toLowerCase();
+        return cat.contains(filter) || filter.contains(cat);
+      }).toList();
+    }
+
+    final double activeDayAmount = _selectedDayIndex != null ? weeklyDayAmounts[_selectedDayIndex!] : weekTotal;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -365,7 +461,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
             onAvatarTap: widget.onOpenDrawer,
           ),
 
-          // Main Scrollable Area matching LEDGER.png
+          // Main Scrollable Area
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -377,7 +473,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // OCTOBER TOTAL Row
+                          // TOTAL Row
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -385,9 +481,9 @@ class _LedgerScreenState extends State<LedgerScreen> {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    'OCTOBER TOTAL',
-                                    style: TextStyle(
+                                  Text(
+                                    periodTitle,
+                                    style: const TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w800,
                                       color: AppTheme.navyBrand,
@@ -395,24 +491,19 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  ValueListenableBuilder<String>(
-                                    valueListenable: _api.currencyNotifier,
-                                    builder: (ctx, curr, _) {
-                                      return Text(
-                                        '$curr ${totalSpend.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
-                                        style: const TextStyle(
-                                          fontSize: 28,
-                                          fontWeight: FontWeight.w900,
-                                          color: AppTheme.textDark,
-                                          letterSpacing: -0.5,
-                                        ),
-                                      );
-                                    },
+                                  Text(
+                                    _api.formatCurrency(periodTotal),
+                                    style: const TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppTheme.textDark,
+                                      letterSpacing: -0.5,
+                                    ),
                                   ),
                                 ],
                               ),
 
-                              // Monthly Dropdown Pill
+                              // Period Dropdown Pill
                               GestureDetector(
                                 onTap: _showPeriodPicker,
                                 child: Container(
@@ -444,7 +535,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
 
                           const SizedBox(height: 18),
 
-                          // Weekly Activity Card with interactive day selectors
+                          // Weekly Activity Card with 7-day interactive selectors
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
@@ -480,7 +571,9 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
-                                        '68% target • ${_api.currency} ${_dayAmounts[_selectedDayIndex]}',
+                                        _selectedDayIndex != null
+                                            ? '${_dayNames[_selectedDayIndex!]} • ${_api.formatCurrency(activeDayAmount)}'
+                                            : 'This Week • ${_api.formatCurrency(activeDayAmount)}',
                                         style: const TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.bold,
@@ -490,29 +583,34 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 18),
+                                const SizedBox(height: 16),
 
-                                // Trend line & Sparkline Chart
+                                // Dynamic Trend line Sparkline
                                 SizedBox(
-                                  height: 40,
+                                  height: 48,
                                   child: RepaintBoundary(
                                     child: CustomPaint(
-                                      painter: _WeeklyActivityTrendPainter(selectedDayIndex: _selectedDayIndex),
+                                      painter: _WeeklyActivityTrendPainter(
+                                        dailyAmounts: weeklyDayAmounts,
+                                        selectedDayIndex: _selectedDayIndex,
+                                      ),
                                       size: Size.infinite,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 10),
 
-                                // Days of Week Row (Interactive)
+                                // 7 Days of Week Interactive Row
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    _buildDayLabel('Mon', 0),
-                                    _buildDayLabel('Wed', 1),
-                                    _buildDayLabel('Today', 2, isBold: true),
-                                    _buildDayLabel('Sun', 3),
-                                  ],
+                                  children: List.generate(7, (idx) {
+                                    final isToday = idx == (currentWeekday - 1);
+                                    return _buildDayLabel(
+                                      _dayNames[idx],
+                                      idx,
+                                      isToday: isToday,
+                                    );
+                                  }),
                                 ),
                               ],
                             ),
@@ -520,8 +618,8 @@ class _LedgerScreenState extends State<LedgerScreen> {
 
                           const SizedBox(height: 18),
 
-                          // Category Spend Velocity & Color Metric Chart
-                          _buildCategoryDistributionBar(),
+                          // Dynamic Category Velocity Bar
+                          _buildCategoryDistributionBar(categorySums),
 
                           const SizedBox(height: 18),
 
@@ -538,7 +636,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                 ),
                               ),
                               Text(
-                                'Oct 2026',
+                                '${sortedCategories.length} Active',
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
@@ -549,33 +647,68 @@ class _LedgerScreenState extends State<LedgerScreen> {
                           ),
                           const SizedBox(height: 12),
 
-                          // 5 Category Cards Row with distinctive, tasteful color coding
-                          Row(
-                            children: [
-                              Expanded(child: _buildCategoryCard(Icons.shopping_bag_outlined, 'Groceries', '18.4k')),
-                              const SizedBox(width: 8),
-                              Expanded(child: _buildCategoryCard(Icons.local_gas_station_outlined, 'Fuel', '11.0k')),
-                              const SizedBox(width: 8),
-                              Expanded(child: _buildCategoryCard(Icons.storefront_outlined, 'Bakeries', '8.4k')),
-                              const SizedBox(width: 8),
-                              Expanded(child: _buildCategoryCard(Icons.bolt_outlined, 'Utilities', '7.2k')),
-                              const SizedBox(width: 8),
-                              Expanded(child: _buildCategoryCard(Icons.local_pharmacy_outlined, 'Healthcare', '3.8k')),
-                            ],
-                          ),
+                          // Dynamic Category Cards Row
+                          if (sortedCategories.isEmpty)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: AppTheme.borderLight),
+                              ),
+                              child: const Center(
+                                child: Text('No spending categories in this period', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                              ),
+                            )
+                          else
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              child: Row(
+                                children: sortedCategories.take(6).map((entry) {
+                                  final catStyle = CategoryTheme.getStyle(entry.key);
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 8.0),
+                                    child: SizedBox(
+                                      width: 82,
+                                      child: _buildCategoryCard(
+                                        catStyle.icon,
+                                        catStyle.label,
+                                        _api.formatCurrency(entry.value),
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
 
                           // Active Filter Indicator (if any)
-                          if (_selectedCategoryFilter != null) ...[
+                          if (_selectedCategoryFilter != null || _selectedDayIndex != null) ...[
                             const SizedBox(height: 10),
                             Row(
                               children: [
-                                Text(
-                                  'Filtered by: $_selectedCategoryFilter',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.navyBrand),
-                                ),
-                                const SizedBox(width: 8),
+                                if (_selectedCategoryFilter != null) ...[
+                                  Text(
+                                    'Category: $_selectedCategoryFilter',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.navyBrand),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                                if (_selectedDayIndex != null) ...[
+                                  Text(
+                                    'Day: ${_dayNames[_selectedDayIndex!]}',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.navyBrand),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
                                 GestureDetector(
-                                  onTap: () => setState(() => _selectedCategoryFilter = null),
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedCategoryFilter = null;
+                                      _selectedDayIndex = null;
+                                    });
+                                  },
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
@@ -584,7 +717,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                     ),
                                     child: const Row(
                                       children: [
-                                        Text('Clear', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                                        Text('Clear Filter', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
                                         SizedBox(width: 3),
                                         Icon(Icons.close, size: 12),
                                       ],
@@ -597,34 +730,24 @@ class _LedgerScreenState extends State<LedgerScreen> {
 
                           const SizedBox(height: 22),
 
-                          // Recent Receipts Section
+                          // Receipts Section Header
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               const Text(
-                                'Recent Receipts',
+                                'Recorded Receipts',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w800,
                                   color: AppTheme.textDark,
                                 ),
                               ),
-                              TextButton(
-                                onPressed: () {
-                                  AppToast.showInfo(context, 'Showing all ${filteredReceipts.length} receipts recorded.');
-                                },
-                                style: TextButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                  minimumSize: const Size(50, 30),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                child: Text(
-                                  'View All (${filteredReceipts.length})',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.headerBlueDark,
-                                  ),
+                              Text(
+                                '${displayReceipts.length} slips',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.headerBlueDark,
                                 ),
                               ),
                             ],
@@ -632,16 +755,46 @@ class _LedgerScreenState extends State<LedgerScreen> {
                           const SizedBox(height: 8),
 
                           // Receipts List
-                          ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: filteredReceipts.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 10),
-                            itemBuilder: (ctx, idx) {
-                              final item = filteredReceipts[idx];
-                              return _buildReceiptTile(item);
-                            },
-                          ),
+                          if (displayReceipts.isEmpty)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: AppTheme.borderLight),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.receipt_long_outlined, size: 40, color: AppTheme.textMuted),
+                                  const SizedBox(height: 10),
+                                  const Text(
+                                    'No receipts found in this view',
+                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textDark),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _selectedCategoryFilter != null || _selectedDayIndex != null
+                                        ? 'Try clearing the active filters above.'
+                                        : 'Scan a receipt or bill to add it to your ledger.',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: displayReceipts.length,
+                              separatorBuilder: (_, __) => const SizedBox(height: 10),
+                              itemBuilder: (ctx, idx) {
+                                final item = displayReceipts[idx];
+                                return _buildReceiptTile(item);
+                              },
+                            ),
 
                           const SizedBox(height: 110), // Padding above bottom nav
                         ],
@@ -654,41 +807,39 @@ class _LedgerScreenState extends State<LedgerScreen> {
     );
   }
 
-  Widget _buildDayLabel(String label, int index, {bool isBold = false}) {
+  Widget _buildDayLabel(String label, int index, {bool isToday = false}) {
     final isSelected = _selectedDayIndex == index;
     return GestureDetector(
-      onTap: () => setState(() => _selectedDayIndex = index),
-      child: Container(
+      onTap: () {
+        setState(() {
+          _selectedDayIndex = isSelected ? null : index;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.headerBlue.withAlpha(30) : Colors.transparent,
+          color: isSelected
+              ? AppTheme.navyBrand
+              : (isToday ? AppTheme.headerBlue.withAlpha(35) : Colors.transparent),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
-          label,
+          isToday && !isSelected ? 'Today' : label,
           style: TextStyle(
-            fontSize: isSelected ? 12 : 11,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected ? AppTheme.navyBrand : AppTheme.textMuted,
+            fontSize: 11,
+            fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.normal,
+            color: isSelected
+                ? Colors.white
+                : (isToday ? AppTheme.navyBrand : AppTheme.textMuted),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCategoryDistributionBar() {
-    final categories = _monthlySummary?['categories'] as Map<String, dynamic>? ?? {
-      'Groceries & Food': 18400.0,
-      'Fuel & Transport': 11000.0,
-      'Bakeries & Confectionery': 8350.0,
-      'Utilities & Bills': 7240.0,
-      'Healthcare & Pharmacy': 3820.0,
-    };
-
-    final double total = categories.values.fold<double>(
-      0.0,
-      (sum, val) => sum + ((val as num?)?.toDouble() ?? 0.0),
-    );
+  Widget _buildCategoryDistributionBar(Map<String, double> categories) {
+    final double total = categories.values.fold<double>(0.0, (sum, val) => sum + val);
     if (total <= 0) return const SizedBox.shrink();
 
     return Container(
@@ -739,7 +890,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
               child: Row(
                 children: categories.entries.map((entry) {
                   final catStyle = CategoryTheme.getStyle(entry.key);
-                  final amount = (entry.value as num).toDouble();
+                  final amount = entry.value;
                   final double pct = amount / total;
                   final isSelected = _selectedCategoryFilter == catStyle.label ||
                       _selectedCategoryFilter == entry.key;
@@ -747,7 +898,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                   return Expanded(
                     flex: (pct * 1000).toInt().clamp(1, 1000),
                     child: Tooltip(
-                      message: '${entry.key}: ${(pct * 100).toStringAsFixed(1)}%',
+                      message: '${catStyle.label}: ${(pct * 100).toStringAsFixed(1)}%',
                       child: GestureDetector(
                         onTap: () {
                           setState(() {
@@ -777,7 +928,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
             runSpacing: 6,
             children: categories.entries.map((entry) {
               final catStyle = CategoryTheme.getStyle(entry.key);
-              final amount = (entry.value as num).toDouble();
+              final amount = entry.value;
               final double pct = amount / total;
               final isSelected = _selectedCategoryFilter == catStyle.label ||
                   _selectedCategoryFilter == entry.key;
@@ -832,7 +983,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
     );
   }
 
-  Widget _buildCategoryCard(IconData icon, String name, String amount) {
+  Widget _buildCategoryCard(IconData icon, String name, String formattedAmount) {
     final isSelected = _selectedCategoryFilter == name;
     final catStyle = CategoryTheme.getStyle(name);
 
@@ -889,12 +1040,14 @@ class _LedgerScreenState extends State<LedgerScreen> {
             ),
             const SizedBox(height: 2),
             Text(
-              amount,
+              formattedAmount,
               style: TextStyle(
-                fontSize: 12.0,
+                fontSize: 11.0,
                 fontWeight: FontWeight.w800,
                 color: isSelected ? catStyle.primary : AppTheme.textDark,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -907,7 +1060,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
     final merchant = r['merchant_name'] ?? r['merchant'] ?? 'Merchant';
     final date = r['receipt_date'] ?? r['date'] ?? 'Recent';
     final itemsCount = r['items_count'] ?? (r['line_items'] as List?)?.length ?? 1;
-    final total = (r['total_amount'] ?? 0.0) as num;
+    final total = ((r['total_amount'] ?? 0.0) as num).toDouble();
     final lineItems = (r['line_items'] as List<dynamic>?) ?? [];
     final category = r['category_name'] ?? r['category'] ?? 'Groceries';
     final isExpanded = _expandedReceiptId == id;
@@ -915,156 +1068,162 @@ class _LedgerScreenState extends State<LedgerScreen> {
     return Hoverable(
       scale: 1.012,
       child: Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderLight),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(5),
-            blurRadius: 6,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _expandedReceiptId = isExpanded ? null : id;
-              });
-            },
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Row(
-                children: [
-                  CategoryAvatar(category: category, size: 44, iconSize: 22),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.borderLight),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(5),
+              blurRadius: 6,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _expandedReceiptId = isExpanded ? null : id;
+                });
+              },
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Row(
+                  children: [
+                    CategoryAvatar(category: category, size: 44, iconSize: 22),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            merchant,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              Text(
+                                '$date • $itemsCount items',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.textMuted,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              CategoryBadge(
+                                category: category,
+                                size: CategoryBadgeSize.small,
+                                showIcon: false,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          merchant,
+                          '-${_api.formatCurrency(total)}',
                           style: const TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w900,
                             color: AppTheme.textDark,
                           ),
                         ),
                         const SizedBox(height: 3),
-                        Row(
-                          children: [
-                            Text(
-                              '$date • $itemsCount items',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: AppTheme.textMuted,
-                              ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.greenVerifiedBg,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'Verified',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.greenVerified,
                             ),
-                            const SizedBox(width: 6),
-                            CategoryBadge(
-                              category: category,
-                              size: CategoryBadgeSize.small,
-                              showIcon: false,
-                            ),
-                          ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        '-${_api.currency} ${total.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          color: AppTheme.textDark,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppTheme.greenVerifiedBg,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'Verified',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.greenVerified,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
 
-          // Expandable in-line detail preview
-          if (isExpanded) ...[
-            const Divider(height: 1, indent: 14, endIndent: 14),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              color: const Color(0xFFF8FAFC),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (lineItems.isNotEmpty)
-                    ...lineItems.take(3).map((item) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              '${item['qty']}x ${item['item_name']}',
-                              style: const TextStyle(fontSize: 12, color: AppTheme.textDark),
-                            ),
-                            Text(
-                              '${_api.currency} ${(item['price'] ?? 0.0).toStringAsFixed(0)}',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                            ),
-                          ],
+            // Expandable in-line detail preview
+            if (isExpanded) ...[
+              const Divider(height: 1, indent: 14, endIndent: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                color: const Color(0xFFF8FAFC),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (lineItems.isNotEmpty)
+                      ...lineItems.take(3).map((item) {
+                        final price = ((item['total_price'] ?? item['price'] ?? 0.0) as num).toDouble();
+                        final qty = item['quantity'] ?? item['qty'] ?? 1;
+                        final name = item['item_name'] ?? 'Item';
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '${qty}x $name',
+                                style: const TextStyle(fontSize: 12, color: AppTheme.textDark),
+                              ),
+                              Text(
+                                _api.formatCurrency(price),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () => _showReceiptDetailDialog(r),
+                          icon: const Icon(Icons.fullscreen, size: 16),
+                          label: const Text('View Full Slip', style: TextStyle(fontSize: 12)),
                         ),
-                      );
-                    }),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton.icon(
-                        onPressed: () => _showReceiptDetailDialog(r),
-                        icon: const Icon(Icons.fullscreen, size: 16),
-                        label: const Text('View Full Slip', style: TextStyle(fontSize: 12)),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
           ],
-        ],
-      ),
+        ),
       ),
     );
   }
 }
 
-/// Custom painter for the subtle sparkline trend in Weekly Activity card
-/// Enhanced with gradient fill area and anti-aliased Bézier curve
+/// Custom painter for dynamic 7-day sparkline trend in Weekly Activity card
 class _WeeklyActivityTrendPainter extends CustomPainter {
-  final int selectedDayIndex;
+  final List<double> dailyAmounts;
+  final int? selectedDayIndex;
 
-  _WeeklyActivityTrendPainter({this.selectedDayIndex = 2});
+  _WeeklyActivityTrendPainter({
+    required this.dailyAmounts,
+    this.selectedDayIndex,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1072,34 +1231,38 @@ class _WeeklyActivityTrendPainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
 
-    // Control points for smooth curve
-    final p0 = Offset(w * 0.04, h * 0.78);
-    final p1 = Offset(w * 0.35, h * 0.62);
-    final p2 = Offset(w * 0.68, h * 0.40);
-    final p3 = Offset(w * 0.96, h * 0.32);
+    final double maxAmt = dailyAmounts.fold(0.0, (m, v) => v > m ? v : m);
+
+    // Compute coordinates for 7 points
+    final List<Offset> points = [];
+    for (int i = 0; i < 7; i++) {
+      final double x = w * (0.04 + 0.92 * (i / 6.0));
+      double norm = 0.0;
+      if (maxAmt > 0) {
+        norm = (dailyAmounts[i] / maxAmt).clamp(0.0, 1.0);
+      }
+      final double y = h * (0.85 - 0.70 * norm);
+      points.add(Offset(x, y));
+    }
 
     final linePath = Path();
-    linePath.moveTo(p0.dx, p0.dy);
-    linePath.cubicTo(
-      w * 0.18, h * 0.72,
-      w * 0.25, h * 0.64,
-      p1.dx, p1.dy,
-    );
-    linePath.cubicTo(
-      w * 0.48, h * 0.58,
-      w * 0.55, h * 0.46,
-      p2.dx, p2.dy,
-    );
-    linePath.cubicTo(
-      w * 0.78, h * 0.36,
-      w * 0.88, h * 0.34,
-      p3.dx, p3.dy,
-    );
+    linePath.moveTo(points[0].dx, points[0].dy);
+
+    for (int i = 0; i < points.length - 1; i++) {
+      final pCurrent = points[i];
+      final pNext = points[i + 1];
+      final midX = (pCurrent.dx + pNext.dx) / 2;
+      linePath.cubicTo(
+        midX, pCurrent.dy,
+        midX, pNext.dy,
+        pNext.dx, pNext.dy,
+      );
+    }
 
     // Gradient area below curve
     final fillPath = Path.from(linePath);
-    fillPath.lineTo(p3.dx, h);
-    fillPath.lineTo(p0.dx, h);
+    fillPath.lineTo(points.last.dx, h);
+    fillPath.lineTo(points.first.dx, h);
     fillPath.close();
 
     final fillPaint = Paint()
@@ -1107,7 +1270,7 @@ class _WeeklyActivityTrendPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          strokeColor.withOpacity(0.22),
+          strokeColor.withOpacity(0.20),
           strokeColor.withOpacity(0.0),
         ],
       ).createShader(Rect.fromLTWH(0, 0, w, h))
@@ -1125,35 +1288,32 @@ class _WeeklyActivityTrendPainter extends CustomPainter {
 
     canvas.drawPath(linePath, linePaint);
 
-    // Determine dynamic marker offset based on selected day
-    Offset center = switch (selectedDayIndex) {
-      0 => p0,
-      1 => p1,
-      2 => p2,
-      3 => p3,
-      _ => p2,
-    };
+    // Determine dynamic marker offset based on selected day (or none)
+    if (selectedDayIndex != null && selectedDayIndex! >= 0 && selectedDayIndex! < 7) {
+      final center = points[selectedDayIndex!];
 
-    // Outer glow halo
-    final haloPaint = Paint()
-      ..color = strokeColor.withOpacity(0.18)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(center, 9.0, haloPaint);
+      // Outer glow halo
+      final haloPaint = Paint()
+        ..color = strokeColor.withOpacity(0.22)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(center, 9.0, haloPaint);
 
-    // Dynamic marker with white border
-    final dotPaint = Paint()
-      ..color = strokeColor
-      ..style = PaintingStyle.fill;
-    final dotBorderPaint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 2.4
-      ..style = PaintingStyle.stroke;
+      // Marker with white border
+      final dotPaint = Paint()
+        ..color = strokeColor
+        ..style = PaintingStyle.fill;
+      final dotBorderPaint = Paint()
+        ..color = Colors.white
+        ..strokeWidth = 2.4
+        ..style = PaintingStyle.stroke;
 
-    canvas.drawCircle(center, 5.0, dotPaint);
-    canvas.drawCircle(center, 5.0, dotBorderPaint);
+      canvas.drawCircle(center, 5.0, dotPaint);
+      canvas.drawCircle(center, 5.0, dotBorderPaint);
+    }
   }
 
   @override
   bool shouldRepaint(covariant _WeeklyActivityTrendPainter oldDelegate) =>
-      oldDelegate.selectedDayIndex != selectedDayIndex;
+      oldDelegate.selectedDayIndex != selectedDayIndex ||
+      oldDelegate.dailyAmounts != dailyAmounts;
 }

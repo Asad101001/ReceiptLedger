@@ -970,6 +970,19 @@ def resolve_review_queue_item(
 
     if line_item_id:
         update_line_item(line_item_id, updates)
+        try:
+            li_row = get_line_item(line_item_id)
+            if li_row and li_row.get("receipt_id"):
+                r_id = li_row["receipt_id"]
+                # If no more unresolved items remain for this receipt, mark PROCESSED
+                unresolved_left = [
+                    q for q in get_review_queue(status="UNRESOLVED")
+                    if q.get("receipt_id") == r_id and q.get("id") != queue_id
+                ]
+                if not unresolved_left:
+                    update_receipt(r_id, {"status": "PROCESSED"})
+        except Exception as exc:
+            logger.debug("Receipt status promotion check note: %s", exc)
 
     if queue_id in _review_queue:
         return _review_queue[queue_id]
@@ -989,6 +1002,36 @@ def resolve_review_queue_item(
         return synthetic
 
     return None
+
+
+def resolve_receipt_all(receipt_id: str) -> bool:
+    """Approve an entire receipt and all its pending review queue items in one step."""
+    now_str = datetime.utcnow().isoformat()
+    # 1. Update receipt status to PROCESSED
+    update_receipt(receipt_id, {"status": "PROCESSED"})
+
+    # 2. Mark all associated line items verified
+    client = get_supabase_client()
+    items = [li for li in _line_items.values() if li.get("receipt_id") == receipt_id]
+    for li in items:
+        update_line_item(li["id"], {"is_verified": True})
+
+    # 3. Resolve review queue items for this receipt
+    for q_id, q in list(_review_queue.items()):
+        li_id = q.get("line_item_id")
+        if any(li["id"] == li_id for li in items):
+            q["review_status"] = "ACCEPTED"
+            q["resolved_at"] = now_str
+            if client:
+                try:
+                    client.table("review_queue").update({
+                        "review_status": "ACCEPTED",
+                        "resolved_at": now_str,
+                    }).eq("id", q_id).execute()
+                except Exception:
+                    pass
+
+    return True
 
 
 # ── Analytics Queries ─────────────────────────────────────────────────────────

@@ -123,54 +123,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showExportDataDialog() {
-    final exportUrl = _api.getExportCsvUrl();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Export Ledger Reports', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Your complete categorized expense report can be downloaded as a CSV spreadsheet:'),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: SelectableText(
-                exportUrl,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppTheme.navyBrand),
-              ),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Compatible with Excel, Google Sheets, and accounting software.',
-              style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _showToast('CSV Export link copied to clipboard!');
-            },
-            icon: const Icon(Icons.copy, size: 16, color: Colors.white),
-            label: const Text('Copy Link', style: TextStyle(color: Colors.white)),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.navyBrand),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   void _showServerConfigDialog() {
     final urlCtrl = TextEditingController(text: _api.baseUrl);
@@ -547,18 +500,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             setState(() => _isDarkMode = !_isDarkMode);
                             _showToast(_isDarkMode ? 'Switched to Dark theme' : 'Switched to Light theme');
                           },
-                        ),
-                        const Divider(height: 1, indent: 64),
-
-                        // Export Data Item
-                        _buildSettingRow(
-                          icon: Icons.download_outlined,
-                          iconBg: const Color(0xFFEDE9FE),
-                          iconColor: const Color(0xFF6D28D9),
-                          title: 'Export Data',
-                          subtitle: 'Download CSV or PDF reports',
-                          trailing: const Icon(Icons.chevron_right, color: AppTheme.textMutedLight, size: 20),
-                          onTap: _showExportDataDialog,
                         ),
                       ],
                     ),

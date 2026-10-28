@@ -53,15 +53,21 @@ class _UploadScreenState extends State<UploadScreen> {
     super.initState();
     _loadReceipts();
     _api.dataVersionNotifier.addListener(_onDataVersionChanged);
+    _api.currencyNotifier.addListener(_onCurrencyChanged);
   }
 
   void _onDataVersionChanged() {
     if (mounted) _loadReceipts();
   }
 
+  void _onCurrencyChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     _api.dataVersionNotifier.removeListener(_onDataVersionChanged);
+    _api.currencyNotifier.removeListener(_onCurrencyChanged);
     super.dispose();
   }
 
@@ -76,7 +82,7 @@ class _UploadScreenState extends State<UploadScreen> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _receipts = _api.isDemoMode ? _api.getSampleReceipts() : [];
+          _receipts = [];
         });
       }
     }
@@ -1059,7 +1065,7 @@ class _UploadScreenState extends State<UploadScreen> {
                       children: [
                         Text('Total Amount', style: TextStyle(fontSize: 13, color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted)),
                         Text(
-                          '${_api.currency} ${total.toStringAsFixed(2)}',
+                          _api.formatCurrency(total),
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
@@ -1082,7 +1088,7 @@ class _UploadScreenState extends State<UploadScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text('Included Tax', style: TextStyle(fontSize: 12, color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted)),
-                          Text('${_api.currency} ${tax.toStringAsFixed(2)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? AppTheme.textLight : AppTheme.textDark)),
+                          Text(_api.formatCurrency(tax), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? AppTheme.textLight : AppTheme.textDark)),
                         ],
                       ),
                     ],
@@ -1143,7 +1149,7 @@ class _UploadScreenState extends State<UploadScreen> {
                           ),
                         ),
                         Text(
-                          '${_api.currency} ${price.toStringAsFixed(0)}',
+                          _api.formatCurrency(price),
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
@@ -1766,29 +1772,11 @@ class _UploadScreenState extends State<UploadScreen> {
                           const SizedBox(height: 4),
                           Text(
                             _receipts.isEmpty
-                                ? 'Upload a slip above or tap below to seed demo data.'
+                                ? 'Capture or upload a receipt above to start tracking.'
                                 : 'Try selecting "All" or a different category filter.',
                             textAlign: TextAlign.center,
                             style: TextStyle(fontSize: 12, color: textMuted),
                           ),
-                          if (_receipts.isEmpty) ...[
-                            const SizedBox(height: 14),
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: isDark ? Colors.white : AppTheme.forestPrimary),
-                                foregroundColor: isDark ? Colors.white : AppTheme.forestPrimary,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              ),
-                              onPressed: () {
-                                _api.seedDemoData();
-                                _loadReceipts();
-                                AppToast.showSuccess(context, 'Seeded 10 demo receipts (PKR 48,810 ledger)');
-                              },
-                              icon: const Icon(Icons.dataset_rounded, size: 16),
-                              label: const Text('Seed Demo Data', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                            ),
-                          ],
                         ],
                       ),
                     )
@@ -1796,7 +1784,7 @@ class _UploadScreenState extends State<UploadScreen> {
                     ...filteredReceipts.take(5).map((r) {
                       final merchant = r['merchant_name'] ?? r['merchant'] ?? 'Merchant';
                       final date = r['receipt_date'] ?? r['date'] ?? 'Recent';
-                      final total = (r['total_amount'] ?? 0.0) as num;
+                      final total = ((r['total_amount'] ?? 0.0) as num).toDouble();
                       final category = r['category_name'] ?? r['category'] ?? 'General';
                       final count = r['items_count'] ?? (r['line_items'] as List?)?.length ?? 1;
 
@@ -1847,7 +1835,7 @@ class _UploadScreenState extends State<UploadScreen> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                '${_api.currency} ${total.toStringAsFixed(0)}',
+                                _api.formatCurrency(total),
                                 style: TextStyle(
                                   fontSize: 14.5,
                                   fontWeight: FontWeight.w800,

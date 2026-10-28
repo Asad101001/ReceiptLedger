@@ -73,7 +73,7 @@ class Settings(BaseSettings):
 
     # ── Pipeline Tuning ──────────────────────────────────────────────────────
     # Confidence threshold below which items are flagged for review
-    review_confidence_threshold: float = 0.85
+    review_confidence_threshold: float = 0.65
     # pHash Hamming distance at or below which images are considered duplicates
     phash_hamming_threshold: int = 4
     # Levenshtein similarity ratio required for dictionary normalisation

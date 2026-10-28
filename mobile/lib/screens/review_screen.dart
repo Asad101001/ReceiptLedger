@@ -42,15 +42,21 @@ class _ReviewScreenState extends State<ReviewScreen> {
     _amountController = TextEditingController();
     _loadQueue();
     _api.dataVersionNotifier.addListener(_onDataVersionChanged);
+    _api.currencyNotifier.addListener(_onCurrencyChanged);
   }
 
   void _onDataVersionChanged() {
     if (mounted) _loadQueue();
   }
 
+  void _onCurrencyChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     _api.dataVersionNotifier.removeListener(_onDataVersionChanged);
+    _api.currencyNotifier.removeListener(_onCurrencyChanged);
     _itemController.dispose();
     _amountController.dispose();
     super.dispose();
@@ -61,19 +67,23 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
     try {
       final list = await _api.getReviewQueue();
-      setState(() {
-        _queueItems = List.from(list);
-        _currentIndex = 0;
-        _isLoading = false;
-        _populateCurrentItem();
-      });
+      if (mounted) {
+        setState(() {
+          _queueItems = List.from(list);
+          _currentIndex = 0;
+          _isLoading = false;
+          _populateCurrentItem();
+        });
+      }
     } catch (_) {
-      setState(() {
-        _queueItems = _api.isDemoMode ? List.from(_api.getSampleReviewQueue()) : [];
-        _currentIndex = 0;
-        _isLoading = false;
-        _populateCurrentItem();
-      });
+      if (mounted) {
+        setState(() {
+          _queueItems = [];
+          _currentIndex = 0;
+          _isLoading = false;
+          _populateCurrentItem();
+        });
+      }
     }
   }
 
@@ -83,8 +93,8 @@ class _ReviewScreenState extends State<ReviewScreen> {
       final li = (item['line_item'] as Map<String, dynamic>?) ?? {};
       final rec = (item['receipt'] as Map<String, dynamic>?) ?? {};
 
-      _itemController.text = (li['item_name'] ?? item['candidate_text'] ?? 'Chakki Atta (10kg)').toString();
-      final total = (li['total_price'] ?? item['total_amount'] ?? rec['total_amount'] ?? 1350.0) as num;
+      _itemController.text = (li['item_name'] ?? item['candidate_text'] ?? rec['merchant_name'] ?? 'Item').toString();
+      final total = ((li['total_price'] ?? item['total_amount'] ?? rec['total_amount'] ?? 0.0) as num).toDouble();
       _amountController.text = total.toStringAsFixed(0);
 
       final cat = (li['category'] ?? li['category_name'] ?? item['category'] ?? 'Groceries').toString();
@@ -96,13 +106,13 @@ class _ReviewScreenState extends State<ReviewScreen> {
     if (_queueItems.isEmpty) return;
 
     final currentItem = _queueItems[_currentIndex];
-    final queueId = currentItem['id']?.toString() ?? 'q-001';
+    final queueId = currentItem['id']?.toString() ?? '';
 
     try {
       await _api.resolveReviewItem(queueId, {
         'action': 'ACCEPTED',
         'confirmed_name': _itemController.text.trim(),
-        'confirmed_total_price': double.tryParse(_amountController.text.trim()) ?? 1350.0,
+        'confirmed_total_price': double.tryParse(_amountController.text.trim()) ?? 0.0,
         'category': _selectedCategory,
       });
 
@@ -124,6 +134,26 @@ class _ReviewScreenState extends State<ReviewScreen> {
         }
         _populateCurrentItem();
       });
+    }
+  }
+
+  Future<void> _acceptEntireSlip() async {
+    if (_queueItems.isEmpty) return;
+    final currentItem = _queueItems[_currentIndex];
+    final rec = (currentItem['receipt'] as Map<String, dynamic>?) ?? {};
+    final receiptId = rec['id']?.toString() ?? currentItem['receipt_id']?.toString() ?? '';
+
+    if (receiptId.isEmpty) {
+      await _confirmItem();
+      return;
+    }
+
+    try {
+      await _api.acceptAllReceiptReviews(receiptId);
+      _showFriendlyToast('Entire slip accepted & verified ✓');
+      await _loadQueue();
+    } catch (_) {
+      await _confirmItem();
     }
   }
 
@@ -177,7 +207,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
             ),
             onPressed: () {
               final val = double.tryParse(editAmountCtrl.text.trim());
-              if (val != null && val > 0) {
+              if (val != null && val >= 0) {
                 setState(() => _amountController.text = val.toStringAsFixed(0));
                 Navigator.pop(ctx);
                 _showFriendlyToast('Amount updated');
@@ -323,7 +353,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Every receipt slip has been verified with high confidence.',
+              'Every receipt slip has been processed and verified.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
@@ -333,19 +363,13 @@ class _ReviewScreenState extends State<ReviewScreen> {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: () {
-                if (_api.isBackendOnline) {
-                  _loadQueue();
-                  _showFriendlyToast('Checking for pending slips...');
-                } else {
-                  _api.seedDemoData();
-                  _loadQueue();
-                  _showFriendlyToast('Seeded demo review slips!');
-                }
+                _loadQueue();
+                _showFriendlyToast('Checking for pending slips...');
               },
               icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: Text(
-                _api.isBackendOnline ? 'Refresh Review Queue' : 'Seed Demo Slips',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+              label: const Text(
+                'Refresh Review Queue',
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.forestPrimary,
@@ -367,12 +391,14 @@ class _ReviewScreenState extends State<ReviewScreen> {
     final rec = (currentItem['receipt'] as Map<String, dynamic>?) ?? {};
     final li = (currentItem['line_item'] as Map<String, dynamic>?) ?? {};
     final queueId = currentItem['id']?.toString() ?? '';
-    final merchant = rec['merchant_name'] ?? currentItem['merchant_name'] ?? currentItem['merchant'] ?? 'SuperStore Fresh Mart';
-    final ticketNo = rec['id'] != null
+    final merchant = rec['merchant_name'] ?? currentItem['merchant_name'] ?? currentItem['merchant'] ?? 'Receipt';
+    final ticketNo = rec['id'] != null && rec['id'].toString().length >= 4
         ? rec['id'].toString().substring(0, 4).toUpperCase()
-        : (currentItem['ticket_no'] ?? '2821');
-    final confidence = ((currentItem['model_confidence'] ?? currentItem['confidence'] ?? li['confidence_score'] ?? 0.98) as num).toDouble();
+        : (currentItem['ticket_no'] ?? 'SLIP');
+    final confidence = ((currentItem['model_confidence'] ?? currentItem['confidence'] ?? li['confidence_score'] ?? 0.85) as num).toDouble();
     final candidateText = currentItem['candidate_text'] ?? li['raw_text'] ?? _itemController.text;
+
+    final rawAmount = double.tryParse(_amountController.text.trim()) ?? 0.0;
 
     // Up next item (if exists)
     final hasNext = _currentIndex < totalCount - 1;
@@ -382,11 +408,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 130), // Ample bottom clearance for navbar
+      padding: const EdgeInsets.fromLTRB(18, 8, 18, 130),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // --- SUBHEADER: VERIFICATION FLOW & PROGRESS (Exact reference match) ---
+          // SUBHEADER: VERIFICATION FLOW & PROGRESS
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -464,7 +490,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
           ),
           const SizedBox(height: 16),
 
-          // --- MAIN WHITE CARD (Exact replica of reference image) ---
+          // MAIN WHITE CARD
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -482,7 +508,6 @@ class _ReviewScreenState extends State<ReviewScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Card Top: "SCANNED SNIPPET" + "Crop Match"
                 const Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -513,7 +538,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 ),
                 const SizedBox(height: 10),
 
-                // 1. STORE TICKET SNIPPET BOX WITH REAL SCANNED CROP
+                // 1. STORE TICKET SNIPPET BOX
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -567,7 +592,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                             ),
                           ),
                           Text(
-                            '${_api.currency} ${_amountController.text}',
+                            _api.formatCurrency(rawAmount),
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w800,
@@ -721,25 +746,13 @@ class _ReviewScreenState extends State<ReviewScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          const Text(
-                            'PKR ',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.textMuted,
-                            ),
-                          ),
-                          Text(
-                            _amountController.text,
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              color: AppTheme.textDark,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        _api.formatCurrency(rawAmount),
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.textDark,
+                        ),
                       ),
                       GestureDetector(
                         onTap: _showEditAmountDialog,
@@ -884,7 +897,27 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 ),
                 const SizedBox(height: 10),
 
-                // 8. SECONDARY BUTTON: Edit All Line Items
+                // 8. 1-TAP ACCEPT ENTIRE SLIP BUTTON
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _acceptEntireSlip,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.navyBrand,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.done_all_rounded, size: 18),
+                    label: const Text(
+                      'Accept Entire Slip (1-Tap)',
+                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // 9. SECONDARY BUTTON: Edit All Line Items
                 SizedBox(
                   height: 48,
                   child: TextButton.icon(
@@ -906,7 +939,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
           ),
           const SizedBox(height: 14),
 
-          // --- UP NEXT IN QUEUE CARD (Exact match from reference image) ---
+          // UP NEXT IN QUEUE CARD
           if (hasNext && nextItem != null) ...[
             GestureDetector(
               onTap: _skipItem,
@@ -958,7 +991,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
                       ),
                     ),
                     Text(
-                      '${_api.currency} ${(((nextItem['line_item'] as Map<String, dynamic>?)?['total_price'] ?? (nextItem['receipt'] as Map<String, dynamic>?)?['total_amount'] ?? nextItem['total_amount'] ?? 2450.0) as num).toStringAsFixed(0)}',
+                      _api.formatCurrency((((nextItem['line_item'] as Map<String, dynamic>?)?['total_price'] ??
+                              (nextItem['receipt'] as Map<String, dynamic>?)?['total_amount'] ??
+                              nextItem['total_amount'] ??
+                              0.0) as num)
+                          .toDouble()),
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,

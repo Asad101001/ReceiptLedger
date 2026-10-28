@@ -274,9 +274,13 @@ async def ingest_receipt(
             )
 
     # ── Step 11: Determine status ────────────────────────────────────────────
+    # A receipt is only held in PENDING_REVIEW if overall scan confidence is low,
+    # or critical extraction failed (empty line items or zero total).
+    # Individual low-confidence items are still sent to the review queue for human refinement.
     needs_review = (
         mean_confidence < settings.review_confidence_threshold
-        or any(li.confidence_score < settings.review_confidence_threshold for li in line_items)
+        or len(line_items) == 0
+        or total_amount <= 0.0
     )
     status = ReceiptStatus.PENDING_REVIEW if needs_review else ReceiptStatus.PROCESSED
 

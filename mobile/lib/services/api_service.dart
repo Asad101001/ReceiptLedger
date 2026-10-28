@@ -50,6 +50,18 @@ class ApiService {
 
   String _baseUrl = 'http://127.0.0.1:8000';
   String? _authToken;
+
+  // Supported Currency Definitions with realistic exchange conversion rates relative to PKR
+  static const Map<String, Map<String, dynamic>> supportedCurrencies = {
+    'PKR': {'code': 'PKR', 'symbol': 'Rs.', 'name': 'Pakistani Rupee', 'rate': 1.0, 'decimals': 0},
+    'USD': {'code': 'USD', 'symbol': r'$', 'name': 'US Dollar', 'rate': 1.0 / 278.50, 'decimals': 2},
+    'EUR': {'code': 'EUR', 'symbol': '€', 'name': 'Euro', 'rate': 1.0 / 302.20, 'decimals': 2},
+    'GBP': {'code': 'GBP', 'symbol': '£', 'name': 'British Pound', 'rate': 1.0 / 354.80, 'decimals': 2},
+    'AED': {'code': 'AED', 'symbol': 'AED', 'name': 'UAE Dirham', 'rate': 1.0 / 75.80, 'decimals': 2},
+    'SAR': {'code': 'SAR', 'symbol': 'SAR', 'name': 'Saudi Riyal', 'rate': 1.0 / 74.20, 'decimals': 2},
+  };
+
+  String _currencyCode = 'PKR';
   final ValueNotifier<String> currencyNotifier = ValueNotifier<String>('Rs.');
   final ValueNotifier<int> reviewCountNotifier = ValueNotifier<int>(0);
   final ValueNotifier<bool> backendOnlineNotifier = ValueNotifier<bool>(false);
@@ -58,12 +70,13 @@ class ApiService {
   final ValueNotifier<UserSession?> currentUserNotifier = ValueNotifier<UserSession?>(UserSession.demo);
   final ValueNotifier<bool> isLoggedInNotifier = ValueNotifier<bool>(true);
 
-  // Explicit seed storage for demo mode
-  List<Map<String, dynamic>>? _seededReceipts;
-  List<Map<String, dynamic>>? _seededReviewQueue;
+  // Local storage for user-scanned / created receipts when offline
+  final List<Map<String, dynamic>> _localReceipts = [];
 
   String get baseUrl => _baseUrl;
-  String get currency => currencyNotifier.value;
+  String get currencyCode => _currencyCode;
+  String get currencySymbol => supportedCurrencies[_currencyCode]?['symbol'] ?? 'Rs.';
+  String get currency => currencySymbol;
   bool get isBackendOnline => backendOnlineNotifier.value;
   bool get isDemoMode => demoModeNotifier.value;
   UserSession? get currentUser => currentUserNotifier.value;
@@ -77,20 +90,70 @@ class ApiService {
     if (_authToken != null) 'Authorization': 'Bearer $_authToken',
   };
 
-  /// Explicitly seeds demo sample data
-  void seedDemoData() {
-    demoModeNotifier.value = true;
-    _seededReceipts = getSampleReceipts();
-    _seededReviewQueue = getSampleReviewQueue();
-    reviewCountNotifier.value = _seededReviewQueue!.length;
+  /// Monetary Conversion: Converts base amount (PKR) to currently selected currency
+  double convertFromPkr(num? pkrAmount, {String? targetCode}) {
+    if (pkrAmount == null) return 0.0;
+    final code = targetCode ?? _currencyCode;
+    final rate = (supportedCurrencies[code]?['rate'] as num?)?.toDouble() ?? 1.0;
+    return pkrAmount.toDouble() * rate;
+  }
+
+  /// Monetary Conversion: Converts amount in selected currency back to base PKR
+  double convertToPkr(num? amount, {String? fromCode}) {
+    if (amount == null) return 0.0;
+    final code = fromCode ?? _currencyCode;
+    final rate = (supportedCurrencies[code]?['rate'] as num?)?.toDouble() ?? 1.0;
+    if (rate == 0.0) return amount.toDouble();
+    return amount.toDouble() / rate;
+  }
+
+  /// Formats currency with correct symbol and monetary conversion applied
+  String formatCurrency(num? pkrAmount, {String? targetCode, bool showSymbol = true}) {
+    if (pkrAmount == null) return showSymbol ? '$currencySymbol 0' : '0';
+    final code = targetCode ?? _currencyCode;
+    final info = supportedCurrencies[code] ?? supportedCurrencies['PKR']!;
+    final symbol = info['symbol'] as String;
+    final decimals = info['decimals'] as int;
+    final converted = convertFromPkr(pkrAmount, targetCode: code);
+
+    String formattedVal;
+    if (decimals == 0) {
+      formattedVal = converted.round().toString().replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (Match m) => '${m[1]},',
+      );
+    } else {
+      formattedVal = converted.toStringAsFixed(decimals);
+    }
+    return showSymbol ? '$symbol $formattedVal' : formattedVal;
+  }
+
+  /// Sets the active transaction currency and updates listeners
+  void setCurrency(String newCurrency) {
+    final clean = newCurrency.trim();
+    if (supportedCurrencies.containsKey(clean)) {
+      _currencyCode = clean;
+    } else {
+      final found = supportedCurrencies.entries.firstWhere(
+        (e) => e.value['symbol'] == clean || e.key.toLowerCase() == clean.toLowerCase(),
+        orElse: () => const MapEntry('PKR', {'code': 'PKR', 'symbol': 'Rs.', 'rate': 1.0, 'decimals': 0}),
+      );
+      _currencyCode = found.key;
+    }
+    currencyNotifier.value = currencySymbol;
     dataVersionNotifier.value++;
   }
 
-  /// Clears all dummy data and resets ledger to clean slate
+  /// No-op: all data is purely dynamic
+  void seedDemoData() {
+    demoModeNotifier.value = false;
+    dataVersionNotifier.value++;
+  }
+
+  /// Clears local state and resets ledger to clean slate
   void clearAllData() {
     demoModeNotifier.value = false;
-    _seededReceipts = [];
-    _seededReviewQueue = [];
+    _localReceipts.clear();
     reviewCountNotifier.value = 0;
     dataVersionNotifier.value++;
   }
@@ -103,10 +166,6 @@ class ApiService {
       await http.post(url, headers: authHeaders).timeout(const Duration(seconds: 8));
     } catch (_) {}
     dataVersionNotifier.value++;
-  }
-
-  void setCurrency(String newCurrency) {
-    currencyNotifier.value = newCurrency;
   }
 
   Future<UserSession> login({
@@ -258,10 +317,7 @@ class ApiService {
       final online = response.statusCode == 200;
       backendOnlineNotifier.value = online;
       if (online) {
-        // As soon as live API is detected, clear all dummy demo data
-        if (_seededReceipts != null || demoModeNotifier.value) {
-          _seededReceipts = null;
-          _seededReviewQueue = null;
+        if (demoModeNotifier.value) {
           demoModeNotifier.value = false;
           dataVersionNotifier.value++;
         }
@@ -283,9 +339,7 @@ class ApiService {
               if (fbResponse.statusCode == 200) {
                 _baseUrl = candidate;
                 backendOnlineNotifier.value = true;
-                if (_seededReceipts != null || demoModeNotifier.value) {
-                  _seededReceipts = null;
-                  _seededReviewQueue = null;
+                if (demoModeNotifier.value) {
                   demoModeNotifier.value = false;
                   dataVersionNotifier.value++;
                 }
@@ -305,9 +359,7 @@ class ApiService {
       final list = await getReviewQueue();
       reviewCountNotifier.value = list.length;
     } catch (_) {
-      if (!isDemoMode) {
-        reviewCountNotifier.value = 0;
-      }
+      reviewCountNotifier.value = 0;
     }
   }
 
@@ -318,10 +370,7 @@ class ApiService {
       final response = await http.get(url, headers: {'Bypass-Tunnel-Reminder': 'true'}).timeout(const Duration(seconds: 4));
       if (response.statusCode == 200) {
         backendOnlineNotifier.value = true;
-        // As soon as live API is detected, clear all dummy demo data
-        if (_seededReceipts != null || demoModeNotifier.value) {
-          _seededReceipts = null;
-          _seededReviewQueue = null;
+        if (demoModeNotifier.value) {
           demoModeNotifier.value = false;
           dataVersionNotifier.value++;
         }
@@ -423,31 +472,31 @@ class ApiService {
       }).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
         backendOnlineNotifier.value = true;
-        // As soon as live API is detected, clear demo state
-        if (demoModeNotifier.value || _seededReceipts != null) {
-          demoModeNotifier.value = false;
-          _seededReceipts = null;
-          _seededReviewQueue = null;
-        }
         final data = jsonDecode(response.body);
         final list = data['receipts'] as List<dynamic>? ?? [];
-        return list.cast<Map<String, dynamic>>();
+        final parsed = list.cast<Map<String, dynamic>>();
+        // Update local cache
+        _localReceipts.clear();
+        _localReceipts.addAll(parsed);
+        return parsed;
       }
     } catch (_) {}
 
-    // Only return dummy data if in Demo Mode and explicitly seeded
-    if (isDemoMode && _seededReceipts != null && _seededReceipts!.isNotEmpty) {
-      var filtered = List<Map<String, dynamic>>.from(_seededReceipts!);
-      if (category != null && category.toLowerCase() != 'all') {
-        filtered = filtered.where((r) =>
-          (r['category_name']?.toString().toLowerCase() == category.toLowerCase())
-        ).toList();
-      }
-      return filtered;
+    // Offline / fallback: filter local receipts dynamically
+    var result = List<Map<String, dynamic>>.from(_localReceipts);
+    if (category != null && category.toLowerCase() != 'all') {
+      result = result.where((r) {
+        final cat = (r['category_name'] ?? r['category'] ?? '').toString().toLowerCase();
+        return cat.contains(category.toLowerCase());
+      }).toList();
     }
-
-    // Fully free clean state
-    return [];
+    if (search != null && search.trim().isNotEmpty) {
+      final s = search.trim().toLowerCase();
+      result = result.where((r) =>
+        (r['merchant_name'] ?? r['merchant'] ?? '').toString().toLowerCase().contains(s)
+      ).toList();
+    }
+    return result;
   }
 
   /// Create a manual receipt record POST /api/v1/receipts/manual
@@ -478,8 +527,10 @@ class ApiService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         backendOnlineNotifier.value = true;
+        final res = jsonDecode(response.body) as Map<String, dynamic>;
+        _localReceipts.insert(0, res);
         dataVersionNotifier.value++;
-        return jsonDecode(response.body) as Map<String, dynamic>;
+        return res;
       } else {
         final decoded = jsonDecode(response.body);
         throw Exception(decoded['detail'] ?? 'Failed to create manual receipt');
@@ -503,8 +554,7 @@ class ApiService {
           }
         ],
       };
-      _seededReceipts ??= [];
-      _seededReceipts!.insert(0, mockRecord);
+      _localReceipts.insert(0, mockRecord);
       dataVersionNotifier.value++;
       return mockRecord;
     }
@@ -521,9 +571,7 @@ class ApiService {
 
       if (response.statusCode == 200) {
         backendOnlineNotifier.value = true;
-        if (_seededReceipts != null) {
-          _seededReceipts!.removeWhere((r) => r['id'] == receiptId);
-        }
+        _localReceipts.removeWhere((r) => r['id'] == receiptId);
         dataVersionNotifier.value++;
         refreshReviewCount();
         return true;
@@ -531,9 +579,7 @@ class ApiService {
     } catch (_) {}
 
     // Offline removal
-    if (_seededReceipts != null) {
-      _seededReceipts!.removeWhere((r) => r['id'] == receiptId);
-    }
+    _localReceipts.removeWhere((r) => r['id'] == receiptId);
     dataVersionNotifier.value++;
     return true;
   }
@@ -550,8 +596,11 @@ class ApiService {
 
       if (response.statusCode == 200) {
         backendOnlineNotifier.value = true;
+        final res = jsonDecode(response.body) as Map<String, dynamic>;
+        final idx = _localReceipts.indexWhere((r) => r['id'] == receiptId);
+        if (idx != -1) _localReceipts[idx] = res;
         dataVersionNotifier.value++;
-        return jsonDecode(response.body) as Map<String, dynamic>;
+        return res;
       }
     } catch (_) {}
     return null;
@@ -574,7 +623,6 @@ class ApiService {
     return null;
   }
 
-
   /// Fetches monthly analytics summary GET /api/v1/analytics/monthly
   Future<Map<String, dynamic>> getMonthlySummary({required int year, required int month}) async {
     final url = Uri.parse('$_baseUrl/api/v1/analytics/monthly?year=$year&month=$month');
@@ -586,26 +634,28 @@ class ApiService {
       }
     } catch (_) {}
 
-    if (isDemoMode) {
-      return {
-        'period': '$year-${month.toString().padLeft(2, '0')}',
-        'total_spend': 48810.0,
-        'receipt_count': 28,
-        'categories': {
-          'Groceries & Food': 18400.0,
-          'Fuel & Transport': 11000.0,
-          'Bakeries & Confectionery': 8350.0,
-          'Utilities & Bills': 7240.0,
-          'Healthcare & Pharmacy': 3820.0,
-        },
-      };
+    // Dynamic offline calculation from local receipts
+    final period = '$year-${month.toString().padLeft(2, '0')}';
+    final matching = _localReceipts.where((r) {
+      final d = (r['receipt_date'] ?? r['date'] ?? '').toString();
+      return d.startsWith(period) && r['status'] != 'DUPLICATE';
+    }).toList();
+
+    double totalSpend = 0.0;
+    final Map<String, double> categories = {};
+    for (final r in matching) {
+      final amt = ((r['total_amount'] ?? 0.0) as num).toDouble();
+      totalSpend += amt;
+      final cat = (r['category_name'] ?? r['category'] ?? 'Miscellaneous').toString();
+      categories[cat] = (categories[cat] ?? 0.0) + amt;
     }
 
     return {
-      'period': '$year-${month.toString().padLeft(2, '0')}',
-      'total_spend': 0.0,
-      'receipt_count': 0,
-      'categories': <String, double>{},
+      'period': period,
+      'total_spend': totalSpend,
+      'receipt_count': matching.length,
+      'categories': categories,
+      'category_breakdown': categories,
     };
   }
 
@@ -622,25 +672,12 @@ class ApiService {
       }
     } catch (_) {}
 
-    // Only fall back to sample when demo mode is active and seeded
-    if (isDemoMode && _seededReviewQueue != null && _seededReviewQueue!.isNotEmpty) {
-      reviewCountNotifier.value = _seededReviewQueue!.length;
-      return _seededReviewQueue!;
-    }
-
     reviewCountNotifier.value = 0;
     return [];
   }
 
   /// Resolves an item in the review queue PATCH /api/v1/review-queue/{id}
   Future<Map<String, dynamic>> resolveReviewItem(String queueId, Map<String, dynamic> payload) async {
-    if (queueId.startsWith('q-') || queueId.length < 10) {
-      if (reviewCountNotifier.value > 0) {
-        reviewCountNotifier.value--;
-      }
-      return {'status': 'resolved', 'id': queueId};
-    }
-
     final url = Uri.parse('$_baseUrl/api/v1/review-queue/$queueId');
     try {
       final response = await http.patch(
@@ -651,15 +688,35 @@ class ApiService {
 
       if (response.statusCode == 200) {
         refreshReviewCount();
+        dataVersionNotifier.value++;
         return jsonDecode(response.body) as Map<String, dynamic>;
       }
     } catch (_) {}
 
-    // Mock resolution for offline / demo mode
     if (reviewCountNotifier.value > 0) {
       reviewCountNotifier.value--;
     }
+    dataVersionNotifier.value++;
     return {'status': 'resolved', 'id': queueId};
+  }
+
+  /// Approves an entire receipt and all its review items in one click POST /api/v1/review-queue/receipt/{receipt_id}/accept-all
+  Future<bool> acceptAllReceiptReviews(String receiptId) async {
+    final url = Uri.parse('$_baseUrl/api/v1/review-queue/receipt/$receiptId/accept-all');
+    try {
+      final response = await http.post(
+        url,
+        headers: authHeaders,
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        refreshReviewCount();
+        dataVersionNotifier.value++;
+        return true;
+      }
+    } catch (_) {}
+    dataVersionNotifier.value++;
+    return true;
   }
 
   String getReceiptImageUrl(String receiptId, {bool signedUrl = false}) {
@@ -676,269 +733,11 @@ class ApiService {
     if (year != null) query += '&year=$year';
     if (month != null) query += '&month=$month';
     return '$_baseUrl/api/v1/analytics/export?$query';
-  }  /// High-fidelity sample dataset — field names match backend API schema
-  List<Map<String, dynamic>> getSampleReceipts() {
-    return [
-      {
-        'id': 'rec-001',
-        'merchant_name': 'Imtiaz Super Market',
-        'receipt_date': '2026-10-25',
-        'items_count': 4,
-        'total_amount': 3420.0,
-        'status': 'PROCESSED',
-        'category_name': 'Groceries & Food',
-        'payment_method': 'HBL Visa Debit •••• 4892',
-        'tax': 160.0,
-        'line_items': [
-          {'item_name': 'Chakki Atta (10kg)', 'quantity': 1, 'total_price': 1350.0, 'category_name': 'Groceries & Food'},
-          {'item_name': 'Basmati Rice Super Kernel (2kg)', 'quantity': 1, 'total_price': 980.0, 'category_name': 'Groceries & Food'},
-          {'item_name': 'Olper\'s Full Cream Milk 1L', 'quantity': 4, 'total_price': 840.0, 'category_name': 'Groceries & Food'},
-          {'item_name': 'Tapal Danedar Tea 400g', 'quantity': 1, 'total_price': 250.0, 'category_name': 'Groceries & Food'},
-        ],
-      },
-      {
-        'id': 'rec-002',
-        'merchant_name': 'Shell V-Power Station',
-        'receipt_date': '2026-10-25',
-        'items_count': 2,
-        'total_amount': 6800.0,
-        'status': 'PROCESSED',
-        'category_name': 'Fuel & Transport',
-        'payment_method': 'Meezan Platinum •••• 1093',
-        'tax': 320.0,
-        'line_items': [
-          {'item_name': 'V-Power High Octane Motor Fuel (20.5L)', 'quantity': 1, 'total_price': 5900.0, 'category_name': 'Fuel & Transport'},
-          {'item_name': 'Shell Helix Engine Oil Top-up 1L', 'quantity': 1, 'total_price': 900.0, 'category_name': 'Fuel & Transport'},
-        ],
-      },
-      {
-        'id': 'rec-003',
-        'merchant_name': 'Rahat Bakers & Sweets',
-        'receipt_date': '2026-10-24',
-        'items_count': 4,
-        'total_amount': 2150.0,
-        'status': 'PROCESSED',
-        'category_name': 'Bakeries & Confectionery',
-        'payment_method': 'Easypaisa QR Scan',
-        'tax': 95.0,
-        'line_items': [
-          {'item_name': 'Chicken Patties (Spicy)', 'quantity': 4, 'total_price': 600.0, 'category_name': 'Bakeries & Confectionery'},
-          {'item_name': 'Fresh Bran Sandwich Bread (L)', 'quantity': 2, 'total_price': 420.0, 'category_name': 'Bakeries & Confectionery'},
-          {'item_name': 'Special Gulab Jamun (500g)', 'quantity': 1, 'total_price': 680.0, 'category_name': 'Bakeries & Confectionery'},
-          {'item_name': 'Plain Almond Tea Cake', 'quantity': 1, 'total_price': 450.0, 'category_name': 'Bakeries & Confectionery'},
-        ],
-      },
-      {
-        'id': 'rec-004',
-        'merchant_name': 'Servaid Pharmacy & Wellness',
-        'receipt_date': '2026-10-23',
-        'items_count': 3,
-        'total_amount': 1480.0,
-        'status': 'PROCESSED',
-        'category_name': 'Healthcare & Pharmacy',
-        'payment_method': 'Cash Counter 02',
-        'tax': 0.0,
-        'line_items': [
-          {'item_name': 'Panadol Extra 500mg (20 pcs)', 'quantity': 2, 'total_price': 400.0, 'category_name': 'Healthcare & Pharmacy'},
-          {'item_name': 'Surbex-Z High-Potency Multivitamins', 'quantity': 1, 'total_price': 580.0, 'category_name': 'Healthcare & Pharmacy'},
-          {'item_name': 'Hydrating Facial Cream & Lip Balm', 'quantity': 1, 'total_price': 500.0, 'category_name': 'Personal Care'},
-        ],
-      },
-      {
-        'id': 'rec-005',
-        'merchant_name': 'K-Electric Billing',
-        'receipt_date': '2026-10-22',
-        'items_count': 1,
-        'total_amount': 14200.0,
-        'status': 'PROCESSED',
-        'category_name': 'Utilities & Bills',
-        'payment_method': '1Link Digital Banking',
-        'tax': 1850.0,
-        'line_items': [
-          {'item_name': 'Electricity Bill Tariff Consumption (380 Units)', 'quantity': 1, 'total_price': 14200.0, 'category_name': 'Utilities & Bills'},
-        ],
-      },
-      {
-        'id': 'rec-006',
-        'merchant_name': 'Metro Cash & Carry',
-        'receipt_date': '2026-10-21',
-        'items_count': 3,
-        'total_amount': 8920.0,
-        'status': 'PROCESSED',
-        'category_name': 'Groceries & Food',
-        'payment_method': 'MasterCard •••• 7712',
-        'tax': 440.0,
-        'line_items': [
-          {'item_name': 'Sunflower Cooking Oil 5L Can', 'quantity': 2, 'total_price': 5700.0, 'category_name': 'Groceries & Food'},
-          {'item_name': 'Surf Excel Detergent Powder 3kg', 'quantity': 1, 'total_price': 1650.0, 'category_name': 'Household & Cleaning'},
-          {'item_name': 'Dishwashing Liquid Lemon 1L', 'quantity': 2, 'total_price': 820.0, 'category_name': 'Household & Cleaning'},
-          {'item_name': 'National Garlic Chilli Sauce 800g', 'quantity': 1, 'total_price': 750.0, 'category_name': 'Groceries & Food'},
-        ],
-      },
-      {
-        'id': 'rec-007',
-        'merchant_name': 'Espresso Coffee & Bistro',
-        'receipt_date': '2026-10-20',
-        'items_count': 3,
-        'total_amount': 1850.0,
-        'status': 'PROCESSED',
-        'category_name': 'Dining & Cafes',
-        'payment_method': 'JazzCash QR',
-        'tax': 240.0,
-        'line_items': [
-          {'item_name': 'Double Espresso Macchiato', 'quantity': 1, 'total_price': 580.0, 'category_name': 'Dining & Cafes'},
-          {'item_name': 'Iced Salted Caramel Frappe', 'quantity': 1, 'total_price': 690.0, 'category_name': 'Dining & Cafes'},
-          {'item_name': 'Belgian Nutella Banana Crepe', 'quantity': 1, 'total_price': 580.0, 'category_name': 'Dining & Cafes'},
-        ],
-      },
-      {
-        'id': 'rec-008',
-        'merchant_name': 'Total Parco Fuel Stop',
-        'receipt_date': '2026-10-18',
-        'items_count': 1,
-        'total_amount': 4200.0,
-        'status': 'PROCESSED',
-        'category_name': 'Fuel & Transport',
-        'payment_method': 'Cash Counter 01',
-        'tax': 190.0,
-        'line_items': [
-          {'item_name': 'Super Unleaded Motor Gasoline (15.5L)', 'quantity': 1, 'total_price': 4200.0, 'category_name': 'Fuel & Transport'},
-        ],
-      },
-      {
-        'id': 'rec-009',
-        'merchant_name': 'D.Watson Chemist & Superstore',
-        'receipt_date': '2026-10-15',
-        'items_count': 3,
-        'total_amount': 2340.0,
-        'status': 'PROCESSED',
-        'category_name': 'Healthcare & Pharmacy',
-        'payment_method': 'HBL PayPak •••• 9921',
-        'tax': 0.0,
-        'line_items': [
-          {'item_name': 'Brufen Extra 400mg Tablets', 'quantity': 2, 'total_price': 480.0, 'category_name': 'Healthcare & Pharmacy'},
-          {'item_name': 'Cac-1000 Plus Orange Effervescent', 'quantity': 2, 'total_price': 1180.0, 'category_name': 'Healthcare & Pharmacy'},
-          {'item_name': 'Waterproof First Aid Dressing Strips', 'quantity': 2, 'total_price': 680.0, 'category_name': 'Healthcare & Pharmacy'},
-        ],
-      },
-      {
-        'id': 'rec-010',
-        'merchant_name': 'Sui Northern Gas (SNGPL)',
-        'receipt_date': '2026-10-12',
-        'items_count': 1,
-        'total_amount': 3450.0,
-        'status': 'PROCESSED',
-        'category_name': 'Utilities & Bills',
-        'payment_method': 'Nayapay Debit',
-        'tax': 410.0,
-        'line_items': [
-          {'item_name': 'Monthly Residential Gas Meter Consumption', 'quantity': 1, 'total_price': 3450.0, 'category_name': 'Utilities & Bills'},
-        ],
-      },
-    ];
   }
 
-  /// High-fidelity sample review items matching REVIEW mockup
-  List<Map<String, dynamic>> getSampleReviewQueue() {
-    return [
-      {
-        'id': 'q-001',
-        'merchant': 'SuperStore Fresh Mart',
-        'receipt_date': 'Today, 04:42 PM • Receipt #2821',
-        'candidate_text': 'Chakki Atta (10kg)',
-        'total_amount': 1350.0,
-        'category': 'Groceries',
-        'confidence': 0.72,
-        'line_item': {
-          'item_name': 'Chakki Atta (10kg)',
-          'total_price': 1350.0,
-          'category': 'Groceries',
-        },
-      },
-      {
-        'id': 'q-002',
-        'merchant': 'Metro Cash & Carry',
-        'receipt_date': 'Yesterday, 11:15 AM • Receipt #1094',
-        'candidate_text': 'Sunflower Cooking Oil 5L Can',
-        'total_amount': 2850.0,
-        'category': 'Groceries',
-        'confidence': 0.68,
-        'line_item': {
-          'item_name': 'Sunflower Cooking Oil 5L Can',
-          'total_price': 2850.0,
-          'category': 'Groceries',
-        },
-      },
-      {
-        'id': 'q-003',
-        'merchant': 'Rahat Bakers & Cafe',
-        'receipt_date': '24 Oct, 08:30 PM • Receipt #0438',
-        'candidate_text': 'Fresh Dairy Butter 200g',
-        'total_amount': 420.0,
-        'category': 'Bakeries',
-        'confidence': 0.75,
-        'line_item': {
-          'item_name': 'Fresh Dairy Butter 200g',
-          'total_price': 420.0,
-          'category': 'Bakeries',
-        },
-      },
-      {
-        'id': 'q-004',
-        'merchant': 'Shell Service Station',
-        'receipt_date': '22 Oct, 02:15 PM • Receipt #7729',
-        'candidate_text': 'Super Unleaded Motor Gasoline',
-        'total_amount': 3000.0,
-        'category': 'Fuel',
-        'confidence': 0.81,
-        'line_item': {
-          'item_name': 'Super Unleaded Motor Gasoline',
-          'total_price': 3000.0,
-          'category': 'Fuel',
-        },
-      },
-      {
-        'id': 'q-005',
-        'merchant': 'D.Watson Chemist & Superstore',
-        'receipt_date': '20 Oct, 05:40 PM • Receipt #5102',
-        'candidate_text': 'Vitamin C 1000mg & Zinc Tablets',
-        'total_amount': 890.0,
-        'category': 'Healthcare',
-        'confidence': 0.64,
-        'line_item': {
-          'item_name': 'Vitamin C 1000mg & Zinc Tablets',
-          'total_price': 890.0,
-          'category': 'Healthcare',
-        },
-      },
-      {
-        'id': 'q-006',
-        'merchant': 'K-Electric Online Billing',
-        'receipt_date': '18 Oct, 09:20 AM • Receipt #9011',
-        'candidate_text': 'Off-Peak Electricity Consumption',
-        'total_amount': 5400.0,
-        'category': 'Utilities',
-        'confidence': 0.91,
-        'line_item': {
-          'item_name': 'Off-Peak Electricity Consumption',
-          'total_price': 5400.0,
-          'category': 'Utilities',
-        },
-      },
-      {
-        'id': 'q-007',
-        'merchant': 'Jalal Sons Departmental Store',
-        'receipt_date': '15 Oct, 07:10 PM • Receipt #3340',
-        'candidate_text': 'Spicy Chicken Patties & Rolls (4 Pcs)',
-        'total_amount': 680.0,
-        'category': 'Bakeries',
-        'confidence': 0.70,
-        'line_item': {
-          'item_name': 'Spicy Chicken Patties & Rolls (4 Pcs)',
-          'total_price': 680.0,
-          'category': 'Bakeries',
-        },
-      },
-    ];
-  }
+  /// Returns empty list - all data is purely dynamic
+  List<Map<String, dynamic>> getSampleReceipts() => [];
+
+  /// Returns empty list - all data is purely dynamic
+  List<Map<String, dynamic>> getSampleReviewQueue() => [];
 }

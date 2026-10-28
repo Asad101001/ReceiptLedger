@@ -242,137 +242,7 @@ class _AppDrawerState extends State<AppDrawer> {
     );
   }
 
-  void _showExportDataDialog() {
-    final exportUrl = _api.getExportCsvUrl();
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        return AlertDialog(
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppTheme.sageLight,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.file_download_rounded, color: AppTheme.forestPrimary, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Export Reports',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: isDark ? Colors.white : AppTheme.textDark,
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Download all categorized receipts, merchant data, and line items:',
-                style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDark ? AppTheme.cardDarkElevated : const Color(0xFFF3F5F0),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isDark ? AppTheme.borderDark : AppTheme.borderLight),
-                ),
-                child: SelectableText(
-                  exportUrl,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                    color: AppTheme.forestPrimary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'Compatible with Excel, Google Sheets, QuickBooks, and Xero.',
-                style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Close'),
-            ),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(ctx);
-                AppToast.showSuccess(context, 'Export generated! Preparing download...');
-              },
-              icon: const Icon(Icons.download_rounded, size: 16, color: Colors.white),
-              label: const Text('Download CSV', style: TextStyle(color: Colors.white)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.forestPrimary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
-  void _confirmSeedDemoData() {
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isDark ? AppTheme.cardDarkElevated : AppTheme.sageLight,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.dataset_rounded, color: isDark ? Colors.white : AppTheme.forestPrimary, size: 20),
-              ),
-              const SizedBox(width: 12),
-              const Text('Seed Demo Data', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-            ],
-          ),
-          content: const Text(
-            'Populate the app with demo receipts and review queue items for demonstration and testing purposes?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDark ? Colors.white : AppTheme.forestPrimary,
-                foregroundColor: isDark ? Colors.black : Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () {
-                Navigator.pop(ctx);
-                _api.seedDemoData();
-                Navigator.pop(context); // close drawer
-                AppToast.showSuccess(context, 'Demo dataset seeded (10 receipts, 7 review items)');
-              },
-              child: const Text('Seed Data'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   void _confirmClearAllData() {
     showDialog(
@@ -645,17 +515,6 @@ class _AppDrawerState extends State<AppDrawer> {
                     ),
                   ),
 
-                  // Export Data
-                  _buildDrawerTile(
-                    icon: Icons.file_download_outlined,
-                    title: 'Export Data',
-                    subtitle: 'Download CSV & PDF',
-                    value: 'Reports',
-                    onTap: _showExportDataDialog,
-                    isDark: isDark,
-                    primaryText: primaryText,
-                  ),
-
                   // Harsh Minimalist Black & White Theme Toggle
                   ValueListenableBuilder<ThemeMode>(
                     valueListenable: AppTheme.themeModeNotifier,
@@ -701,7 +560,7 @@ class _AppDrawerState extends State<AppDrawer> {
                   const Padding(
                     padding: EdgeInsets.only(left: 12, top: 8, bottom: 4),
                     child: Text(
-                      'DATA & DEMO MODE',
+                      'DATA MANAGEMENT',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
@@ -709,17 +568,6 @@ class _AppDrawerState extends State<AppDrawer> {
                         letterSpacing: 0.8,
                       ),
                     ),
-                  ),
-
-                  // Seed Demo Data Tile
-                  _buildDrawerTile(
-                    icon: Icons.dataset_rounded,
-                    title: 'Seed Demo Data',
-                    subtitle: 'Populate demo receipts & review slips',
-                    value: 'Seed',
-                    onTap: _confirmSeedDemoData,
-                    isDark: isDark,
-                    primaryText: primaryText,
                   ),
 
                   // Clear All Data Tile

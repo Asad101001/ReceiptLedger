@@ -95,6 +95,25 @@ async def resolve_review_item(
     return resolved
 
 
+@router.post(
+    "/review-queue/receipt/{receipt_id}/accept-all",
+    summary="Approve an entire receipt and all its pending review items",
+    tags=["Review Queue"],
+)
+async def accept_all_receipt(
+    receipt_id: str = Path(..., description="UUID of the receipt"),
+):
+    """Marks the entire receipt PROCESSED and all its review items ACCEPTED in one step."""
+    success = store.resolve_receipt_all(receipt_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Receipt '{receipt_id}' not found.",
+        )
+    return {"status": "success", "receipt_id": receipt_id, "receipt_status": "PROCESSED"}
+
+
+
 @router.get(
     "/review-queue/{queue_id}/crop",
     summary="Get a cropped receipt image snippet for a review queue item",
