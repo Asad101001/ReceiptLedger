@@ -7,7 +7,7 @@ This directory serves as the centralized, technical repository for ReceiptLedger
 ## 1. Directory Structure
 
 ```text
-design_assets/
+UI mockups/
 ├── README.md                          # Technical design system specification (this document)
 ├── icons/                             # Vector brand & navigation SVG assets
 │   ├── app_icon.svg                   # Primary brand logo mark (Ledger + Receipt glyph)

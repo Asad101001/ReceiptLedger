@@ -106,7 +106,7 @@ flowchart LR
 | [`backend/`](backend/) | Core OCR routing, OpenCV deskewing, normalization, and API gateway | FastAPI • SQLite • EasyOCR • Gemini |
 | [`mobile/`](mobile/) | Capture client, animated splash, auth login/signup, and ledger UI | Flutter • Dart • Material 3 |
 | [`web/`](web/) | Analytics dashboard, monthly trend charts, and review queue | React • Vite • Chart.js |
-| [`design_assets/`](design_assets/) | Design specifications, vector SVG icon tokens, and UI mockups | SVG • Figma Specs • PNG Wireframes |
+| [`UI mockups/`](UI%20mockups/) | Design specifications, vector SVG icon tokens, and UI mockups | SVG • Figma Specs • PNG Wireframes |
 | [`scripts/`](scripts/) | End-to-end stress tests, zero-cost HTTPS tunnels, and data tools | Python • PowerShell • Bash |
 | [`docs/`](docs/) | Complete engineering specifications, IEEE 830 SRS, and course governance | Markdown • Mermaid |
 | [`data/`](data/) | Sample receipt collection repository and local item taxonomy dictionary | Dataset • JSON |
