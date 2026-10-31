@@ -9,6 +9,7 @@ import {
   LogOut,
   Receipt,
   User,
+  X,
 } from 'lucide-react';
 import { useConsoleStore } from '../../store/useConsoleStore';
 
@@ -16,12 +17,16 @@ interface SidebarProps {
   userEmail?: string;
   onLogout: () => void;
   pendingReviewCount?: number;
+  isOpenMobile?: boolean;
+  onCloseMobile?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   userEmail = 'user@receiptledger.com',
   onLogout,
   pendingReviewCount = 7,
+  isOpenMobile = false,
+  onCloseMobile,
 }) => {
   const { activeNav, setActiveNav, toggleShortcutsPanel } = useConsoleStore();
 
@@ -57,10 +62,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
   ];
 
-  return (
-    <aside className="w-64 bg-white border-r border-[#CBD5E1] flex flex-col justify-between h-screen shrink-0 select-none">
+  const handleNavClick = (id: typeof activeNav) => {
+    setActiveNav(id);
+    if (onCloseMobile) onCloseMobile();
+  };
+
+  const handleShortcutsClick = () => {
+    toggleShortcutsPanel();
+    if (onCloseMobile) onCloseMobile();
+  };
+
+  const renderContent = (isMobileView = false) => (
+    <>
       {/* ── Top Brand Header ────────────────────────────────────────────── */}
-      <div className="p-4 border-b border-[#CBD5E1]">
+      <div className="p-4 border-b border-[#CBD5E1] flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 bg-black text-white rounded-lg flex items-center justify-center font-mono font-bold shrink-0">
             <Receipt className="w-5 h-5 text-white" />
@@ -75,6 +90,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
         </div>
+
+        {isMobileView && onCloseMobile && (
+          <button
+            type="button"
+            onClick={onCloseMobile}
+            aria-label="Close navigation"
+            className="p-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* ── Main Navigation List ────────────────────────────────────────── */}
@@ -89,7 +115,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           return (
             <button
               key={item.id}
-              onClick={() => setActiveNav(item.id)}
+              onClick={() => handleNavClick(item.id)}
               className={clsx(
                 'w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors font-medium text-xs',
                 isActive
@@ -130,7 +156,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-3 border-t border-[#CBD5E1] space-y-3 bg-[#F8FAFC]">
         {/* Keyboard Shortcuts Trigger */}
         <button
-          onClick={toggleShortcutsPanel}
+          onClick={handleShortcutsClick}
           className="w-full flex items-center justify-between px-3 py-2 text-xs font-mono text-slate-600 bg-white border border-[#CBD5E1] rounded-lg hover:bg-slate-50 transition-colors"
           title="Toggle Keyboard Shortcuts"
         >
@@ -141,7 +167,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <kbd className="text-[10px]">?</kbd>
         </button>
 
-        {/* User Card (from Pinterest reference #1) */}
+        {/* User Card */}
         <div className="bg-white border border-[#CBD5E1] rounded-xl p-3 space-y-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-full bg-slate-200 border border-[#CBD5E1] flex items-center justify-center text-slate-700 shrink-0">
@@ -169,6 +195,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* ── Persistent Desktop Sidebar (hidden on mobile, visible on md+) ── */}
+      <aside className="hidden md:flex w-64 bg-white border-r border-[#CBD5E1] flex-col justify-between h-screen shrink-0 select-none">
+        {renderContent(false)}
+      </aside>
+
+      {/* ── Mobile Drawer Overlay (visible strictly when toggled on < md) ── */}
+      {isOpenMobile && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          {/* Backdrop */}
+          <div
+            onClick={onCloseMobile}
+            className="fixed inset-0 bg-slate-950/70 transition-opacity"
+            aria-hidden="true"
+          />
+
+          {/* Drawer container */}
+          <aside className="relative w-72 max-w-[85vw] bg-white border-r border-[#CBD5E1] flex flex-col justify-between h-full z-10 shadow-2xl animate-in slide-in-from-left duration-200 select-none">
+            {renderContent(true)}
+          </aside>
+        </div>
+      )}
+    </>
   );
 };

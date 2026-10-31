@@ -28,8 +28,32 @@ import {
 import { adaptReceipt, adaptReviewQueueItem } from '../lib/adapter';
 import { z } from 'zod';
 
-const RAW_API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
-export const API_BASE_URL = RAW_API_BASE.replace(/\/+$/, '');
+const API_URL_STORAGE_KEY = 'receiptledger_api_base_url';
+
+export const getApiBaseUrl = (): string => {
+  if (typeof localStorage !== 'undefined') {
+    const stored = localStorage.getItem(API_URL_STORAGE_KEY);
+    if (stored && stored.trim()) {
+      return stored.trim().replace(/\/+$/, '');
+    }
+  }
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (envUrl && envUrl.trim()) {
+    return envUrl.trim().replace(/\/+$/, '');
+  }
+  return 'http://localhost:8000/api/v1';
+};
+
+export const setApiBaseUrl = (url: string | null): void => {
+  if (typeof localStorage === 'undefined') return;
+  if (url && url.trim()) {
+    localStorage.setItem(API_URL_STORAGE_KEY, url.trim().replace(/\/+$/, ''));
+  } else {
+    localStorage.removeItem(API_URL_STORAGE_KEY);
+  }
+};
+
+export const API_BASE_URL = getApiBaseUrl();
 
 export class ApiError extends Error {
   public status: number;
@@ -74,7 +98,8 @@ async function apiRequest<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const token = getAuthToken();
-  const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -99,7 +124,7 @@ async function apiRequest<T>(
   } catch (fetchError: unknown) {
     const errorDetail = fetchError instanceof Error ? fetchError.message : String(fetchError);
     throw new ApiError(
-      `Gateway connection unavailable (${API_BASE_URL}). Ensure the backend server is running. (${errorDetail})`,
+      `Gateway connection unavailable (${baseUrl}). Ensure the backend server is running. (${errorDetail})`,
       0,
       fetchError
     );
@@ -261,7 +286,7 @@ export const api = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(`${API_BASE_URL}/receipts/upload`, {
+    const res = await fetch(`${getApiBaseUrl()}/receipts/upload`, {
       method: 'POST',
       headers,
       body: formData,
@@ -283,15 +308,15 @@ export const api = {
 
   // ── Asset & Media URLs ─────────────────────────────────────────────────────
   getReceiptImageUrl(receiptId: string): string {
-    return `${API_BASE_URL}/receipts/${receiptId}/image`;
+    return `${getApiBaseUrl()}/receipts/${receiptId}/image`;
   },
 
   getReviewCropUrl(queueId: string): string {
-    return `${API_BASE_URL}/review-queue/${queueId}/crop`;
+    return `${getApiBaseUrl()}/review-queue/${queueId}/crop`;
   },
 
   getExportCsvUrl(year = 2026, month = 10): string {
-    return `${API_BASE_URL}/analytics/export?format=csv&year=${year}&month=${month}`;
+    return `${getApiBaseUrl()}/analytics/export?format=csv&year=${year}&month=${month}`;
   },
 };
 

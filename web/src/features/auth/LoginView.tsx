@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, Receipt, WifiOff } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { getApiBaseUrl } from '../../api/client';
 
 export const LoginView: React.FC = () => {
   const { login, isLoggingIn, enterDevMockMode } = useAuth();
@@ -69,7 +70,7 @@ export const LoginView: React.FC = () => {
                 <div className="text-[11px] leading-relaxed">{errorMsg}</div>
 
                 {/* Explicit Offline Dev Mode Option when API is unavailable */}
-                {isDev && isNetworkFailure && (
+                {(isNetworkFailure || isDev) && (
                   <div className="pt-2">
                     <button
                       type="button"
@@ -140,7 +141,7 @@ export const LoginView: React.FC = () => {
         </form>
 
         {/* Demo Credentials Hint (Visible strictly in development mode) */}
-        {isDev && (
+        {true && (
           <div className="bg-[#F8FAFC] border-t border-[#CBD5E1] p-4 text-xs font-mono text-slate-600 space-y-2">
             <div className="flex items-center justify-between">
               <span className="font-semibold text-slate-700 uppercase text-[11px] flex items-center gap-1.5">
@@ -181,7 +182,8 @@ export const LoginView: React.FC = () => {
       </div>
 
       {/* Footer System Info */}
-      <div className="mt-4 text-center text-[11px] font-mono text-slate-400">
+      <div className="mt-3 text-center text-[10px] font-mono text-slate-500">Gateway: <span className="font-semibold text-slate-700">{getApiBaseUrl()}</span></div>
+      <div className="mt-2 text-center text-[11px] font-mono text-slate-400">
         ReceiptLedger Monorepo Gateway • Scope: Admin, Audit &amp; Triage
       </div>
     </div>

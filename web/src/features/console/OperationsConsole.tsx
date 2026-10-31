@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import clsx from 'clsx';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../api/client';
+import { api, getApiBaseUrl } from '../../api/client';
 import { useConsoleStore } from '../../store/useConsoleStore';
 import { useHotkeys } from '../../hooks/useHotkeys';
 import { AppLayout } from '../../components/layout/AppLayout';
@@ -485,8 +485,8 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
       />
 
       {/* ── Sub-Navigation Workspace Bar ───────────────────────────────────── */}
-      <div className="bg-white border-b border-[#CBD5E1] px-5 py-2.5 flex items-center justify-between select-none">
-        <div className="flex items-center gap-2">
+      <div className="bg-white border-b border-[#CBD5E1] px-3 sm:px-5 py-2 sm:py-2.5 flex items-center justify-between select-none overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={() => setActiveNav('overview')}
             className={clsx(
@@ -605,7 +605,7 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
           <>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch">
               {/* Workspace A: Human-in-the-Loop Review Desk */}
-              <section className="h-[520px]">
+              <section className="min-h-[520px] xl:h-[580px]">
                 <ReviewDesk
                   queueItems={queueItems}
                   activeIndex={safeActiveQueueIndex}
@@ -619,7 +619,7 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
               </section>
 
               {/* Workspace B: Ingestion Audit Ledger */}
-              <section className="h-[520px]">
+              <section className="min-h-[520px] xl:h-[580px]">
                 <AuditLedger
                   receiptsData={receiptsData}
                   isLoading={!isMockMode && receiptsQuery.isLoading}
@@ -677,7 +677,7 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
         )}
 
         {activeNav === 'review' && (
-          <section className="h-[680px]">
+          <section className="min-h-[640px] xl:h-[680px]">
             <ReviewDesk
               queueItems={queueItems}
               activeIndex={safeActiveQueueIndex}
@@ -692,7 +692,7 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
         )}
 
         {activeNav === 'ledger' && (
-          <section className="h-[680px]">
+          <section className="min-h-[640px] xl:h-[680px]">
             <AuditLedger
               receiptsData={receiptsData}
               isLoading={!isMockMode && receiptsQuery.isLoading}
@@ -741,8 +741,8 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
                       OFFLINE FIXTURE TELEMETRY
                     </span>
                   )}
-                  <span className="text-[11px] font-mono text-slate-500">
-                    Host: http://localhost:8000/api/v1
+                  <span className="text-[11px] font-mono text-slate-500 truncate max-w-[280px]">
+                    Gateway: {getApiBaseUrl()}
                   </span>
                 </div>
               </div>

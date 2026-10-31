@@ -400,7 +400,7 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onDoubleClick={handleDoubleClick}
-              className={`flex-1 relative overflow-hidden flex items-center justify-center p-4 select-none ${
+              className={`flex-1 min-h-[280px] sm:min-h-[340px] relative overflow-hidden flex items-center justify-center p-4 select-none ${
                 isDragging ? 'cursor-grabbing' : 'cursor-grab'
               }`}
             >
@@ -595,7 +595,7 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({
 
             {/* ── Tactile Verification Controls ────────────────────────────── */}
             <div className="pt-2 border-t border-[#CBD5E1] space-y-2">
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {/* 1-Click Accept (Enter) */}
                 <button
                   type="button"
