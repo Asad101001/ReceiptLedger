@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Database,
   Search,
   Download,
   Calendar,
@@ -16,6 +15,7 @@ import {
 import { PaginatedReceiptsResponse, ReceiptDetail } from '../../types';
 import { api } from '../../api/client';
 import { formatPKR, formatDate } from '../../lib/formatters';
+import { ProjectIcon } from '../../components/ui/ProjectIcon';
 
 export type ReceiptTypeFilter = 'ALL' | 'PRINTED' | 'HANDWRITTEN';
 export type ReceiptStatusFilter = 'ALL' | 'PROCESSED' | 'PENDING_REVIEW' | 'FLAGGED' | 'DUPLICATE' | 'FAILED';
@@ -180,8 +180,8 @@ export const AuditLedger: React.FC<AuditLedgerProps> = ({
       {/* ── Sub-Header: Clean crisp white surface with black RL badge ── */}
       <div className="bg-white border-b border-[#CBD5E1] px-5 py-3 flex items-center justify-between text-slate-900">
         <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 bg-black text-white rounded-lg flex items-center justify-center shrink-0">
-            <Database className="w-3.5 h-3.5 text-white" />
+          <div className="w-6 h-6 bg-black text-white rounded-lg flex items-center justify-center p-1 shrink-0">
+            <ProjectIcon name="ledger" className="w-4 h-4 text-white" />
           </div>
           <span className="font-mono font-bold text-xs tracking-wider uppercase text-slate-900">
             WORKSPACE B: INGESTION AUDIT LEDGER

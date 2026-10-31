@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
-  FileText,
   Hash,
   Store,
   Layers,
@@ -16,6 +15,8 @@ import {
 } from 'lucide-react';
 import { ReceiptDetail } from '../../types';
 import { api } from '../../api/client';
+import { getReceiptImageUrlFromBucket } from '../../lib/supabase';
+import { ProjectIcon } from '../../components/ui/ProjectIcon';
 import { formatPKR, formatDate } from '../../lib/formatters';
 import { calculateHammingDistance } from '../../lib/adapter';
 
@@ -36,6 +37,7 @@ export const SlideOutDrawer: React.FC<SlideOutDrawerProps> = ({
   const [copied, setCopied] = useState<boolean>(false);
   const [idCopied, setIdCopied] = useState<boolean>(false);
   const [imageError, setImageError] = useState<boolean>(false);
+  const [bucketImgUrl, setBucketImgUrl] = useState<string>('');
   const drawerRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElement = useRef<HTMLElement | null>(null);
 
@@ -44,6 +46,9 @@ export const SlideOutDrawer: React.FC<SlideOutDrawerProps> = ({
     if (isOpen) {
       previouslyFocusedElement.current = document.activeElement as HTMLElement;
       setImageError(false);
+      if (receipt?.id) {
+        getReceiptImageUrlFromBucket(receipt.id).then(url => { if (url) setBucketImgUrl(url); });
+      }
       // Focus first actionable element inside drawer
       const focusable = drawerRef.current?.querySelectorAll<HTMLElement>(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -59,7 +64,8 @@ export const SlideOutDrawer: React.FC<SlideOutDrawerProps> = ({
   if (!isOpen || !receipt) return null;
 
   const lineItems = receipt.line_items || [];
-  const imageUrl = api.getReceiptImageUrl(receipt.id);
+  const rawUrl = receipt.receipt_image_url;
+  const imageUrl: string = bucketImgUrl || (typeof rawUrl === 'string' ? rawUrl : '') || api.getReceiptImageUrl(receipt.id);
 
   const copyPayload = () => {
     navigator.clipboard.writeText(JSON.stringify(receipt, null, 2));
@@ -125,8 +131,8 @@ export const SlideOutDrawer: React.FC<SlideOutDrawerProps> = ({
         {/* Header */}
         <div className="bg-[#0F172A] border-b border-[#334155] text-white p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-1.5 bg-slate-800 border border-slate-700 rounded-lg">
-              <FileText className="w-5 h-5 text-emerald-400" />
+            <div className="p-1.5 bg-slate-800 border border-slate-700 rounded-lg flex items-center justify-center">
+              <ProjectIcon name="ledger" className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
               <div className="flex items-center gap-2">

@@ -7,6 +7,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { api } from '../api/client';
+import { ProjectIcon } from './ui/ProjectIcon';
 import { useConsoleStore } from '../store/useConsoleStore';
 
 interface UploadReceiptDrawerProps {
@@ -119,8 +120,8 @@ export const UploadReceiptDrawer: React.FC<UploadReceiptDrawerProps> = ({
         {/* Header */}
         <div className="bg-[#0F172A] border-b border-[#334155] text-white p-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="p-1.5 bg-slate-800 border border-slate-700 rounded">
-              <Upload className="w-5 h-5 text-blue-400" />
+            <div className="p-1.5 bg-slate-800 border border-slate-700 rounded flex items-center justify-center">
+              <ProjectIcon name="capture" className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
               <h2 className="font-mono font-bold text-sm tracking-wide uppercase text-slate-100">

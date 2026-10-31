@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
-import { Menu, Upload, ExternalLink, Code2 } from 'lucide-react';
+import { Menu, ExternalLink, Code2 } from 'lucide-react';
+import { ProjectIcon } from '../ui/ProjectIcon';
 import { useConsoleStore } from '../../store/useConsoleStore';
 import { getApiBaseUrl } from '../../api/client';
 
@@ -40,8 +41,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center p-1 shrink-0">
-              <img src="/icons/app_icon.svg" alt="ReceiptLedger" className="w-5 h-5 object-contain" />
+            <div className="w-7 h-7 bg-white text-black rounded-lg flex items-center justify-center p-1 shrink-0">
+              <ProjectIcon name="app" className="w-5 h-5 text-black" />
             </div>
             <div>
               <div className="font-mono font-bold text-xs tracking-wider uppercase text-white flex items-center gap-1.5">
@@ -64,7 +65,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
             title="Upload Receipt Image"
             className="p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 hover:text-white transition-colors cursor-pointer"
           >
-            <Upload className="w-4 h-4" />
+            <ProjectIcon name="capture" className="w-4 h-4 text-white" />
           </button>
         </div>
       </header>

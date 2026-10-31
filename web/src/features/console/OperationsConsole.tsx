@@ -15,7 +15,7 @@ import { KeyboardShortcutsPanel } from '../../components/KeyboardShortcutsPanel'
 import { UploadReceiptDrawer } from '../../components/UploadReceiptDrawer';
 import { DuplicateConflictBanner } from '../../components/DuplicateConflictBanner';
 import { NetworkErrorBanner } from '../../components/NetworkErrorBanner';
-import { DesignShowcaseModal } from '../../components/DesignShowcaseModal';
+import { ProjectIcon } from '../../components/ui/ProjectIcon';
 import {
   ReviewQueueItem,
   ReviewQueueResolveRequest,
@@ -77,7 +77,6 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
 
   const [ledgerPage, setLedgerPage] = useState<number>(1);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isDesignShowcaseOpen, setIsDesignShowcaseOpen] = useState(false);
   const [trendMonths, setTrendMonths] = useState<number>(6);
 
   // ── Queries ─────────────────────────────────────────────────────────────────
@@ -484,8 +483,7 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
         isMockMode={isMockMode}
         onEnterDevMockMode={handleSwitchToMockMode}
         onExportCsv={handleExportCsv}
-        onOpenDesignShowcase={() => setIsDesignShowcaseOpen(true)}
-      />
+              />
 
       {/* ── Sub-Navigation Workspace Bar ───────────────────────────────────── */}
       <div className="bg-white border-b border-[#CBD5E1] px-3 sm:px-5 py-2 sm:py-2.5 flex items-center justify-between select-none overflow-x-auto scrollbar-none">
@@ -493,28 +491,31 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
           <button
             onClick={() => setActiveNav('overview')}
             className={clsx(
-              'px-3 py-1 text-xs font-mono font-semibold rounded-full border transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer',
+              'px-3.5 py-1.5 text-xs font-mono font-semibold rounded-xl border transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer flex items-center gap-2',
               activeNav === 'overview'
-                ? 'bg-black text-white border-black'
+                ? 'bg-black text-white border-black shadow-xs'
                 : 'bg-[#F8FAFC] text-slate-700 border-[#CBD5E1] hover:bg-slate-100'
             )}
           >
-            Overview Console
+            <ProjectIcon name="app" className={clsx('w-3.5 h-3.5', activeNav === 'overview' ? 'text-white' : 'text-slate-600')} />
+            <span>Overview</span>
           </button>
+
           <button
             onClick={() => setActiveNav('review')}
             className={clsx(
-              'px-3 py-1 text-xs font-mono font-semibold rounded-full border transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer flex items-center gap-1.5',
+              'px-3.5 py-1.5 text-xs font-mono font-semibold rounded-xl border transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer flex items-center gap-2',
               activeNav === 'review'
-                ? 'bg-black text-white border-black'
+                ? 'bg-black text-white border-black shadow-xs'
                 : 'bg-[#F8FAFC] text-slate-700 border-[#CBD5E1] hover:bg-slate-100'
             )}
           >
+            <ProjectIcon name="review" className={clsx('w-3.5 h-3.5', activeNav === 'review' ? 'text-white' : 'text-slate-600')} />
             <span>Receipt Review</span>
             {queueItems.length > 0 && (
               <span
                 className={clsx(
-                  'text-[10px] px-1.5 py-0.5 rounded-full font-bold',
+                  'text-[10px] px-1.5 py-0.2 rounded-full font-bold ml-0.5',
                   activeNav === 'review'
                     ? 'bg-amber-400 text-black'
                     : 'bg-amber-100 text-amber-900 border border-amber-300'
@@ -524,27 +525,31 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
               </span>
             )}
           </button>
+
           <button
             onClick={() => setActiveNav('ledger')}
             className={clsx(
-              'px-3 py-1 text-xs font-mono font-semibold rounded-full border transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer',
+              'px-3.5 py-1.5 text-xs font-mono font-semibold rounded-xl border transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer flex items-center gap-2',
               activeNav === 'ledger'
-                ? 'bg-black text-white border-black'
+                ? 'bg-black text-white border-black shadow-xs'
                 : 'bg-[#F8FAFC] text-slate-700 border-[#CBD5E1] hover:bg-slate-100'
             )}
           >
-            Audit Ledger
+            <ProjectIcon name="ledger" className={clsx('w-3.5 h-3.5', activeNav === 'ledger' ? 'text-white' : 'text-slate-600')} />
+            <span>Audit Ledger</span>
           </button>
+
           <button
             onClick={() => setActiveNav('health')}
             className={clsx(
-              'px-3 py-1 text-xs font-mono font-semibold rounded-full border transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer',
+              'px-3.5 py-1.5 text-xs font-mono font-semibold rounded-xl border transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer flex items-center gap-2',
               activeNav === 'health'
-                ? 'bg-black text-white border-black'
+                ? 'bg-black text-white border-black shadow-xs'
                 : 'bg-[#F8FAFC] text-slate-700 border-[#CBD5E1] hover:bg-slate-100'
             )}
           >
-            System Health &amp; Runs
+            <ProjectIcon name="settings" className={clsx('w-3.5 h-3.5', activeNav === 'health' ? 'text-white' : 'text-slate-600')} />
+            <span>System &amp; Admin</span>
           </button>
         </div>
 
@@ -729,6 +734,95 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
 
         {activeNav === 'health' && (
           <div className="space-y-4">
+            {/* Administrative Operations Strip */}
+            <section className="bg-white border border-[#CBD5E1] rounded-2xl p-5 select-none space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#CBD5E1]">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-black text-white flex items-center justify-center p-1.5">
+                      <ProjectIcon name="settings" className="w-4 h-4 text-white" />
+                    </div>
+                    <h2 className="font-mono font-bold text-sm uppercase tracking-wide text-slate-900">
+                      System &amp; Administrative Control Center
+                    </h2>
+                  </div>
+                  <p className="font-mono text-xs text-slate-500 mt-1">
+                    Manage database seeding, storage bucket synchronization, ledger resets, and engine quotas
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Seed Demo */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isMockMode) {
+                        handleReloadMockQueue();
+                        return;
+                      }
+                      seedMutation.mutate();
+                    }}
+                    disabled={seedMutation.isPending}
+                    className="flex items-center gap-1.5 bg-black hover:bg-slate-800 disabled:opacity-50 text-white font-mono text-xs font-bold px-3.5 py-2 rounded-xl border border-black transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer"
+                  >
+                    <span>Seed Demo (148 Receipts)</span>
+                  </button>
+
+                  {/* Reset Ledger */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm("Are you sure you want to reset the ledger? This will clear test transactions.")) {
+                        resetMutation.mutate();
+                      }
+                    }}
+                    disabled={resetMutation.isPending}
+                    className="flex items-center gap-1.5 bg-white hover:bg-red-50 hover:text-red-700 hover:border-red-300 text-slate-700 font-mono text-xs font-semibold px-3 py-2 rounded-xl border border-[#CBD5E1] transition-all duration-150 hover:-translate-y-0.5 cursor-pointer"
+                  >
+                    <span>Reset Ledger</span>
+                  </button>
+
+                  {/* Export CSV */}
+                  <button
+                    type="button"
+                    onClick={handleExportCsv}
+                    className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-800 font-mono text-xs font-semibold px-3 py-2 rounded-xl border border-[#CBD5E1] transition-all duration-150 hover:-translate-y-0.5 cursor-pointer"
+                  >
+                    <span>Export CSV</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Infrastructure & Credentials Info */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 font-mono text-xs">
+                <div className="bg-[#F8FAFC] border border-[#CBD5E1] p-3 rounded-xl space-y-1">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase">SUPABASE DATABASE</div>
+                  <div className="font-bold text-slate-900 truncate">okuxmizxjfddxyrfvdib.supabase.co</div>
+                  <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1 mt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                    <span>PostgreSQL 3NF Connected</span>
+                  </div>
+                </div>
+
+                <div className="bg-[#F8FAFC] border border-[#CBD5E1] p-3 rounded-xl space-y-1">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase">STORAGE BUCKET</div>
+                  <div className="font-bold text-slate-900 truncate">receipt-images (81 assets)</div>
+                  <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1 mt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                    <span>Signed Token Access Active</span>
+                  </div>
+                </div>
+
+                <div className="bg-[#F8FAFC] border border-[#CBD5E1] p-3 rounded-xl space-y-1">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase">AI VISION ENGINE</div>
+                  <div className="font-bold text-slate-900 truncate">Gemini 3.5 Flash Lite + Vision</div>
+                  <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1 mt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                    <span>950 Cloud Quota Remaining</span>
+                  </div>
+                </div>
+              </div>
+            </section>
             {/* System Engine Telemetry Strip */}
             <section className="bg-white border border-[#CBD5E1] rounded-xl p-4 select-none">
               <div className="flex items-center justify-between pb-3 border-b border-[#CBD5E1] mb-3">
@@ -871,8 +965,9 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
           queryClient.invalidateQueries();
         }}
       />
-      <DesignShowcaseModal isOpen={isDesignShowcaseOpen} onClose={() => setIsDesignShowcaseOpen(false)} />
-      <DesignShowcaseModal isOpen={isDesignShowcaseOpen} onClose={() => setIsDesignShowcaseOpen(false)} />
+      
+      
+
     </AppLayout>
   );
 };

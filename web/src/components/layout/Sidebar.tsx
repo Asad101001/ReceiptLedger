@@ -1,16 +1,8 @@
 import React from 'react';
 import clsx from 'clsx';
-import {
-  LayoutDashboard,
-  CheckSquare,
-  ScrollText,
-  Activity,
-  Keyboard,
-  LogOut,
-  User,
-  X,
-} from 'lucide-react';
+import { Keyboard, LogOut, User, X } from 'lucide-react';
 import { useConsoleStore } from '../../store/useConsoleStore';
+import { ProjectIcon, ProjectIconName } from '../ui/ProjectIcon';
 
 interface SidebarProps {
   userEmail?: string;
@@ -29,34 +21,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { activeNav, setActiveNav, toggleShortcutsPanel } = useConsoleStore();
 
-  const navItems = [
+  const navItems: Array<{
+    id: 'overview' | 'review' | 'ledger' | 'health';
+    label: string;
+    description: string;
+    iconName: ProjectIconName;
+    badge: number | null;
+    badgeVariant?: 'warning';
+  }> = [
     {
-      id: 'overview' as const,
+      id: 'overview',
       label: 'Overview',
       description: 'Operations cockpit & KPIs',
-      icon: LayoutDashboard,
+      iconName: 'app',
       badge: null,
     },
     {
-      id: 'review' as const,
+      id: 'review',
       label: 'Receipt Review',
       description: 'Human-in-the-loop triage',
-      icon: CheckSquare,
+      iconName: 'review',
       badge: pendingReviewCount > 0 ? pendingReviewCount : null,
       badgeVariant: 'warning',
     },
     {
-      id: 'ledger' as const,
+      id: 'ledger',
       label: 'Audit Ledger',
       description: 'Ingestion records & inspector',
-      icon: ScrollText,
+      iconName: 'ledger',
       badge: null,
     },
     {
-      id: 'health' as const,
-      label: 'System Health',
-      description: 'Engines & observability runs',
-      icon: Activity,
+      id: 'health',
+      label: 'System & Admin',
+      description: 'Engine status, logs & controls',
+      iconName: 'settings',
       badge: null,
     },
   ];
@@ -76,8 +75,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* ── Top Brand Header ────────────────────────────────────────────── */}
       <div className="p-4 border-b border-[#CBD5E1] flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-white border border-[#CBD5E1] shadow-xs flex items-center justify-center p-1.5 shrink-0 transition-transform duration-200 hover:scale-105">
-            <img src="/icons/app_icon.svg" alt="ReceiptLedger" className="w-6 h-6 object-contain" />
+          <div className="w-9 h-9 rounded-xl bg-black text-white shadow-xs flex items-center justify-center p-1.5 shrink-0 transition-transform duration-200 hover:scale-105">
+            <ProjectIcon name="app" className="w-6 h-6 text-white" />
           </div>
           <div className="min-w-0">
             <div className="text-sm font-bold text-slate-900 tracking-tight leading-tight flex items-center gap-1.5 font-mono">
@@ -102,13 +101,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
-      {/* ── Main Navigation List ────────────────────────────────────────── */}
+      {/* ── Main Navigation List with Project SVGs ───────────────────────── */}
       <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto" aria-label="Main Navigation">
         <div className="px-3 pb-1 text-[10px] font-mono font-semibold uppercase tracking-wider text-slate-400">
           Workspaces
         </div>
         {navItems.map((item) => {
-          const Icon = item.icon;
           const isActive = activeNav === item.id;
 
           return (
@@ -123,11 +121,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <Icon
-                  className={clsx(
-                    'w-4 h-4 shrink-0',
-                    isActive ? 'text-white' : 'text-slate-500'
-                  )}
+                <ProjectIcon
+                  name={item.iconName}
+                  className={clsx('w-4 h-4 shrink-0', isActive ? 'text-white' : 'text-slate-600')}
                 />
                 <div className="truncate">
                   <div>{item.label}</div>
@@ -199,12 +195,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
-      {/* ── Persistent Desktop Sidebar (hidden on mobile, visible on md+) ── */}
       <aside className="hidden md:flex w-64 bg-white border-r border-[#CBD5E1] flex-col justify-between h-screen shrink-0 select-none">
         {renderContent(false)}
       </aside>
 
-      {/* ── Mobile Drawer Overlay ── */}
       {isOpenMobile && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div

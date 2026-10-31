@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Scan,
   ZoomIn,
   ZoomOut,
   RotateCcw,
@@ -15,6 +14,8 @@ import {
 } from 'lucide-react';
 import { ReviewQueueItem, ReviewQueueResolveRequest } from '../../types';
 import { api } from '../../api/client';
+import { getReceiptImageUrlFromBucket } from '../../lib/supabase';
+import { ProjectIcon } from '../../components/ui/ProjectIcon';
 import { computeBoundingBoxStyle, getConfidenceTier } from '../../lib/adapter';
 import { formatPKR } from '../../lib/formatters';
 
@@ -50,6 +51,7 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [viewMode, setViewMode] = useState<'full' | 'crop'>('full');
   const [imageError, setImageError] = useState<boolean>(false);
+  const [bucketImgUrl, setBucketImgUrl] = useState<string>('');
 
   // Form Fields
   const [confirmedName, setConfirmedName] = useState<string>('');
@@ -78,6 +80,9 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({
       setConfirmedUnitPrice(initialUnitPrice);
       setConfirmedTotalPrice(Math.round(initialTotal * 100) / 100);
       setImageError(Boolean(isMockMode && !currentItem.receipt_image_url));
+      if (currentItem.receipt_id) {
+        getReceiptImageUrlFromBucket(currentItem.receipt_id).then(url => { if (url) { setBucketImgUrl(url); setImageError(false); } });
+      }
 
       // Auto-focus candidate product name for rapid operator triage
       setTimeout(() => {
@@ -206,10 +211,7 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({
   // Bounding box snippet positioning
   const bboxStyle = computeBoundingBoxStyle(currentItem?.line_item?.bbox, activeIndex, queueItems.length);
 
-  const receiptImageUrl =
-    currentItem?.receipt_image_url !== undefined
-      ? currentItem.receipt_image_url
-      : (isMockMode ? '' : (receiptId ? api.getReceiptImageUrl(receiptId) : ''));
+  const receiptImageUrl = bucketImgUrl || (currentItem?.receipt_image_url !== undefined ? currentItem.receipt_image_url : (isMockMode ? '' : (receiptId ? api.getReceiptImageUrl(receiptId) : '')));
   const cropImageUrl =
     currentItem?.crop_image_url !== undefined
       ? currentItem.crop_image_url
@@ -220,8 +222,8 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({
       {/* ── Sub-Header: Pinterest-styled clean white surface with crisp border ── */}
       <div className="bg-white border-b border-[#CBD5E1] px-5 py-3 flex items-center justify-between text-slate-900">
         <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 bg-black text-white rounded-lg flex items-center justify-center shrink-0">
-            <Scan className="w-3.5 h-3.5 text-white" />
+          <div className="w-6 h-6 bg-black text-white rounded-lg flex items-center justify-center p-1 shrink-0">
+            <ProjectIcon name="review" className="w-4 h-4 text-white" />
           </div>
           <span className="font-mono font-bold text-xs tracking-wider uppercase text-slate-900">
             WORKSPACE A: HUMAN-IN-THE-LOOP REVIEW DESK
