@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, Receipt, WifiOff } from 'lucide-react';
+import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, WifiOff } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getApiBaseUrl } from '../../api/client';
 
@@ -45,8 +45,8 @@ export const LoginView: React.FC = () => {
         {/* Brand Header */}
         <div className="p-6 pb-4 border-b border-[#CBD5E1] bg-white">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-black text-white rounded-xl flex items-center justify-center shrink-0">
-              <Receipt className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 bg-white border border-[#CBD5E1] rounded-xl flex items-center justify-center p-1.5 shrink-0 shadow-xs">
+              <img src="/icons/app_icon.svg" alt="ReceiptLedger" className="w-7 h-7 object-contain" />
             </div>
             <div>
               <h1 className="font-mono font-bold text-sm tracking-wider uppercase text-slate-900 leading-tight">

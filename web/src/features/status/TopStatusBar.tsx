@@ -16,6 +16,8 @@ import {
   Settings,
   X,
   Server,
+  Activity,
+  Layers,
 } from 'lucide-react';
 import { HealthResponse } from '../../types';
 import { useConsoleStore } from '../../store/useConsoleStore';
@@ -33,6 +35,7 @@ export interface TopStatusBarProps {
   isMockMode?: boolean;
   onEnterDevMockMode?: () => void;
   onExportCsv?: () => void;
+  onOpenDesignShowcase?: () => void;
 }
 
 export const TopStatusBar: React.FC<TopStatusBarProps> = ({
@@ -47,12 +50,14 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
   isMockMode = false,
   onEnterDevMockMode,
   onExportCsv,
+  onOpenDesignShowcase,
 }) => {
   const { toggleShortcutsPanel, toggleUploadDrawer } = useConsoleStore();
   const [resetConfirmStep, setResetConfirmStep] = useState(false);
 
-  // Gateway URL Configuration Modal State
+  // Modals state
   const [isGatewayModalOpen, setIsGatewayModalOpen] = useState(false);
+  const [isHealthModalOpen, setIsHealthModalOpen] = useState(false);
   const [customGatewayUrl, setCustomGatewayUrl] = useState(getApiBaseUrl());
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [isTestingGateway, setIsTestingGateway] = useState(false);
@@ -69,7 +74,7 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
   const quotaMatch = engines?.cloud_vision?.match(/quota_remaining=(\d+)/);
   const quotaRemaining = quotaMatch ? parseInt(quotaMatch[1], 10) : null;
 
-  // Handle two-step reset confirmation (Inline, NO modal popup!)
+  // Handle two-step reset confirmation
   const handleResetClick = async () => {
     if (!resetConfirmStep) {
       setResetConfirmStep(true);
@@ -131,152 +136,91 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
   return (
     <>
       <header className="bg-white border-b border-[#CBD5E1] text-slate-900 px-3 sm:px-5 py-2.5 sm:py-3 select-none">
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-          {/* Left: Branding & Workspace title */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          {/* ── Left: Brand emblem + title + streamlined status pill ── */}
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-black text-white rounded-lg flex items-center justify-center font-mono font-bold text-xs tracking-wider shrink-0">
-              RL
+            <div className="w-8 h-8 rounded-lg bg-white border border-[#CBD5E1] shadow-xs flex items-center justify-center p-1 shrink-0 transition-transform duration-200 hover:scale-105">
+              <img src="/icons/app_icon.svg" alt="ReceiptLedger" className="w-5 h-5 object-contain" />
             </div>
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="font-mono font-bold text-xs sm:text-sm tracking-wider uppercase text-slate-900">
-                  RECEIPTLEDGER OPERATIONS CONSOLE
+              <div className="flex items-center gap-2">
+                <h1 className="font-mono font-bold text-xs sm:text-sm tracking-wide uppercase text-slate-900">
+                  ReceiptLedger
                 </h1>
-                <span className="font-mono text-[9px] sm:text-[10px] font-semibold bg-[#F1F5F9] text-slate-700 border border-[#CBD5E1] px-1.5 py-0.5 rounded">
-                  Responsive
+                <span className="font-mono text-[9px] font-semibold bg-slate-100 text-slate-700 border border-[#CBD5E1] px-1.5 py-0.2 rounded">
+                  Console
                 </span>
               </div>
-              <div className="text-[10px] sm:text-[11px] font-mono text-slate-500 flex items-center gap-2 mt-0.5 flex-wrap">
-                <span>Admin, Audit &amp; Triage</span>
-                <span>•</span>
+              <div className="text-[10px] sm:text-[11px] font-mono text-slate-500 flex items-center gap-2 mt-0.5">
+                {/* Decluttered, single clean status indicator */}
+                {isMockMode ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsHealthModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 text-amber-900 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded font-semibold text-[10px] hover:bg-amber-100 transition-colors cursor-pointer"
+                    title="Click for system engine telemetry"
+                  >
+                    <WifiOff className="w-3 h-3 text-amber-700" />
+                    <span>Offline Demo</span>
+                  </button>
+                ) : isHealthLoading ? (
+                  <span className="inline-flex items-center gap-1.5 text-slate-500 text-[10px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse" />
+                    <span>Checking...</span>
+                  </span>
+                ) : allOperational ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsHealthModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 text-emerald-800 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded font-semibold text-[10px] hover:bg-emerald-100 transition-colors cursor-pointer"
+                    title="Click for system engine telemetry"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                    <span>Operational</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsHealthModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 text-amber-900 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded font-semibold text-[10px] hover:bg-amber-100 transition-colors cursor-pointer"
+                    title="Click for system engine telemetry"
+                  >
+                    <AlertTriangle className="w-3 h-3 text-amber-600" />
+                    <span>Engines Degraded</span>
+                  </button>
+                )}
+
+                <span className="text-slate-300">•</span>
+
+                {/* Gateway config link */}
                 <button
                   type="button"
                   onClick={() => setIsGatewayModalOpen(true)}
-                  className="inline-flex items-center gap-1 text-slate-700 hover:text-black font-semibold underline decoration-slate-300 hover:decoration-black cursor-pointer truncate max-w-[260px] sm:max-w-none"
+                  className="inline-flex items-center gap-1 text-slate-500 hover:text-black transition-colors underline decoration-slate-300 hover:decoration-black cursor-pointer truncate max-w-[200px]"
                   title="Configure backend gateway URL"
                 >
-                  <Server className="w-3 h-3 text-emerald-600 inline shrink-0" />
-                  <span className="truncate">{currentGateway}</span>
-                  <Settings className="w-3 h-3 text-slate-400 inline shrink-0 ml-0.5" />
+                  <Server className="w-3 h-3 text-slate-400 inline shrink-0" />
+                  <span className="truncate">{currentGateway.replace(/^https?:\/\//, '')}</span>
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Center: System Status & Engine Chips driven by GET /health */}
-          <div className="flex items-center flex-wrap gap-2 text-xs font-mono bg-[#F8FAFC] border border-[#CBD5E1] px-2.5 sm:px-3 py-1.5 rounded-xl">
-            <span className="text-slate-500 font-semibold tracking-wide text-[10px] sm:text-[11px]">STATUS:</span>
-            {isMockMode ? (
-              <span className="flex items-center gap-1.5 bg-amber-50 text-amber-900 border border-amber-300 font-semibold px-2 py-0.5 rounded text-[10px] sm:text-[11px]">
-                <WifiOff className="w-3 h-3 text-amber-700" />
-                OFFLINE DEMO METRICS (MOCK)
-              </span>
-            ) : isHealthLoading ? (
-              <span className="flex items-center gap-1.5 text-slate-500 text-[10px] sm:text-[11px]">
-                <span className="w-2 h-2 rounded-full bg-slate-400 animate-pulse inline-block" />
-                CHECKING SYSTEM...
-              </span>
-            ) : allOperational ? (
-              <span className="flex items-center gap-1.5 text-emerald-800 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded font-semibold text-[10px] sm:text-[11px]">
-                <CheckCircle2 className="w-3 h-3 text-emerald-600 inline-block" />
-                ALL ENGINES OPERATIONAL
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 text-amber-900 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded font-semibold text-[10px] sm:text-[11px]">
-                <AlertTriangle className="w-3 h-3 text-amber-600 inline-block" />
-                ENGINES DEGRADED
-              </span>
-            )}
-
-            {!isMockMode && onEnterDevMockMode && !allOperational && (
+          {/* ── Right: Polished, toned-down actions ── */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Design Showcase Button (UI Mockups preview) */}
+            {onOpenDesignShowcase && (
               <button
                 type="button"
-                onClick={onEnterDevMockMode}
-                title="Switch to Offline Dev Mode with mock fixtures"
-                className="flex items-center gap-1 font-mono text-[10px] sm:text-[11px] font-bold bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 px-2 py-0.5 rounded transition-colors cursor-pointer"
+                onClick={onOpenDesignShowcase}
+                title="View UI Design System Mockups from sprint deliverables"
+                className="hidden lg:flex items-center gap-1.5 bg-white hover:bg-slate-50 hover:border-slate-400 text-slate-700 font-mono text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-[#CBD5E1] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer"
               >
-                <WifiOff className="w-3 h-3 text-amber-700" />
-                <span>Offline Dev Mode</span>
+                <Layers className="w-3.5 h-3.5 text-slate-500" />
+                <span>UI Mockups</span>
               </button>
             )}
 
-            <span className="hidden sm:inline text-slate-300">|</span>
-
-            {/* Engine Chips */}
-            <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-700 flex-wrap">
-              <span
-                className={`flex items-center gap-1 px-1.5 py-0.5 rounded border ${
-                  isGeminiOk
-                    ? 'bg-white text-slate-900 border-[#CBD5E1]'
-                    : 'bg-amber-50 text-amber-900 border-amber-300'
-                }`}
-                title={engines?.gemini || 'Gemini'}
-              >
-                <Sparkles className="w-3 h-3 text-amber-600" />
-                GEMINI AI
-              </span>
-
-              <span
-                className={`flex items-center gap-1 px-1.5 py-0.5 rounded border ${
-                  isCloudVisionOk
-                    ? 'bg-white text-slate-900 border-[#CBD5E1]'
-                    : 'bg-amber-50 text-amber-900 border-amber-300'
-                }`}
-                title={engines?.cloud_vision || 'Cloud Vision'}
-              >
-                <Eye className="w-3 h-3 text-blue-600" />
-                CLOUD VISION
-                {quotaRemaining !== null && (
-                  <span
-                    className={`font-semibold ${
-                      quotaRemaining < 100 ? 'text-amber-700 font-bold' : 'text-slate-500 font-normal'
-                    }`}
-                  >
-                    ({quotaRemaining})
-                  </span>
-                )}
-              </span>
-
-              <span
-                className={`flex items-center gap-1 px-1.5 py-0.5 rounded border ${
-                  isDbOk
-                    ? 'bg-white text-slate-900 border-[#CBD5E1]'
-                    : 'bg-red-50 text-red-900 border-red-300'
-                }`}
-                title={`Database: ${engines?.database || 'supabase'}`}
-              >
-                <Database className="w-3 h-3 text-emerald-600" />
-                {engines?.database?.includes('supabase') ? 'SUPABASE' : 'DATABASE'}
-              </span>
-
-              <span
-                className={`hidden md:flex items-center gap-1 px-1.5 py-0.5 rounded border ${
-                  isTesseractOk
-                    ? 'bg-white text-slate-900 border-[#CBD5E1]'
-                    : 'bg-[#F1F5F9] text-slate-400 border-slate-200'
-                }`}
-                title={`Tesseract: ${engines?.tesseract || 'n/a'}`}
-              >
-                <Cpu className="w-3 h-3 text-slate-500" />
-                TESSERACT
-              </span>
-
-              <span
-                className={`hidden md:flex items-center gap-1 px-1.5 py-0.5 rounded border ${
-                  isEasyOcrOk
-                    ? 'bg-white text-slate-900 border-[#CBD5E1]'
-                    : 'bg-[#F1F5F9] text-slate-400 border-slate-200'
-                }`}
-                title={`EasyOCR: ${engines?.easyocr || 'n/a'}`}
-              >
-                <Cpu className="w-3 h-3 text-slate-500" />
-                EASYOCR
-              </span>
-            </div>
-          </div>
-
-          {/* Right: Tactile Testing & Action Controls */}
-          <div className="flex items-center gap-2 flex-wrap">
             {/* Seed Demo Button */}
             <button
               type="button"
@@ -287,24 +231,46 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
                   ? 'Reload clearly labelled mock review-queue items and receipts'
                   : 'POST /api/v1/dashboard/seed-demo - Seeds 148 Pakistani receipts'
               }
-              className="flex items-center gap-1.5 bg-black hover:bg-slate-800 disabled:opacity-50 text-white font-mono text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg border border-black transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 bg-white hover:bg-slate-50 hover:border-slate-400 disabled:opacity-50 text-slate-800 font-mono text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg border border-[#CBD5E1] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSeeding ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{isMockMode ? 'Reload Mock' : 'Seed Demo (148)'}</span>
-              <span className="sm:hidden">{isMockMode ? 'Reload' : 'Seed'}</span>
+              <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${isSeeding ? 'animate-spin' : ''}`} />
+              <span>{isMockMode ? 'Reload Mock' : 'Seed (148)'}</span>
             </button>
 
-            {/* Inline Two-Step Reset Ledger Button */}
+            {/* Export CSV Button */}
+            {onExportCsv && (
+              <button
+                type="button"
+                onClick={onExportCsv}
+                title="Export full ledger as CSV"
+                className="hidden sm:flex items-center gap-1 bg-white hover:bg-slate-50 hover:border-slate-400 text-slate-800 font-mono text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-[#CBD5E1] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-500" />
+                <span>CSV</span>
+              </button>
+            )}
+
+            {/* Primary Action: Upload Receipt */}
+            <button
+              type="button"
+              onClick={toggleUploadDrawer}
+              title="Upload and ingest receipt image"
+              className="flex items-center gap-1.5 bg-black hover:bg-slate-800 text-white font-mono text-xs font-semibold px-3 py-1.5 rounded-lg border border-black transition-all duration-150 hover:-translate-y-0.5 hover:shadow-sm cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5 text-white" />
+              <span>Upload</span>
+            </button>
+
+            {/* Inline Reset Ledger */}
             {!resetConfirmStep ? (
               <button
                 type="button"
                 onClick={() => setResetConfirmStep(true)}
                 disabled={isResetting}
-                title="POST /api/v1/dashboard/reset - Test zero-data states"
-                className="flex items-center gap-1.5 bg-white hover:bg-red-50 hover:text-red-700 hover:border-red-300 text-slate-700 font-mono text-xs px-2 sm:px-2.5 py-1.5 rounded-lg border border-[#CBD5E1] transition-colors cursor-pointer"
+                title="Reset ledger records"
+                className="flex items-center justify-center w-8 h-8 bg-white hover:bg-red-50 hover:text-red-700 hover:border-red-300 text-slate-500 rounded-lg border border-[#CBD5E1] transition-all duration-150 hover:-translate-y-0.5 cursor-pointer"
               >
-                <Trash2 className="w-3.5 h-3.5 text-slate-500" />
-                <span className="hidden sm:inline">Reset</span>
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             ) : (
               <div className="flex items-center gap-1 bg-red-50 border border-red-300 p-0.5 rounded-lg font-mono text-xs">
@@ -314,50 +280,26 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
                   disabled={isResetting}
                   className="bg-red-600 hover:bg-red-700 text-white font-bold px-2 py-1 rounded transition-colors cursor-pointer text-[11px]"
                 >
-                  Confirm?
+                  Reset?
                 </button>
                 <button
                   type="button"
                   onClick={handleCancelReset}
                   className="text-slate-600 hover:text-black px-1.5 py-1 transition-colors cursor-pointer text-[11px]"
                 >
-                  Cancel
+                  No
                 </button>
               </div>
             )}
-
-            {/* Export CSV Ledger Button */}
-            {onExportCsv && (
-              <button
-                type="button"
-                onClick={onExportCsv}
-                title="Export full ledger as CSV"
-                className="flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-800 font-mono text-xs font-semibold px-2 sm:px-2.5 py-1.5 rounded-lg border border-[#CBD5E1] transition-colors cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5 text-slate-500" />
-                <span className="hidden sm:inline">Export CSV</span>
-              </button>
-            )}
-
-            {/* Upload Receipt Button */}
-            <button
-              type="button"
-              onClick={toggleUploadDrawer}
-              title="Upload and ingest receipt image"
-              className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-800 font-mono text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg border border-[#CBD5E1] transition-colors cursor-pointer"
-            >
-              <Upload className="w-3.5 h-3.5 text-slate-500" />
-              <span className="hidden sm:inline">Upload</span>
-            </button>
 
             {/* Gateway Settings Button */}
             <button
               type="button"
               onClick={() => setIsGatewayModalOpen(true)}
-              title="Configure API Gateway Endpoint"
-              className="flex items-center justify-center w-8 h-8 bg-white hover:bg-slate-50 text-slate-700 rounded-lg border border-[#CBD5E1] transition-colors cursor-pointer"
+              title="API Gateway settings"
+              className="flex items-center justify-center w-8 h-8 bg-white hover:bg-slate-50 hover:border-slate-400 text-slate-600 rounded-lg border border-[#CBD5E1] transition-all duration-150 hover:-translate-y-0.5 cursor-pointer"
             >
-              <Settings className="w-3.5 h-3.5 text-slate-600" />
+              <Settings className="w-3.5 h-3.5" />
             </button>
 
             {/* Shortcuts Help Button */}
@@ -365,15 +307,15 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
               type="button"
               onClick={toggleShortcutsPanel}
               title="Keyboard shortcuts cheat sheet (key '?')"
-              className="hidden sm:flex items-center justify-center w-8 h-8 bg-white hover:bg-slate-50 text-slate-700 rounded-lg border border-[#CBD5E1] transition-colors cursor-pointer"
+              className="hidden sm:flex items-center justify-center w-8 h-8 bg-white hover:bg-slate-50 hover:border-slate-400 text-slate-500 rounded-lg border border-[#CBD5E1] transition-all duration-150 hover:-translate-y-0.5 cursor-pointer"
             >
-              <HelpCircle className="w-4 h-4 text-slate-500" />
+              <HelpCircle className="w-3.5 h-3.5" />
             </button>
 
             {/* User Profile & Logout */}
-            <div className="flex items-center gap-1 text-xs font-mono bg-[#F8FAFC] text-slate-700 border border-[#CBD5E1] px-2 py-1 rounded-lg">
+            <div className="flex items-center gap-1.5 text-xs font-mono bg-[#F8FAFC] text-slate-700 border border-[#CBD5E1] px-2 py-1 rounded-lg">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-              <span className="hidden sm:inline text-slate-700 truncate max-w-[120px] font-medium" title={userEmail}>
+              <span className="hidden sm:inline text-slate-700 truncate max-w-[110px] font-medium" title={userEmail}>
                 {userEmail || 'operator'}
               </span>
               <button
@@ -389,7 +331,128 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
         </div>
       </header>
 
-      {/* ── API Gateway Configuration Modal ───────────────────────────────── */}
+      {/* ── System Engine Telemetry Modal (Clean breakdown when user asks for it) ── */}
+      {isHealthModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="System Health Telemetry"
+          className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4 select-none"
+        >
+          <div
+            onClick={() => setIsHealthModalOpen(false)}
+            className="fixed inset-0 bg-slate-950/70 transition-opacity"
+            aria-hidden="true"
+          />
+
+          <div className="relative w-full max-w-lg bg-white border border-[#CBD5E1] rounded-2xl shadow-2xl z-10 overflow-hidden animate-in fade-in-50 zoom-in-95 duration-150">
+            <div className="bg-[#0F172A] border-b border-[#334155] text-white p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-slate-800 border border-slate-700 rounded-lg">
+                  <Activity className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="font-mono font-bold text-xs uppercase tracking-wide text-white">
+                    Engine Status &amp; Observability
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-mono">
+                    Underlying OCR pipelines, AI model, and database sync
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHealthModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3 font-mono text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* Gemini AI */}
+                <div className="p-3 bg-[#F8FAFC] border border-[#CBD5E1] rounded-xl space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-600" /> Gemini AI
+                    </span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${isGeminiOk ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-amber-50 text-amber-800 border-amber-300'}`}>
+                      {isGeminiOk ? 'CONNECTED' : 'STANDBY'}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    Multimodal receipt parsing &amp; item categorization
+                  </div>
+                </div>
+
+                {/* Cloud Vision */}
+                <div className="p-3 bg-[#F8FAFC] border border-[#CBD5E1] rounded-xl space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                      <Eye className="w-3.5 h-3.5 text-blue-600" /> Cloud Vision
+                    </span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${isCloudVisionOk ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-amber-50 text-amber-800 border-amber-300'}`}>
+                      {quotaRemaining !== null ? `${quotaRemaining} Quota` : 'ACTIVE'}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    High-accuracy optical character recognition
+                  </div>
+                </div>
+
+                {/* Database / Supabase */}
+                <div className="p-3 bg-[#F8FAFC] border border-[#CBD5E1] rounded-xl space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                      <Database className="w-3.5 h-3.5 text-emerald-600" /> Database Store
+                    </span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${isDbOk ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-red-50 text-red-800 border-red-300'}`}>
+                      {engines?.database?.includes('supabase') ? 'SUPABASE' : 'MEMORY'}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    Ledger storage &amp; perceptual hashes
+                  </div>
+                </div>
+
+                {/* Local Fallback OCR (Tesseract / EasyOCR) */}
+                <div className="p-3 bg-[#F8FAFC] border border-[#CBD5E1] rounded-xl space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                      <Cpu className="w-3.5 h-3.5 text-slate-600" /> Local Fallback
+                    </span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${isTesseractOk || isEasyOcrOk ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                      {isTesseractOk || isEasyOcrOk ? 'READY' : 'STANDBY'}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    Offline device-level optical recognition
+                  </div>
+                </div>
+              </div>
+
+              {!isMockMode && onEnterDevMockMode && !allOperational && (
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsHealthModalOpen(false);
+                      onEnterDevMockMode();
+                    }}
+                    className="w-full flex items-center justify-center gap-2 font-mono text-xs font-bold bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 py-2 rounded-xl transition-colors cursor-pointer"
+                  >
+                    <WifiOff className="w-4 h-4 text-amber-700" />
+                    <span>Switch to Offline Dev Mode (Mock Data)</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── API Gateway Configuration Modal ── */}
       {isGatewayModalOpen && (
         <div
           role="dialog"
@@ -397,15 +460,13 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
           aria-label="API Gateway Settings"
           className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4 select-none"
         >
-          {/* Backdrop */}
           <div
             onClick={() => setIsGatewayModalOpen(false)}
             className="fixed inset-0 bg-slate-950/70 transition-opacity"
             aria-hidden="true"
           />
 
-          {/* Modal Panel */}
-          <div className="relative w-full max-w-lg bg-white border border-[#CBD5E1] rounded-2xl shadow-2xl z-10 overflow-hidden">
+          <div className="relative w-full max-w-lg bg-white border border-[#CBD5E1] rounded-2xl shadow-2xl z-10 overflow-hidden animate-in fade-in-50 zoom-in-95 duration-150">
             <div className="bg-[#0F172A] border-b border-[#334155] text-white p-4 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="p-1.5 bg-slate-800 border border-slate-700 rounded-lg">
@@ -446,7 +507,6 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
                 </p>
               </div>
 
-              {/* Ping Result Feedback */}
               {testResult && (
                 <div
                   className={`p-3 rounded-xl border flex items-start gap-2 ${
@@ -471,7 +531,7 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
                   type="button"
                   onClick={handleTestGateway}
                   disabled={isTestingGateway}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold border border-[#CBD5E1] transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold border border-[#CBD5E1] transition-all duration-150 hover:-translate-y-0.5 cursor-pointer"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isTestingGateway ? 'animate-spin' : ''}`} />
                   <span>{isTestingGateway ? 'Testing...' : 'Test Connection'}</span>
@@ -488,7 +548,7 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
                   <button
                     type="button"
                     onClick={handleSaveGateway}
-                    className="px-4 py-2 bg-black hover:bg-slate-800 text-white rounded-xl font-bold transition-colors cursor-pointer"
+                    className="px-4 py-2 bg-black hover:bg-slate-800 text-white rounded-xl font-bold transition-all duration-150 hover:-translate-y-0.5 hover:shadow-sm cursor-pointer"
                   >
                     Save &amp; Connect
                   </button>

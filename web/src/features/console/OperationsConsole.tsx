@@ -15,6 +15,7 @@ import { KeyboardShortcutsPanel } from '../../components/KeyboardShortcutsPanel'
 import { UploadReceiptDrawer } from '../../components/UploadReceiptDrawer';
 import { DuplicateConflictBanner } from '../../components/DuplicateConflictBanner';
 import { NetworkErrorBanner } from '../../components/NetworkErrorBanner';
+import { DesignShowcaseModal } from '../../components/DesignShowcaseModal';
 import {
   ReviewQueueItem,
   ReviewQueueResolveRequest,
@@ -76,6 +77,7 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
 
   const [ledgerPage, setLedgerPage] = useState<number>(1);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isDesignShowcaseOpen, setIsDesignShowcaseOpen] = useState(false);
   const [trendMonths, setTrendMonths] = useState<number>(6);
 
   // ── Queries ─────────────────────────────────────────────────────────────────
@@ -482,6 +484,7 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
         isMockMode={isMockMode}
         onEnterDevMockMode={handleSwitchToMockMode}
         onExportCsv={handleExportCsv}
+        onOpenDesignShowcase={() => setIsDesignShowcaseOpen(true)}
       />
 
       {/* ── Sub-Navigation Workspace Bar ───────────────────────────────────── */}
@@ -490,7 +493,7 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
           <button
             onClick={() => setActiveNav('overview')}
             className={clsx(
-              'px-3 py-1 text-xs font-mono font-semibold rounded-full border transition-colors',
+              'px-3 py-1 text-xs font-mono font-semibold rounded-full border transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer',
               activeNav === 'overview'
                 ? 'bg-black text-white border-black'
                 : 'bg-[#F8FAFC] text-slate-700 border-[#CBD5E1] hover:bg-slate-100'
@@ -501,7 +504,7 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
           <button
             onClick={() => setActiveNav('review')}
             className={clsx(
-              'px-3 py-1 text-xs font-mono font-semibold rounded-full border transition-colors flex items-center gap-1.5',
+              'px-3 py-1 text-xs font-mono font-semibold rounded-full border transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer flex items-center gap-1.5',
               activeNav === 'review'
                 ? 'bg-black text-white border-black'
                 : 'bg-[#F8FAFC] text-slate-700 border-[#CBD5E1] hover:bg-slate-100'
@@ -524,7 +527,7 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
           <button
             onClick={() => setActiveNav('ledger')}
             className={clsx(
-              'px-3 py-1 text-xs font-mono font-semibold rounded-full border transition-colors',
+              'px-3 py-1 text-xs font-mono font-semibold rounded-full border transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer',
               activeNav === 'ledger'
                 ? 'bg-black text-white border-black'
                 : 'bg-[#F8FAFC] text-slate-700 border-[#CBD5E1] hover:bg-slate-100'
@@ -535,7 +538,7 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
           <button
             onClick={() => setActiveNav('health')}
             className={clsx(
-              'px-3 py-1 text-xs font-mono font-semibold rounded-full border transition-colors',
+              'px-3 py-1 text-xs font-mono font-semibold rounded-full border transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer',
               activeNav === 'health'
                 ? 'bg-black text-white border-black'
                 : 'bg-[#F8FAFC] text-slate-700 border-[#CBD5E1] hover:bg-slate-100'
@@ -868,6 +871,8 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
           queryClient.invalidateQueries();
         }}
       />
+      <DesignShowcaseModal isOpen={isDesignShowcaseOpen} onClose={() => setIsDesignShowcaseOpen(false)} />
+      <DesignShowcaseModal isOpen={isDesignShowcaseOpen} onClose={() => setIsDesignShowcaseOpen(false)} />
     </AppLayout>
   );
 };

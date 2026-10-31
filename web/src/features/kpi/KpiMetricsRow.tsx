@@ -85,7 +85,7 @@ export const KpiMetricsRow: React.FC<KpiMetricsRowProps> = ({
       {/* 4 KPI Telemetry Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* ── CARD 1: Total Ingested ────────────────────────────────────────── */}
-        <div className="bg-white border border-[#CBD5E1] p-4 rounded-xl flex flex-col justify-between transition-colors hover:border-slate-400">
+        <div className="bg-white border border-[#CBD5E1] p-4 rounded-xl flex flex-col justify-between transition-all duration-200 hover:border-slate-400 hover:-translate-y-0.5 hover:shadow-xs">
           <div className="flex items-center justify-between">
             <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-slate-500">
               TOTAL INGESTED
@@ -129,7 +129,7 @@ export const KpiMetricsRow: React.FC<KpiMetricsRowProps> = ({
         </div>
 
         {/* ── CARD 2: Total Reconciled Spend ─────────────────────────────────── */}
-        <div className="bg-white border border-[#CBD5E1] p-4 rounded-xl flex flex-col justify-between transition-colors hover:border-slate-400">
+        <div className="bg-white border border-[#CBD5E1] p-4 rounded-xl flex flex-col justify-between transition-all duration-200 hover:border-slate-400 hover:-translate-y-0.5 hover:shadow-xs">
           <div className="flex items-center justify-between">
             <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-slate-500">
               TOTAL RECONCILED SPEND
@@ -156,7 +156,7 @@ export const KpiMetricsRow: React.FC<KpiMetricsRowProps> = ({
         </div>
 
         {/* ── CARD 3: Human Review Queue ─────────────────────────────────────── */}
-        <div className="bg-white border border-[#CBD5E1] p-4 rounded-xl flex flex-col justify-between transition-colors hover:border-slate-400">
+        <div className="bg-white border border-[#CBD5E1] p-4 rounded-xl flex flex-col justify-between transition-all duration-200 hover:border-slate-400 hover:-translate-y-0.5 hover:shadow-xs">
           <div className="flex items-center justify-between">
             <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-slate-500">
               HUMAN REVIEW QUEUE
@@ -188,7 +188,7 @@ export const KpiMetricsRow: React.FC<KpiMetricsRowProps> = ({
         </div>
 
         {/* ── CARD 4: AI Extraction Accuracy ─────────────────────────────────── */}
-        <div className="bg-white border border-[#CBD5E1] p-4 rounded-xl flex flex-col justify-between transition-colors hover:border-slate-400">
+        <div className="bg-white border border-[#CBD5E1] p-4 rounded-xl flex flex-col justify-between transition-all duration-200 hover:border-slate-400 hover:-translate-y-0.5 hover:shadow-xs">
           <div className="flex items-center justify-between">
             <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-slate-500">
               AI EXTRACTION ACCURACY
