@@ -214,6 +214,7 @@ def insert_receipt(
     ocr_confidence: float,
     user_id: Optional[str] = None,
     receipt_id: Optional[str] = None,
+    created_at: Optional[str] = None,
 ) -> Dict:
     r_id = receipt_id or str(uuid.uuid4())
     safe_user = _safe_uuid(user_id)
@@ -228,7 +229,7 @@ def insert_receipt(
         "receipt_type": receipt_type,
         "status": status,
         "ocr_confidence": float(ocr_confidence),
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": created_at or datetime.utcnow().isoformat(),
     }
     _receipts[r_id] = row
 
@@ -622,8 +623,9 @@ def insert_line_item(
     category: str,
     is_verified: bool = False,
     bbox: Optional[Dict[str, Any]] = None,
+    item_id: Optional[str] = None,
 ) -> Dict:
-    item_id = str(uuid.uuid4())
+    item_id = item_id or str(uuid.uuid4())
     cat_id = get_category_id(category) or get_category_id("Miscellaneous") or list(_categories.keys())[0]
 
     row = {
@@ -774,8 +776,9 @@ def insert_review_queue_item(
     line_item_id: str,
     candidate_text: str,
     model_confidence: float,
+    queue_id: Optional[str] = None,
 ) -> Dict:
-    queue_id = str(uuid.uuid4())
+    queue_id = queue_id or str(uuid.uuid4())
     row = {
         "id": queue_id,
         "line_item_id": line_item_id,
@@ -1364,109 +1367,337 @@ def get_dashboard_overview(year: Optional[int] = None, month: Optional[int] = No
 def seed_demo_data() -> Dict[str, int]:
     """
     Populate realistic demo receipts, line items, and review queue items.
-    Writes to Supabase (and local store) to allow dashboard testing with rich charts.
+    Generates 148 receipts for the primary workspace month totaling PKR 184,250.00
+    with 7 items in the human review queue, exactly matching the desktop design brief.
     """
-    today = date.today()
-    this_month_str = today.strftime("%Y-%m")
-    prev_month_date = today.replace(day=1) - timedelta(days=15)
-    prev_month_str = prev_month_date.strftime("%Y-%m")
+    import os
+    import shutil
+    import random
+    from pathlib import Path
+    from app.core.run_logger import save_run_log
 
-    sample_receipts_data = [
-        # --- Current Month Receipts ---
+    today = date.today()
+    target_period = "2026-10"
+    prev_period = "2026-09"
+    today_period = today.strftime("%Y-%m")
+
+    # Sample images directory
+    backend_root = Path(__file__).resolve().parents[2]
+    repo_root = backend_root.parent
+    sample_images_dir = repo_root / "data" / "sample_receipts"
+    image_store = _image_store_path()
+
+    def _link_sample_img(receipt_id: str, sample_name: str) -> None:
+        src = sample_images_dir / sample_name
+        if src.exists():
+            ext = src.suffix.lstrip(".")
+            dst = image_store / f"{receipt_id}.{ext}"
+            try:
+                shutil.copyfile(src, dst)
+            except Exception:
+                pass
+
+    # ── 1. The 7 Human-in-the-Loop Review Queue Receipts ─────────────────────
+    # Exact item from PDF Section 6.2:
+    review_receipt_1_id = "41fd8d2a-e322-4f5f-aa37-ed65ffab5519"
+    review_item_1_id = "93b118b5-12ea-44d5-8bc2-a5d6f1406541"
+    review_queue_1_id = "7a79f40f-3047-4d76-a577-a41a58af9a56"
+
+    specific_review_receipts = [
         {
-            "merchant": "Imtiaz Super Market",
-            "date": f"{this_month_str}-04",
-            "type": "PRINTED",
-            "confidence": 0.94,
-            "items": [
-                ("Wheat Flour (Chakki Atta) 10kg", 1.0, "bag", 1450.0, 1450.0, 0.95, "Groceries & Food", True),
-                ("Olper's Full Cream Milk 1L", 4.0, "ltr", 280.0, 1120.0, 0.93, "Groceries & Food", True),
-                ("Surf Excel Detergent Powder 1kg", 1.0, "pkt", 680.0, 680.0, 0.92, "Household & Cleaning", True),
-                ("Tapal Danedar Tea 430g", 1.0, "box", 720.0, 720.0, 0.91, "Groceries & Food", True),
-            ],
-        },
-        {
-            "merchant": "Chase Up Departmental Store",
-            "date": f"{this_month_str}-08",
-            "type": "PRINTED",
-            "confidence": 0.91,
-            "items": [
-                ("Dettol Antibacterial Soap 3-Pack", 1.0, "pack", 450.0, 450.0, 0.93, "Personal Care", True),
-                ("Lays Wavy Masala Potato Chips", 3.0, "pcs", 100.0, 300.0, 0.90, "Snacks & Beverages", True),
-                ("National Tomato Ketchup 500g", 1.0, "bottle", 320.0, 320.0, 0.92, "Groceries & Food", True),
-            ],
-        },
-        {
-            "merchant": "Al-Madina Kiryana Store",
-            "date": f"{this_month_str}-10",
+            "receipt_id": review_receipt_1_id,
+            "merchant": "Chaudhry Sabzi & Fruit Store",
+            "date": f"{target_period}-18",
             "type": "HANDWRITTEN",
-            "confidence": 0.78,
+            "confidence": 0.76,
+            "sample_img": "challenging_greengrocer_marble.jpg",
+            "phash": "a7b3c2d4e5f60812",
             "items": [
-                ("Sugar (Cheeni) 2kg", 2.0, "kg", 160.0, 320.0, 0.88, "Groceries & Food", True),
-                ("Cooking Oil (Dalda Pouch)", 1.0, "ltr", 530.0, 530.0, 0.72, "Groceries & Food", False),
-                ("Eggs (Anday) 1 Dozen", 1.0, "dozen", 360.0, 360.0, 0.89, "Groceries & Food", True),
+                {
+                    "item_id": review_item_1_id,
+                    "queue_id": review_queue_1_id,
+                    "name": "Sweet Melon",
+                    "raw_text": "129728 WITHA PER KG 0.640",
+                    "qty": 0.64,
+                    "unit": "kg",
+                    "u_price": 199.0,
+                    "t_price": 127.36,
+                    "conf": 0.745,
+                    "cat": "Groceries & Food",
+                    "verified": False,
+                    "bbox": {"ymin": 0.32, "xmin": 0.08, "ymax": 0.44, "xmax": 0.92},
+                },
+                {
+                    "name": "Fresh Farm Tomatoes 1.5kg",
+                    "raw_text": "TOMATOES FARM FRESH 1.5K",
+                    "qty": 1.5,
+                    "unit": "kg",
+                    "u_price": 120.0,
+                    "t_price": 180.0,
+                    "conf": 0.94,
+                    "cat": "Groceries & Food",
+                    "verified": True,
+                    "bbox": {"ymin": 0.45, "xmin": 0.08, "ymax": 0.55, "xmax": 0.92},
+                },
+                {
+                    "name": "White Potatoes (Aaloo) 2kg",
+                    "raw_text": "AALOO 2.0 KG 80",
+                    "qty": 2.0,
+                    "unit": "kg",
+                    "u_price": 80.0,
+                    "t_price": 160.0,
+                    "conf": 0.91,
+                    "cat": "Groceries & Food",
+                    "verified": True,
+                    "bbox": {"ymin": 0.56, "xmin": 0.08, "ymax": 0.66, "xmax": 0.92},
+                },
             ],
         },
         {
-            "merchant": "K-Electric Online Billing",
-            "date": f"{this_month_str}-02",
+            "receipt_id": "8b192e44-d130-4e89-9a71-678cba0123ef",
+            "merchant": "Javed Nihari Restaurant",
+            "date": f"{target_period}-16",
             "type": "PRINTED",
-            "confidence": 0.98,
+            "confidence": 0.81,
+            "sample_img": "javed_nahari_sample.png",
+            "phash": "b8f219c0de3456a1",
             "items": [
-                ("Electricity Bill Consumption", 1.0, "month", 5840.0, 5840.0, 0.98, "Utilities & Bills", True),
+                {
+                    "name": "Nalli Nihari (Half)",
+                    "raw_text": "1 NALLI NIHARI HLF 1150",
+                    "qty": 1.0,
+                    "unit": "plate",
+                    "u_price": 1150.0,
+                    "t_price": 1150.0,
+                    "conf": 0.762,
+                    "cat": "Dining Out",
+                    "verified": False,
+                    "bbox": {"ymin": 0.40, "xmin": 0.12, "ymax": 0.48, "xmax": 0.88},
+                },
+                {
+                    "name": "Special Roghni Naan",
+                    "raw_text": "4 ROGHNI NAAN @ 40",
+                    "qty": 4.0,
+                    "unit": "pcs",
+                    "u_price": 40.0,
+                    "t_price": 160.0,
+                    "conf": 0.95,
+                    "cat": "Dining Out",
+                    "verified": True,
+                    "bbox": {"ymin": 0.49, "xmin": 0.12, "ymax": 0.56, "xmax": 0.88},
+                },
+                {
+                    "name": "GST Punjab Revenue (16%)",
+                    "raw_text": "GST SALES TAX 16% 209.6",
+                    "qty": 1.0,
+                    "unit": "tax",
+                    "u_price": 209.6,
+                    "t_price": 209.6,
+                    "conf": 0.93,
+                    "cat": "Dining Out",
+                    "verified": True,
+                    "bbox": {"ymin": 0.58, "xmin": 0.12, "ymax": 0.65, "xmax": 0.88},
+                },
             ],
         },
         {
-            "merchant": "Bin Hashim Pharmacy & Supermarket",
-            "date": f"{this_month_str}-12",
+            "receipt_id": "a93c72b1-50e4-4fa0-b88d-e4c19208aef7",
+            "merchant": "Metro Cash & Carry",
+            "date": f"{target_period}-14",
+            "type": "PRINTED",
+            "confidence": 0.84,
+            "sample_img": "metro_safari_park_sample.png",
+            "phash": "c4d5e6f7a8b90123",
+            "items": [
+                {
+                    "name": "Ariel Touch of Downy 2kg",
+                    "raw_text": "490243015923 ARIEL TOUCH DOWNY 2KG",
+                    "qty": 1.0,
+                    "unit": "bag",
+                    "u_price": 1480.0,
+                    "t_price": 1480.0,
+                    "conf": 0.795,
+                    "cat": "Household & Cleaning",
+                    "verified": False,
+                    "bbox": {"ymin": 0.46, "xmin": 0.10, "ymax": 0.53, "xmax": 0.90},
+                },
+                {
+                    "name": "Nestle MilkPak 1L x 12 Ctn",
+                    "raw_text": "896101412035 NESTLE MILKPAK 12PK",
+                    "qty": 1.0,
+                    "unit": "ctn",
+                    "u_price": 3450.0,
+                    "t_price": 3450.0,
+                    "conf": 0.96,
+                    "cat": "Groceries & Food",
+                    "verified": True,
+                    "bbox": {"ymin": 0.54, "xmin": 0.10, "ymax": 0.61, "xmax": 0.90},
+                },
+            ],
+        },
+        {
+            "receipt_id": "3f8812e9-40b8-4c3d-8e44-d890aef01bc3",
+            "merchant": "Bin Hashim Pharmacy",
+            "date": f"{target_period}-12",
             "type": "PRINTED",
             "confidence": 0.82,
+            "sample_img": "challenging_pharmacy_receipt.jpg",
+            "phash": "d5e6f7a8b9c01234",
             "items": [
-                ("Colgate Total Toothpaste 140g", 1.0, "tube", 310.0, 310.0, 0.91, "Personal Care", True),
-                ("Ambiguous Herbal Balm", 1.0, "box", 190.0, 190.0, 0.69, "Personal Care", False),
+                {
+                    "name": "Panadol Extra 500mg Strip",
+                    "raw_text": "PANADOL EXTR TAB 20S 140",
+                    "qty": 2.0,
+                    "unit": "strip",
+                    "u_price": 140.0,
+                    "t_price": 280.0,
+                    "conf": 0.710,
+                    "cat": "Health & Pharmacy",
+                    "verified": False,
+                    "bbox": {"ymin": 0.32, "xmin": 0.08, "ymax": 0.40, "xmax": 0.92},
+                },
+                {
+                    "name": "Colgate Total Toothpaste 140g",
+                    "raw_text": "COLGATE TOT TP 140G 310",
+                    "qty": 1.0,
+                    "unit": "tube",
+                    "u_price": 310.0,
+                    "t_price": 310.0,
+                    "conf": 0.94,
+                    "cat": "Personal Care",
+                    "verified": True,
+                    "bbox": {"ymin": 0.42, "xmin": 0.08, "ymax": 0.50, "xmax": 0.92},
+                },
+
             ],
         },
         {
-            "merchant": "Shell V-Power Fuel Station",
-            "date": f"{this_month_str}-05",
-            "type": "PRINTED",
-            "confidence": 0.95,
-            "items": [
-                ("V-Power High Octane Fuel (20.5L)", 1.0, "ltr", 5900.0, 5900.0, 0.95, "Fuel & Transport", True),
-                ("Helix Engine Oil Top-up", 1.0, "bottle", 900.0, 900.0, 0.93, "Fuel & Transport", True),
-            ],
-        },
-        {
-            "merchant": "Rahat Bakers & Sweets",
-            "date": f"{this_month_str}-09",
-            "type": "PRINTED",
-            "confidence": 0.92,
-            "items": [
-                ("Chicken Patties (Spicy)", 4.0, "pcs", 150.0, 600.0, 0.94, "Bakeries & Confectionery", True),
-                ("Fresh Bran Sandwich Bread", 2.0, "loaf", 210.0, 420.0, 0.92, "Bakeries & Confectionery", True),
-                ("Special Gulab Jamun (500g)", 1.0, "box", 680.0, 680.0, 0.90, "Bakeries & Confectionery", True),
-            ],
-        },
-        # --- Previous Month Receipts ---
-        {
-            "merchant": "Imtiaz Super Market",
-            "date": f"{prev_month_str}-15",
-            "type": "PRINTED",
-            "confidence": 0.93,
-            "items": [
-                ("Basmati Rice (Super Kernel) 5kg", 1.0, "bag", 1850.0, 1850.0, 0.94, "Groceries & Food", True),
-                ("Ariel Washing Powder 1kg", 1.0, "pkt", 690.0, 690.0, 0.91, "Household & Cleaning", True),
-                ("K-Electric Bill Prior Month", 1.0, "month", 6200.0, 6200.0, 0.97, "Utilities & Bills", True),
-            ],
-        },
-        {
-            "merchant": "Subhan Milk Shop",
-            "date": f"{prev_month_str}-22",
+            "receipt_id": "e721a908-34b2-4d51-9ef2-5bc098124ef1",
+            "merchant": "Al-Madina Kiryana Store",
+            "date": f"{target_period}-10",
             "type": "HANDWRITTEN",
-            "confidence": 0.85,
+            "confidence": 0.79,
+            "sample_img": "handwritten_receipt_sample.jpg",
+            "phash": "e6f7a8b9c0d12345",
             "items": [
-                ("Fresh Buffalo Milk 5L", 5.0, "ltr", 220.0, 1100.0, 0.87, "Groceries & Food", True),
-                ("Plain Yogurt (Dahi) 1kg", 1.0, "kg", 260.0, 260.0, 0.85, "Groceries & Food", True),
+                {
+                    "name": "Cooking Oil (Dalda Pouch)",
+                    "raw_text": "DALDA OIL POUCH 1L 530",
+                    "qty": 1.0,
+                    "unit": "ltr",
+                    "u_price": 530.0,
+                    "t_price": 530.0,
+                    "conf": 0.720,
+                    "cat": "Groceries & Food",
+                    "verified": False,
+                    "bbox": {"ymin": 0.36, "xmin": 0.06, "ymax": 0.45, "xmax": 0.94},
+                },
+                {
+                    "name": "Sugar (Cheeni) 2kg",
+                    "raw_text": "CHEENI 2KG 320",
+                    "qty": 2.0,
+                    "unit": "kg",
+                    "u_price": 160.0,
+                    "t_price": 320.0,
+                    "conf": 0.92,
+                    "cat": "Groceries & Food",
+                    "verified": True,
+                    "bbox": {"ymin": 0.46, "xmin": 0.06, "ymax": 0.55, "xmax": 0.94},
+                },
+                {
+                    "name": "Eggs (Anday) 1 Dozen",
+                    "raw_text": "ANDAY 1 DOZEN 360",
+                    "qty": 1.0,
+                    "unit": "dozen",
+                    "u_price": 360.0,
+                    "t_price": 360.0,
+                    "conf": 0.95,
+                    "cat": "Groceries & Food",
+                    "verified": True,
+                    "bbox": {"ymin": 0.56, "xmin": 0.06, "ymax": 0.65, "xmax": 0.94},
+                },
+            ],
+        },
+        {
+            "receipt_id": "c1093b45-78e2-4f12-a89c-30981245def9",
+            "merchant": "Subhan Milk Shop",
+            "date": f"{target_period}-08",
+            "type": "HANDWRITTEN",
+            "confidence": 0.78,
+            "sample_img": "challenging_carbon_copy_karyana.jpg",
+            "phash": "f7a8b9c0d1e23456",
+            "items": [
+                {
+                    "name": "Fresh Khoya Desi 500g",
+                    "raw_text": "KHOYA 1/2 KG 450",
+                    "qty": 0.5,
+                    "unit": "kg",
+                    "u_price": 900.0,
+                    "t_price": 450.0,
+                    "conf": 0.685,
+                    "cat": "Groceries & Food",
+                    "verified": False,
+                    "bbox": {"ymin": 0.34, "xmin": 0.08, "ymax": 0.43, "xmax": 0.90},
+                },
+                {
+                    "name": "Fresh Buffalo Milk 4L",
+                    "raw_text": "DOODH 4LTR 880",
+                    "qty": 4.0,
+                    "unit": "ltr",
+                    "u_price": 220.0,
+                    "t_price": 880.0,
+                    "conf": 0.93,
+                    "cat": "Groceries & Food",
+                    "verified": True,
+                    "bbox": {"ymin": 0.44, "xmin": 0.08, "ymax": 0.52, "xmax": 0.90},
+                },
+            ],
+        },
+        {
+            "receipt_id": "7421890b-ca56-41e9-9a10-89104523def1",
+            "merchant": "Naheed Supermarket",
+            "date": f"{target_period}-06",
+            "type": "PRINTED",
+            "confidence": 0.85,
+            "sample_img": "printed_receipt_sample.jpg",
+            "phash": "a8b9c0d1e2f34567",
+            "items": [
+                {
+                    "name": "Shan Special Biryani Masala",
+                    "raw_text": "SHAN SPEC BIRYANI 100G",
+                    "qty": 2.0,
+                    "unit": "pack",
+                    "u_price": 175.0,
+                    "t_price": 350.0,
+                    "conf": 0.780,
+                    "cat": "Groceries & Food",
+                    "verified": False,
+                    "bbox": {"ymin": 0.30, "xmin": 0.10, "ymax": 0.38, "xmax": 0.88},
+                },
+                {
+                    "name": "National Tomato Ketchup 500g",
+                    "raw_text": "NATIONAL KETCHUP 500G 320",
+                    "qty": 1.0,
+                    "unit": "bottle",
+                    "u_price": 320.0,
+                    "t_price": 320.0,
+                    "conf": 0.96,
+                    "cat": "Groceries & Food",
+                    "verified": True,
+                    "bbox": {"ymin": 0.40, "xmin": 0.10, "ymax": 0.48, "xmax": 0.88},
+                },
+                {
+                    "name": "Lipton Yellow Label 400g",
+                    "raw_text": "LIPTON YLW 400G 680",
+                    "qty": 1.0,
+                    "unit": "box",
+                    "u_price": 680.0,
+                    "t_price": 680.0,
+                    "conf": 0.95,
+                    "cat": "Groceries & Food",
+                    "verified": True,
+                    "bbox": {"ymin": 0.50, "xmin": 0.10, "ymax": 0.58, "xmax": 0.88},
+                },
             ],
         },
     ]
@@ -1475,41 +1706,276 @@ def seed_demo_data() -> Dict[str, int]:
     item_count = 0
     review_count = 0
 
-    for r_data in sample_receipts_data:
-        total = sum(item[4] for item in r_data["items"])
-        status = "PENDING_REVIEW" if any(not item[7] for item in r_data["items"]) else "PROCESSED"
+    current_month_seeded_total = 0.0
+
+    # Insert the 7 review receipts first
+    for r in specific_review_receipts:
+        total = sum(i["t_price"] for i in r["items"])
+        current_month_seeded_total += total
         rcpt = insert_receipt(
-            merchant_name=r_data["merchant"],
-            receipt_date=r_data["date"],
+            merchant_name=r["merchant"],
+            receipt_date=r["date"],
             total_amount=round(total, 2),
-            receipt_type=r_data["type"],
-            status=status,
-            ocr_confidence=r_data["confidence"],
+            receipt_type=r["type"],
+            status="PENDING_REVIEW",
+            ocr_confidence=r["confidence"],
+            receipt_id=r.get("receipt_id"),
         )
         receipt_count += 1
+        _link_sample_img(rcpt["id"], r["sample_img"])
+        insert_receipt_hash(rcpt["id"], r.get("phash", "a1b2c3d4e5f67890"), f"fingerprint_{rcpt['id']}")
 
-        for name, qty, unit, u_price, t_price, conf, cat, verified in r_data["items"]:
+        for item in r["items"]:
             li = insert_line_item(
                 receipt_id=rcpt["id"],
-                raw_text=name,
-                item_name=name,
-                quantity=qty,
-                unit=unit,
-                unit_price=u_price,
-                total_price=t_price,
-                confidence_score=conf,
-                category=cat,
-                is_verified=verified,
+                raw_text=item["raw_text"],
+                item_name=item["name"],
+                quantity=item["qty"],
+                unit=item["unit"],
+                unit_price=item["u_price"],
+                total_price=item["t_price"],
+                confidence_score=item["conf"],
+                category=item["cat"],
+                is_verified=item["verified"],
+                bbox=item.get("bbox"),
+                item_id=item.get("item_id"),
+            )
+            item_count += 1
+            if not item["verified"]:
+                insert_review_queue_item(
+                    line_item_id=li["id"],
+                    candidate_text=item["name"],
+                    model_confidence=item["conf"],
+                    queue_id=item.get("queue_id"),
+                )
+                review_count += 1
+
+    # ── 2. Synthesize remaining receipts to reach exactly 148 receipts & PKR 184,250.00 ──
+    target_count = 148
+    remaining_receipts_count = target_count - len(specific_review_receipts)  # 141 receipts
+    target_total_spend = 184250.00
+    spend_needed = target_total_spend - current_month_seeded_total
+
+    store_catalog = [
+        ("Imtiaz Super Market", "PRINTED", [
+            ("Wheat Flour (Chakki Atta) 10kg", 1.0, "bag", 1450.0, "Groceries & Food"),
+            ("Olper's Full Cream Milk 1L", 4.0, "ltr", 280.0, "Groceries & Food"),
+            ("Surf Excel Detergent 1kg", 1.0, "pkt", 680.0, "Household & Cleaning"),
+            ("Tapal Danedar Tea 430g", 1.0, "box", 720.0, "Groceries & Food"),
+            ("Dalda Canola Cooking Oil 5L", 1.0, "tin", 2650.0, "Groceries & Food"),
+        ]),
+        ("Chase Up Departmental Store", "PRINTED", [
+            ("Dettol Antibacterial Soap 3-Pk", 1.0, "pack", 450.0, "Personal Care"),
+            ("Lays Wavy Masala Potato Chips", 3.0, "pcs", 100.0, "Snacks & Beverages"),
+            ("National Tomato Ketchup 500g", 1.0, "bottle", 320.0, "Groceries & Food"),
+            ("Ariel Matic Laundry Pods 20s", 1.0, "box", 1250.0, "Household & Cleaning"),
+        ]),
+        ("Hyperstar Carrefour Clifton", "PRINTED", [
+            ("Basmati Super Kernel Rice 5kg", 1.0, "bag", 1850.0, "Groceries & Food"),
+            ("Nutella Hazelnut Spread 350g", 1.0, "jar", 980.0, "Snacks & Beverages"),
+            ("Dove Moisture Shampoo 360ml", 1.0, "bottle", 790.0, "Personal Care"),
+            ("French Baguette Bread", 2.0, "pcs", 220.0, "Groceries & Food"),
+        ]),
+        ("K-Electric Online Billing", "PRINTED", [
+            ("Residential Electricity Bill", 1.0, "bill", 5840.0, "Utilities & Bills"),
+        ]),
+        ("Sui Southern Gas Company (SSGC)", "PRINTED", [
+            ("Monthly Gas Utility Invoice", 1.0, "bill", 1450.0, "Utilities & Bills"),
+        ]),
+        ("PSO Fuel Station Defense", "PRINTED", [
+            ("Altron Premium Petrol 25 Litres", 25.0, "ltr", 282.0, "Transportation"),
+        ]),
+        ("Shell Select Express", "PRINTED", [
+            ("Super Unleaded Petrol 18L", 18.0, "ltr", 282.0, "Transportation"),
+            ("Red Bull Energy Drink Can", 2.0, "can", 350.0, "Snacks & Beverages"),
+        ]),
+        ("D.Watson Chemist & Superstore", "PRINTED", [
+            ("Surbex-Z Multivitamin Tablets", 1.0, "box", 480.0, "Health & Pharmacy"),
+            ("Dettol Antiseptic Liquid 250ml", 1.0, "bottle", 420.0, "Health & Pharmacy"),
+            ("Oral-B Pro-Health Toothbrush", 2.0, "pcs", 290.0, "Personal Care"),
+        ]),
+        ("Aghas Supermarket Clifton", "PRINTED", [
+            ("Philadelphia Cream Cheese 200g", 1.0, "tub", 850.0, "Groceries & Food"),
+            ("Twinings Earl Grey Tea 50 Bags", 1.0, "box", 1150.0, "Groceries & Food"),
+            ("Belgian Dark Chocolate 100g", 2.0, "bar", 480.0, "Snacks & Beverages"),
+        ]),
+        ("Rahat Bakery", "PRINTED", [
+            ("Special Chicken Patties 6-Pack", 6.0, "pcs", 90.0, "Snacks & Beverages"),
+            ("Chocolate Fudge Cake 1.5lb", 1.0, "cake", 1200.0, "Snacks & Beverages"),
+            ("Fresh Bran Bread Large", 1.0, "loaf", 180.0, "Groceries & Food"),
+        ]),
+        ("Espresso Coffee Bar", "PRINTED", [
+            ("Double Shot Cafe Latte", 2.0, "cup", 650.0, "Dining Out"),
+            ("Belgian Waffle with Maple Syrup", 1.0, "plate", 980.0, "Dining Out"),
+        ]),
+        ("Del Frio Restaurant", "PRINTED", [
+            ("Grilled Moroccan Chicken Steak", 1.0, "plate", 1650.0, "Dining Out"),
+            ("Oreo Mudslide Ice Cream Shake", 1.0, "glass", 680.0, "Dining Out"),
+        ]),
+        ("Baqai Medical Pharmacy", "PRINTED", [
+            ("Augmentin 625mg Tablets 14s", 1.0, "box", 740.0, "Health & Pharmacy"),
+            ("Brufen 400mg Suspension", 1.0, "bottle", 160.0, "Health & Pharmacy"),
+        ]),
+    ]
+
+    # Pre-generate target totals that sum exactly to spend_needed
+    base_shares = [
+        random.uniform(300, 2800) for _ in range(remaining_receipts_count)
+    ]
+    scale_factor = spend_needed / sum(base_shares)
+    adjusted_totals = [round(v * scale_factor, 2) for v in base_shares]
+    rounding_diff = round(spend_needed - sum(adjusted_totals), 2)
+    adjusted_totals[0] = round(adjusted_totals[0] + rounding_diff, 2)
+
+    sample_hashes = [
+        "1a2b3c4d5e6f7089", "9876543210abcdef", "fedcba9876543210",
+        "aabbccddeeff0011", "2233445566778899", "3344556677889900",
+        "4455667788990011", "5566778899001122", "6677889900112233"
+    ]
+
+    for idx, r_total in enumerate(adjusted_totals):
+        day_num = 1 + (idx % 28)
+        r_date = f"{target_period}-{day_num:02d}"
+        store_info = store_catalog[idx % len(store_catalog)]
+        m_name, r_type, items_list = store_info
+
+        # Select items fitting r_total
+        item_data = []
+        item_subtotal = 0.0
+        for i_name, i_qty, i_unit, i_uprice, i_cat in items_list:
+            t_price = round(i_qty * i_uprice, 2)
+            item_data.append((i_name, i_qty, i_unit, i_uprice, t_price, i_cat))
+            item_subtotal += t_price
+
+        # Proportionally calibrate item prices so sum equals r_total
+        final_items = []
+        c_ratio = r_total / max(item_subtotal, 1.0)
+        accum = 0.0
+        for i_idx, (i_name, i_qty, i_unit, i_uprice, t_price, i_cat) in enumerate(item_data):
+            if i_idx == len(item_data) - 1:
+                cur_t = round(r_total - accum, 2)
+            else:
+                cur_t = round(t_price * c_ratio, 2)
+                accum += cur_t
+            cur_u = round(cur_t / max(i_qty, 1.0), 2)
+            final_items.append((i_name, i_qty, i_unit, cur_u, cur_t, i_cat))
+
+        rcpt = insert_receipt(
+            merchant_name=m_name,
+            receipt_date=r_date,
+            total_amount=r_total,
+            receipt_type=r_type,
+            status="PROCESSED",
+            ocr_confidence=round(random.uniform(0.91, 0.99), 3),
+        )
+        receipt_count += 1
+        insert_receipt_hash(rcpt["id"], sample_hashes[idx % len(sample_hashes)], f"sha_{rcpt['id'][:8]}")
+
+        for i_name, i_qty, i_unit, cur_u, cur_t, i_cat in final_items:
+            insert_line_item(
+                receipt_id=rcpt["id"],
+                raw_text=f"{i_name.upper()} {cur_t}",
+                item_name=i_name,
+                quantity=i_qty,
+                unit=i_unit,
+                unit_price=cur_u,
+                total_price=cur_t,
+                confidence_score=round(random.uniform(0.92, 0.99), 3),
+                category=i_cat,
+                is_verified=True,
             )
             item_count += 1
 
-            if not verified:
-                insert_review_queue_item(
-                    line_item_id=li["id"],
-                    candidate_text=name,
-                    model_confidence=conf,
-                )
-                review_count += 1
+    # ── 3. Prior Month Baseline (130 Receipts, PKR 161,620.00 -> +14.0% Delta) ──
+    prior_count = 130
+    prior_target_spend = 161620.00
+    prior_shares = [random.uniform(400, 2500) for _ in range(prior_count)]
+    prior_scale = prior_target_spend / sum(prior_shares)
+    prior_totals = [round(v * prior_scale, 2) for v in prior_shares]
+    prior_diff = round(prior_target_spend - sum(prior_totals), 2)
+    prior_totals[0] = round(prior_totals[0] + prior_diff, 2)
+
+    for idx, p_total in enumerate(prior_totals):
+        day_num = 1 + (idx % 28)
+        p_date = f"{prev_period}-{day_num:02d}"
+        store_info = store_catalog[idx % len(store_catalog)]
+        m_name, r_type, items_list = store_info
+
+        rcpt = insert_receipt(
+            merchant_name=m_name,
+            receipt_date=p_date,
+            total_amount=p_total,
+            receipt_type=r_type,
+            status="PROCESSED",
+            ocr_confidence=round(random.uniform(0.89, 0.98), 3),
+        )
+
+        n_items = min(2, len(items_list))
+        sub_t_base = round(p_total / n_items, 2)
+        accum_p = 0.0
+        for i_idx in range(n_items):
+            i_name, i_qty, i_unit, i_uprice, i_cat = items_list[i_idx]
+            if i_idx == n_items - 1:
+                cur_t = round(p_total - accum_p, 2)
+            else:
+                cur_t = sub_t_base
+                accum_p += cur_t
+            insert_line_item(
+                receipt_id=rcpt["id"],
+                raw_text=f"{i_name.upper()}",
+                item_name=i_name,
+                quantity=i_qty,
+                unit=i_unit,
+                unit_price=round(cur_t / max(i_qty, 1.0), 2),
+                total_price=cur_t,
+                confidence_score=round(random.uniform(0.90, 0.98), 3),
+                category=i_cat,
+                is_verified=True,
+            )
+
+    # ── 4. Seed Observability Benchmark Run Logs (PDF 6.0 & Bottom Ribbon) ───
+    try:
+        save_run_log(
+            descriptor="gemini_flash_lite_evaluation_run",
+            records=[
+                {"receipt_id": review_receipt_1_id, "merchant": "Chaudhry Sabzi & Fruit Store", "model": "gemini-3.5-flash-lite", "latency_ms": 340, "accuracy": 0.962, "success": True},
+                {"receipt_id": "8b192e44-d130-4e89-9a71-678cba0123ef", "merchant": "Javed Nihari Restaurant", "model": "gemini-3.5-flash-lite", "latency_ms": 420, "accuracy": 0.958, "success": True},
+                {"receipt_id": "a93c72b1-50e4-4fa0-b88d-e4c19208aef7", "merchant": "Metro Cash & Carry", "model": "gemini-3.5-flash-lite", "latency_ms": 490, "accuracy": 0.971, "success": True},
+            ],
+            metrics={
+                "total_records": 148,
+                "success_count": 141,
+                "failure_count": 7,
+                "accuracy_percentage": 96.2,
+                "average_latency_ms": 385,
+                "p95_latency_ms": 610,
+                "model": "gemini-3.5-flash-lite",
+            },
+            metadata={
+                "pipeline": "OpenCV Deskew -> Perceptual Hash -> Gemini Vision -> NLP Normalizer",
+                "environment": "Monorepo Gateway v1.0.0",
+                "device": "Desktop Ops Console",
+            },
+            summary_text="ReceiptLedger Benchmark Run: 148 Receipts evaluated. Accuracy: 96.2%. Average latency: 385ms."
+        )
+
+        save_run_log(
+            descriptor="cloud_vision_hybrid_benchmark",
+            records=[
+                {"test_set": "sroie_and_pakistani_pos", "accuracy": 0.948, "latency_ms": 520, "success": True}
+            ],
+            metrics={
+                "total_records": 100,
+                "success_count": 95,
+                "failure_count": 5,
+                "accuracy_percentage": 94.8,
+                "average_latency_ms": 512,
+                "model": "Google Cloud Vision + Tesseract Fallback",
+            },
+            metadata={"quota_remaining": 950, "batch_mode": True},
+        )
+    except Exception as exc:
+        logger.debug("Observability benchmark run log save exception: %s", exc)
 
     return {
         "receipts": receipt_count,
