@@ -157,7 +157,9 @@ The `web/` operations dashboard is pre-configured for direct Vercel deployment w
 2. Set **Root Directory** to `web` *(Vercel auto-detects `Vite`)*.
 3. In **Environment Variables**, set:
    * `VITE_API_BASE_URL`: Your backend URL (e.g. `https://<tunnel-url>.trycloudflare.com/api/v1` or production API).
-4. Click **Deploy**. Vercel will build and host the dashboard on a global HTTPS CDN.
+4. Click **Deploy**. Vercel will build and host the dashboard on a global HTTPS CDN:
+   * Production URL: [https://receiptledger-web.vercel.app](https://receiptledger-web.vercel.app)
+   * Alternate URL: [https://receiptledger-app.vercel.app](https://receiptledger-app.vercel.app)
 
 ---
 
