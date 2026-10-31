@@ -105,7 +105,7 @@ flowchart LR
 |:---|:---|:---:|
 | [`backend/`](backend/) | Core OCR routing, OpenCV deskewing, normalization, and API gateway | FastAPI • SQLite • EasyOCR • Gemini |
 | [`mobile/`](mobile/) | Capture client, animated splash, auth login/signup, and ledger UI | Flutter • Dart • Material 3 |
-| [`web/`](web/) | Analytics dashboard, monthly trend charts, and review queue | React • Vite • Chart.js |
+| [`web/`](web/) | Desktop operations console, audit ledger, and human review desk | React 18 • TypeScript • Vite • Tailwind • Vercel |
 | [`UI mockups/`](UI%20mockups/) | Design specifications, vector SVG icon tokens, and UI mockups | SVG • Figma Specs • PNG Wireframes |
 | [`scripts/`](scripts/) | End-to-end stress tests, zero-cost HTTPS tunnels, and data tools | Python • PowerShell • Bash |
 | [`docs/`](docs/) | Complete engineering specifications, IEEE 830 SRS, and course governance | Markdown • Mermaid |
@@ -146,6 +146,18 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ### Option 3: Free Cloud Hosting (Zero Credit Card)
 - **Hugging Face Spaces (Docker/FastAPI)**: 100% Free with 16 GB RAM and persistent HTTPS URL without entering a credit card.
 - **Render.com Free Web Service**: Standard Free Tier web service using GitHub OAuth without requiring credit card details.
+
+---
+
+## Deploying Web Dashboard to Vercel (1-Click Ready)
+
+The `web/` operations dashboard is pre-configured for direct Vercel deployment with SPA route rewrites:
+
+1. Import **`Asad101001/ReceiptLedger`** into [Vercel](https://vercel.com).
+2. Set **Root Directory** to `web` *(Vercel auto-detects `Vite`)*.
+3. In **Environment Variables**, set:
+   * `VITE_API_BASE_URL`: Your backend URL (e.g. `https://<tunnel-url>.trycloudflare.com/api/v1` or production API).
+4. Click **Deploy**. Vercel will build and host the dashboard on a global HTTPS CDN.
 
 ---
 
