@@ -77,6 +77,18 @@ docker compose up --build
 ```
 The backend API will be available at `http://localhost:8000`.
 
+### Option D: 1-Click Render Cloud Deployment (Blueprint)
+The repository contains a production-ready `render.yaml` blueprint:
+1. Connect `Asad101001/ReceiptLedger` to Render.
+2. Select **New Blueprint** and choose `render.yaml`.
+3. Render automatically provisions the Dockerized FastAPI service with health checks and zero required credit card details.
+
+### Option E: Static Ngrok Dedicated Domain
+For persistent mobile and device testing without IP rotation:
+```bash
+ngrok http --domain=disagree-slick-record.ngrok-free.app 8000
+```
+
 ---
 
 ## 4. Web Dashboard Environment (React + Vite)
@@ -144,5 +156,5 @@ Automated builds and quality gates run on every push to `main` via GitHub Action
   flutter build apk --release
   ```
   Output generated at `mobile/build/app/outputs/flutter-apk/app-release.apk`.
-* **Download Prebuilt APK**: Direct access to production-ready [**`ReceiptLedger-v1.0.0-release.apk`**](../../ReceiptLedger-v1.0.0-release.apk) located in the repository root.
+* **Download Prebuilt APK**: Direct download of production-ready builds via [**Latest GitHub Release (`ReceiptLedger-release.apk`)**](https://github.com/Asad101001/ReceiptLedger/releases/latest).
 

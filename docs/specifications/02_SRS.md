@@ -89,12 +89,13 @@ graph LR
 * **Outputs:** Preprocessed image payload compressed to $\le 1.5$ MB with EXIF metadata.
 * **Error Handling:** If the image resolution is below $720 \times 1280$ or excessively blurred, prompt user to retake photo.
 
-#### FR-2: Dual OCR Routing & Extraction
-* **Description:** The system shall determine the receipt type and route to the appropriate OCR extraction engine.
+#### FR-2: Hybrid OCR Routing & Multimodal Vision Extraction
+* **Description:** The system shall determine the receipt type and route to the appropriate extraction engine or multimodal AI vision model.
 * **Processing:**
-  * **Path A (Printed):** Dispatched to Cloud Vision API (`TEXT_DETECTION`). Fallback: Tesseract 5.
-  * **Path B (Handwritten):** Dispatched to EasyOCR supplemented with Tesseract 5 secondary tokenization.
-* **Outputs:** Bounding box coordinates, recognized text tokens, and confidence scores ($0.00 - 1.00$).
+  * **Path A (Printed Retail):** Dispatched to Cloud Vision API (`TEXT_DETECTION`). Fallback: Local Tesseract 5 (`--oem 1 --psm 6`).
+  * **Path B (Handwritten Slips):** Dispatched to EasyOCR supplemented with Tesseract 5 secondary tokenization.
+  * **Path C (Multimodal AI Vision):** When configured, dispatched to Google Gemini 2.0/3.5 Flash for high-accuracy Roman Urdu transliteration, digital wallet slip parsing (NayaPay, SadaPay, Easypaisa), and direct bounding box extraction.
+* **Outputs:** Bounding box coordinates (`bbox: {ymin, xmin, ymax, xmax}`), recognized text tokens, canonical names, and confidence scores ($0.00 - 1.00$).
 
 #### FR-3: Item Normalization & Domain Correction
 * **Description:** Extracted text tokens must be cleaned, reconstructed into line items, and normalized.

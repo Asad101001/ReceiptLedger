@@ -144,8 +144,9 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 - Health check: `http://localhost:8000/api/v1/health`
 
 ### Option 3: Free Cloud Hosting (Zero Credit Card)
+- **Render.com 1-Click Blueprint (`render.yaml`)**: Pre-configured `render.yaml` deploys the containerized FastAPI backend on Render's free tier with automated health probes and zero card entry.
+- **Static Ngrok Tunnel**: Dedicated stable testing URL (`https://disagree-slick-record.ngrok-free.app`) for seamless mobile APK evaluation without DNS churn.
 - **Hugging Face Spaces (Docker/FastAPI)**: 100% Free with 16 GB RAM and persistent HTTPS URL without entering a credit card.
-- **Render.com Free Web Service**: Standard Free Tier web service using GitHub OAuth without requiring credit card details.
 
 ---
 
@@ -197,8 +198,8 @@ Master documentation index and governance deliverables are cataloged in [`docs/R
 ## Automated CI/CD & Android Release
 
 Every commit to `main` executes an automated quality gate and builds the production Android APK using GitHub Actions:
-* **Workflow**: [`.github/workflows/build-and-release.yml`](.github/workflows/build-and-release.yml) (Runs `flutter test`, `flutter analyze`, and builds release binary).
-* **Direct Download**: Sideloadable [**`ReceiptLedger-v1.0.0-release.apk`**](ReceiptLedger-v1.0.0-release.apk) ready for physical device testing.
+* **Workflow**: [`.github/workflows/build-and-release.yml`](.github/workflows/build-and-release.yml) (Runs `flutter test`, `flutter analyze`, builds release binary, and broadcasts to Slack).
+* **Direct Download**: Sideloadable [**Latest Production APK (`ReceiptLedger-release.apk`)**](https://github.com/Asad101001/ReceiptLedger/releases/latest) ready for physical Android device testing.
 
 
 ---

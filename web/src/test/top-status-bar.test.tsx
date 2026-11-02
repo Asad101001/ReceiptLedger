@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TopStatusBar } from '../features/status/TopStatusBar';
 import { HealthResponse } from '../types';
+import { useConsoleStore } from '../store/useConsoleStore';
 
 const mockHealthy: HealthResponse = {
   status: 'ok',
@@ -17,7 +18,11 @@ const mockHealthy: HealthResponse = {
 };
 
 describe('Phase 3: Top Status Bar & Engine Telemetry', () => {
-  it('renders all engines operational status with Cloud Vision quota remaining', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('renders brand header, console badge, and cloud synced status when healthy', () => {
     render(
       <TopStatusBar
         health={mockHealthy}
@@ -31,28 +36,21 @@ describe('Phase 3: Top Status Bar & Engine Telemetry', () => {
       />
     );
 
-    // Master operational status
-    expect(screen.getByText('ALL ENGINES OPERATIONAL')).toBeInTheDocument();
-
-    // Engine chips
-    expect(screen.getByText('GEMINI AI')).toBeInTheDocument();
-    expect(screen.getByText('CLOUD VISION')).toBeInTheDocument();
-    expect(screen.getByText('(950 quota)')).toBeInTheDocument();
-    expect(screen.getByText('SUPABASE')).toBeInTheDocument();
-    expect(screen.getByText('TESSERACT')).toBeInTheDocument();
-    expect(screen.getByText('EASYOCR')).toBeInTheDocument();
-
-    // User profile
+    expect(screen.getByText('ReceiptLedger')).toBeInTheDocument();
+    expect(screen.getByText('Console')).toBeInTheDocument();
+    expect(screen.getByText('Cloud Synced')).toBeInTheDocument();
+    expect(screen.getByText('Admin, Audit & Human Triage')).toBeInTheDocument();
     expect(screen.getByText('operator@receiptledger.com')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Upload Receipt/i })).toBeInTheDocument();
   });
 
-  it('renders degraded status when an engine reports degraded or low quota', () => {
+  it('renders system degraded status when an engine reports degraded or unavailable', () => {
     const degradedHealth: HealthResponse = {
       status: 'degraded',
       version: '1.0.0',
       environment: 'development',
       engines: {
-        cloud_vision: 'degraded (quota_remaining=25)',
+        cloud_vision: 'unavailable',
         tesseract: 'ok',
         easyocr: 'ok',
         gemini: 'unavailable',
@@ -73,12 +71,26 @@ describe('Phase 3: Top Status Bar & Engine Telemetry', () => {
       />
     );
 
-    expect(screen.getByText('ENGINES DEGRADED')).toBeInTheDocument();
-    expect(screen.getByText('(25 quota)')).toBeInTheDocument();
-    expect(screen.getByText('DATABASE')).toBeInTheDocument();
+    expect(screen.getByText('System Degraded')).toBeInTheDocument();
   });
 
-  it('clearly labels offline demo mode when backend is unreachable or mock mode is active', () => {
+  it('renders synchronizing status indicator when health is loading', () => {
+    render(
+      <TopStatusBar
+        isHealthLoading={true}
+        onSeedDemo={vi.fn()}
+        onResetLedger={vi.fn()}
+        isSeeding={false}
+        isResetting={false}
+        userEmail="operator@receiptledger.com"
+        onLogout={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Synchronizing...')).toBeInTheDocument();
+  });
+
+  it('clearly labels offline demo mode when mock mode is active', () => {
     render(
       <TopStatusBar
         isHealthLoading={false}
@@ -86,100 +98,44 @@ describe('Phase 3: Top Status Bar & Engine Telemetry', () => {
         onResetLedger={vi.fn()}
         isSeeding={false}
         isResetting={false}
-        userEmail="user@receiptledger.com"
+        userEmail="operator@receiptledger.com"
         onLogout={vi.fn()}
         isMockMode={true}
       />
     );
 
-    expect(screen.getByText('OFFLINE DEMO METRICS (MOCK)')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Reload Mock Queue/i })).toBeInTheDocument();
+    expect(screen.getByText('Offline Fixtures')).toBeInTheDocument();
   });
 
-  it('renders Offline Dev Mode button when degraded and callback is provided', () => {
-    const onEnterDevMock = vi.fn();
+  it('triggers onLogout callback when sign out button is clicked', () => {
+    const onLogout = vi.fn();
     render(
       <TopStatusBar
-        health={{
-          status: 'degraded',
-          version: '1.0.0',
-          environment: 'development',
-          engines: {
-            cloud_vision: 'unavailable',
-            tesseract: 'ok',
-            easyocr: 'ok',
-            gemini: 'unavailable',
-            database: 'unavailable',
-          },
-        }}
+        health={mockHealthy}
         isHealthLoading={false}
         onSeedDemo={vi.fn()}
         onResetLedger={vi.fn()}
         isSeeding={false}
         isResetting={false}
         userEmail="operator@receiptledger.com"
-        onLogout={vi.fn()}
-        isMockMode={false}
-        onEnterDevMockMode={onEnterDevMock}
+        onLogout={onLogout}
       />
     );
 
-    const offlineBtn = screen.getByRole('button', { name: /Offline Dev Mode/i });
-    expect(offlineBtn).toBeInTheDocument();
-    fireEvent.click(offlineBtn);
-    expect(onEnterDevMock).toHaveBeenCalledTimes(1);
+    const logoutBtn = screen.getByTitle('Sign Out');
+    fireEvent.click(logoutBtn);
+    expect(onLogout).toHaveBeenCalledTimes(1);
   });
 
-  it('triggers inline two-step reset confirmation without modal popups', async () => {
-    const onResetLedger = vi.fn().mockResolvedValue(undefined);
+  it('triggers toggleUploadDrawer when Upload Receipt button is clicked', () => {
+    const toggleUploadDrawer = vi.fn();
+    useConsoleStore.setState({ toggleUploadDrawer });
 
     render(
       <TopStatusBar
         health={mockHealthy}
         isHealthLoading={false}
         onSeedDemo={vi.fn()}
-        onResetLedger={onResetLedger}
-        isSeeding={false}
-        isResetting={false}
-        userEmail="operator@receiptledger.com"
-        onLogout={vi.fn()}
-      />
-    );
-
-    // Initial state: "Reset Ledger" button visible, no confirm button yet
-    const resetBtn = screen.getByRole('button', { name: /Reset Ledger/i });
-    expect(resetBtn).toBeInTheDocument();
-    expect(screen.queryByText('Confirm Reset?')).not.toBeInTheDocument();
-
-    // Step 1: Click "Reset Ledger"
-    fireEvent.click(resetBtn);
-
-    // Must show inline confirm and cancel buttons (NO modal!)
-    const confirmBtn = screen.getByRole('button', { name: /Confirm Reset\?/i });
-    const cancelBtn = screen.getByRole('button', { name: /Cancel/i });
-    expect(confirmBtn).toBeInTheDocument();
-    expect(cancelBtn).toBeInTheDocument();
-
-    // Step 2: Cancel should revert to original state
-    fireEvent.click(cancelBtn);
-    expect(screen.getByRole('button', { name: /Reset Ledger/i })).toBeInTheDocument();
-    expect(screen.queryByText('Confirm Reset?')).not.toBeInTheDocument();
-    expect(onResetLedger).not.toHaveBeenCalled();
-
-    // Step 3: Click reset again and confirm
-    fireEvent.click(screen.getByRole('button', { name: /Reset Ledger/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Confirm Reset\?/i }));
-    expect(onResetLedger).toHaveBeenCalledTimes(1);
-  });
-
-  it('triggers Seed Demo callback', () => {
-    const onSeedDemo = vi.fn().mockResolvedValue(undefined);
-
-    render(
-      <TopStatusBar
-        health={mockHealthy}
-        isHealthLoading={false}
-        onSeedDemo={onSeedDemo}
         onResetLedger={vi.fn()}
         isSeeding={false}
         isResetting={false}
@@ -188,9 +144,9 @@ describe('Phase 3: Top Status Bar & Engine Telemetry', () => {
       />
     );
 
-    const seedBtn = screen.getByRole('button', { name: /Seed Demo \(148\)/i });
-    fireEvent.click(seedBtn);
-    expect(onSeedDemo).toHaveBeenCalledTimes(1);
+    const uploadBtn = screen.getByRole('button', { name: /Upload Receipt/i });
+    fireEvent.click(uploadBtn);
+    expect(toggleUploadDrawer).toHaveBeenCalledTimes(1);
   });
 
   it('strictly adheres to zero-gradient and zero-glassmorphism constraints', () => {

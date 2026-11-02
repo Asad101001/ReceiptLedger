@@ -20,7 +20,7 @@ Consumers and small businesses regularly collect physical paper receipts. Due to
 ### 1.3 Solution Approach
 ReceiptLedger provides an end-to-end receipt extraction and analytics pipeline:
 1. **Camera Ingestion:** Mobile photo capture supporting single-shot and multi-receipt capture.
-2. **Dual-Engine OCR:** A bifurcated processing pipeline handling clean printed retail text and irregular handwritten slips.
+2. **Hybrid OCR & Vision Matrix:** A multi-path processing pipeline handling clean printed retail text (Google Cloud Vision API / Tesseract 5), irregular handwritten slips (EasyOCR + PyTorch), and zero-cost multimodal entity extraction with spatial bounding boxes via Google Gemini 2.0/3.5 Flash. Support extends to both paper receipts and digital payment slips (e.g., NayaPay, SadaPay, Raast).
 3. **Item Normalization:** Rule- and dictionary-based canonical standardization of messy merchant descriptions, colloquial units, and local pack sizes.
 4. **Local Categorization:** Automatic mapping to common household and neighborhood retail spend categories.
 5. **Duplicate Prevention:** Cryptographic image hashing combined with text similarity scoring to eliminate duplicate entries.

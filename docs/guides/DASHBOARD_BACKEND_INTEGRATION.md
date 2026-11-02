@@ -231,7 +231,8 @@ It immediately becomes available under `/api/v1/dashboard/my-widget` and auto-do
 
 In `web/.env`:
 ```env
-VITE_API_URL=http://localhost:8000
+# Local Development Gateway URL (read by web/src/api/client.ts)
+VITE_API_BASE_URL=http://localhost:8000/api/v1
 ```
 
 In `web/vite.config.js` (Optional proxy configuration to avoid CORS issues entirely):

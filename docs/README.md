@@ -96,7 +96,7 @@ Hands-on manuals for setting up cloud infrastructure, running local verification
 
 | Guide | Scope | Key Topics |
 |:---|:---|:---|
-| [**Backend Operations Guide**](guides/BACKEND_SETUP_AND_OPERATIONS_GUIDE.md) | Backend Core Engine | Google Cloud Vision API credentials, Supabase PostgreSQL DDL, Tesseract 5 installation, 32-test offline CLI suite (`python -m app.cli_test`), and cURL testing guide |
+| [**Backend Operations Guide**](guides/BACKEND_SETUP_AND_OPERATIONS_GUIDE.md) | Backend Core Engine | Google Cloud Vision API credentials, Supabase PostgreSQL DDL, Tesseract 5 installation, 37-test offline CLI suite (`python -m app.cli_test`), and cURL testing guide |
 | [**Dashboard Integration Guide**](guides/DASHBOARD_BACKEND_INTEGRATION.md) | Web Client + API | Fast-start local server launch, CORS origin configuration, Review Queue endpoints, and Swagger UI reference |
 
 ---
@@ -107,7 +107,7 @@ Formal QA test evidence and adversarial stress test documentation:
 
 | Report | Document ID | Scope | Metrics / Results |
 |:---|:---:|:---|:---|
-| [**Backend Adversarial Stress Test Report**](reports/VIGOROUS_BACKEND_STRESS_TEST_REPORT.md) | `RL-QA-RPT-2026-003` | 28 adversarial vectors across ingestion, deduplication, NLP parsing, SQL/XSS injections, and review triage | **100% Pass** (28/28 adversarial, 35/35 core CLI); 6 boundary defects identified & mitigated |
+| [**Backend Adversarial Stress Test Report**](reports/VIGOROUS_BACKEND_STRESS_TEST_REPORT.md) | `RL-QA-RPT-2026-003` | 28 adversarial vectors across ingestion, deduplication, NLP parsing, SQL/XSS injections, and review triage | **100% Pass** (28/28 adversarial, 37/37 core CLI); 6 boundary defects identified & mitigated |
 
 ---
 
@@ -117,8 +117,8 @@ Automated build, test, and release delivery pipeline:
 
 | Component | Path / Location | Scope |
 |:---|:---|:---|
-| **GitHub Actions Pipeline** | [`.github/workflows/build-and-release.yml`](../.github/workflows/build-and-release.yml) | Automated Flutter test/analyze quality gate, release APK compilation, and GitHub Release drafting on push to `main` |
-| **Android Release Binary** | [`ReceiptLedger-v1.0.0-release.apk`](../ReceiptLedger-v1.0.0-release.apk) | Production release APK signed for direct sideloading and Android device evaluation |
+| **GitHub Actions Pipeline** | [`.github/workflows/build-and-release.yml`](../.github/workflows/build-and-release.yml) | Automated Flutter test/analyze quality gate, release APK compilation, Slack release broadcasts, and GitHub Release publishing on push to `main` |
+| **Android Release Binary** | [**Latest GitHub Release APK**](https://github.com/Asad101001/ReceiptLedger/releases/latest) | Production release APK signed for direct sideloading and Android device evaluation |
 | **Zero-Cost HTTPS Tunnel** | [`scripts/devops/tunnel_server.py`](../scripts/devops/tunnel_server.py) / `run_tunneled_backend.bat` | Dual Cloudflare Quick Tunnel and Pinggy OpenSSH tunnel exposing backend securely at $0/mo |
 
 ---

@@ -128,7 +128,8 @@ To prevent communication bottlenecks, team members work in three synchronized pa
 ## 5. Team Governance & Rituals
 
 1. **Daily Standup:**
-   * **Where:** Slack `#all-receipt-ledger`
+   * **Where:** Slack `#daily-standup` (`receipt-ledger.slack.com`)
+   * **Automations:** Real-time Jira ticket events broadcast to `#jira`; CI/CD release alerts broadcast to `#github-builds`.
    * **Cadence:** Daily by 12:00 PM
    * **Format:**
      1. *What did I complete yesterday?*

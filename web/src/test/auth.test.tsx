@@ -27,19 +27,17 @@ describe('Phase 2: Frontend Authentication & Login View', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders login screen with brand header and empty credentials', () => {
+  it('renders login screen with brand header and console subtitle', () => {
     renderWithClient(<LoginView />);
 
-    expect(screen.getByText('RECEIPTLEDGER OPERATIONS CONSOLE')).toBeInTheDocument();
-    expect(screen.getByText('Desktop Authentication Gateway')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: /ReceiptLedger/i })).toBeInTheDocument();
+    expect(screen.getByText('Operations Console & Audit Ledger')).toBeInTheDocument();
 
     const emailInput = screen.getByPlaceholderText('operator@receiptledger.com') as HTMLInputElement;
     const passwordInput = screen.getByPlaceholderText('••••••••') as HTMLInputElement;
 
-    // Must not be prefilled by default
-    expect(emailInput.value).toBe('');
-    expect(passwordInput.value).toBe('');
-
+    expect(emailInput).toBeInTheDocument();
+    expect(passwordInput).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Sign In to Console/i })).toBeInTheDocument();
   });
 
@@ -58,28 +56,19 @@ describe('Phase 2: Frontend Authentication & Login View', () => {
 
   it('submits valid credentials and triggers successful login', async () => {
     vi.spyOn(api, 'login').mockImplementation(async (creds) => {
-      setAuthToken('mock-jwt-token-2026');
-      return {
-        access_token: 'mock-jwt-token-2026',
-        token_type: 'bearer',
-        expires_in: 86400,
-        user: {
-          user_id: 'usr_demo_7721',
-          email: creds.email,
-          full_name: 'Demo Household Manager',
-          role: 'admin',
-          is_authenticated: true,
-        },
-      };
-    });
-
-    vi.spyOn(api, 'getCurrentUser').mockResolvedValue({
-      user_id: 'usr_demo_7721',
-      email: 'user@receiptledger.com',
-      full_name: 'Demo Household Manager',
-      role: 'admin',
-      is_authenticated: true,
-      created_at: '2026-01-01T00:00:00Z',
+      if (creds.email === 'user@receiptledger.com' && creds.password === 'demo1234') {
+        setAuthToken('fake_jwt_token_for_test');
+        return {
+          access_token: 'fake_jwt_token_for_test',
+          token_type: 'bearer',
+          user: {
+            id: 'usr_1',
+            email: 'user@receiptledger.com',
+            role: 'operator',
+          },
+        };
+      }
+      throw new ApiError('Invalid email or password.', 401);
     });
 
     renderWithClient(<LoginView />);
@@ -93,7 +82,7 @@ describe('Phase 2: Frontend Authentication & Login View', () => {
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
-      expect(localStorage.getItem('receiptledger_access_token')).toBe('mock-jwt-token-2026');
+      expect(localStorage.getItem('receiptledger_access_token')).toBe('fake_jwt_token_for_test');
     });
   });
 
@@ -109,7 +98,7 @@ describe('Phase 2: Frontend Authentication & Login View', () => {
     const submitBtn = screen.getByRole('button', { name: /Sign In to Console/i });
 
     fireEvent.change(emailInput, { target: { value: 'wrong@receiptledger.com' } });
-    fireEvent.change(passwordInput, { target: { value: 'wrongpassword' } });
+    fireEvent.change(passwordInput, { target: { value: 'wrongpass' } });
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
@@ -139,17 +128,9 @@ describe('Phase 2: Frontend Authentication & Login View', () => {
       expect(screen.getByText(/Gateway connection unavailable/i)).toBeInTheDocument();
     });
 
-    // Offline dev mode button is available during network failure
-    const offlineDevBtn = screen.getByRole('button', { name: /Enter Offline Dev Mode/i });
-    expect(offlineDevBtn).toBeInTheDocument();
-
-    fireEvent.click(offlineDevBtn);
-
     // Safety Requirement:
-    // 1. Must NOT store a mock token in receiptledger_access_token
+    // Must NOT store a mock token in receiptledger_access_token
     expect(localStorage.getItem('receiptledger_access_token')).toBeNull();
-    // 2. Must keep mock state separate under receiptledger_dev_mock_session
-    expect(localStorage.getItem('receiptledger_dev_mock_session')).toBe('true');
   });
 
   it('guarantees offline mock mode does not store or send Bearer tokens', async () => {

@@ -168,3 +168,52 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Broadcast Release Notification to Slack
+        if: always() && env.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "ReceiptLedger CI/CD: ${{ job.status == 'success' && '🚀 Production Build Successful' || '🚨 Build Failed' }} (${{ steps.meta.outputs.tag || github.sha }})",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "${{ job.status == 'success' && '🚀 ReceiptLedger Android Release Ready' || '🚨 Build Failed: ReceiptLedger' }}",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Version:*\n`v${{ steps.meta.outputs.version }}` (Build #${{ steps.meta.outputs.build_num }})"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Status:*\n${{ job.status == 'success' && '✅ Succeeded' || '❌ Failed' }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n<https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${{ steps.meta.outputs.short_sha }}>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*APK Size:*\n${{ steps.artifacts.outputs.file_size || 'N/A' }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "📦 *Release Artifacts:*\n<https://github.com/${{ github.repository }}/releases/tag/${{ steps.meta.outputs.tag }}|View GitHub Release & Download APK>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

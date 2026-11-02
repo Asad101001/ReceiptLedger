@@ -13,6 +13,7 @@ scripts/
 │   ├── run_backend.bat            # Standard local FastAPI backend launcher (Port 8000)
 │   ├── start_tunneled_backend.bat # 100% Free Public HTTPS tunnel launcher (Cloudflare / Pinggy)
 │   ├── tunnel_server.py           # Cross-platform zero-dependency HTTPS tunnel manager
+│   ├── notify_slack.py            # Automated Slack webhook notifier (releases, standups, tests)
 │   └── render_icons.py            # Android & Web raster icon generator
 ├── testing/                       # Integration, benchmark, and regression test suites
 │   ├── vigorous_backend_stress_test.py # 100% endpoint coverage & concurrency stress test

@@ -29,6 +29,7 @@ flowchart TD
         ROUTER[OCR Path Decision Engine]
         OCRA[Path A: Cloud Vision / Tesseract]
         OCRB[Path B: EasyOCR / Tesseract]
+        OCRC[Path C: Multimodal Gemini Vision]
         NORM[Normalization & Fuzzy Matcher]
         DEDUP[pHash & Text Deduplication]
         CAT[Rule-Based Categorizer]
@@ -45,8 +46,10 @@ flowchart TD
     PRE --> ROUTER
     ROUTER -->|Printed Text| OCRA
     ROUTER -->|Handwritten Slips| OCRB
+    ROUTER -->|Multimodal AI Path| OCRC
     OCRA --> NORM
     OCRB --> NORM
+    OCRC --> NORM
     NORM --> DEDUP --> CAT
     CAT -->|Store Validated Data| PG
     PRE -->|Persist Original/Cropped Image| S3
@@ -63,11 +66,12 @@ flowchart TD
   * `PerspectiveTransformer`: Uses OpenCV (`cv2.findContours`, `cv2.getPerspectiveTransform`) to straighten angled photos.
   * `AdaptiveBinarizer`: Applies adaptive thresholding (`cv2.adaptiveThreshold`) to separate text strokes from background paper grain.
 
-### 2.2 Subsystem 2: Dual-Engine OCR Pipeline
+### 2.2 Subsystem 2: Hybrid OCR & Vision Pipeline
 * **Responsibilities:** Extract text characters, words, and coordinates while balancing accuracy with cloud quota limits.
 * **Routing Strategy:**
   * **Path A (Organized Retail):** Clear rectangular grid receipts from branded stores are directed to **Google Cloud Vision API** (`TEXT_DETECTION`). If the free monthly limit (1,000 calls) is reached, traffic gracefully routes to **Tesseract 5** (`--oem 1 --psm 6`).
   * **Path B (Informal / Handwritten):** Irregular slips from local markets are processed by **EasyOCR** (PyTorch-based CRNN architecture, CPU-optimized) combined with local contrast normalization.
+  * **Path C (Multimodal AI Vision):** When Google AI Studio credentials (`GEMINI_API_KEY`) are present, receipts and digital wallet slips (NayaPay, SadaPay) are routed to **Gemini 2.0/3.5 Flash** for direct semantic extraction with spatial bounding boxes (`bbox: {ymin, xmin, ymax, xmax}`) for high-precision review queue image cropping.
 * **Output Standard:** Uniform JSON schema containing extracted tokens with 4-point bounding polygons and individual confidence values ($0.0 - 1.0$).
 
 ### 2.3 Subsystem 3: Normalization & Fuzzy Domain Correction

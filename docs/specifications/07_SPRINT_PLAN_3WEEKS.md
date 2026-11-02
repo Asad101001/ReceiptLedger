@@ -110,11 +110,56 @@ gantt
 
 ---
 
-## 3. Team Rituals & Governance
+## 3. Team Rituals & Slack Collaboration Topology
 
-* **Daily Async Standup:** Completed via Slack `#daily-standup` by 12:00 PM daily. Each member reports:
-  1. *What did I complete yesterday?*
-  2. *What will I work on today?*
-  3. *Any blockers or impediments?*
-* **Sprint Review & Demo:** Held at the conclusion of each week to review working software increments.
+Team coordination and event-driven notifications operate through the dedicated Slack workspace **`receipt-ledger`** (`https://receipt-ledger.slack.com`):
+
+| Channel Name | Purpose | Integration / Bot Trigger | Cadence |
+|:---|:---|:---|:---:|
+| **`#daily-standup`** | Asynchronous daily Scrum standups | Team members post reports (or via `notify_slack.py`) | Daily by 12:00 PM |
+| **`#jira`** | Automated Jira issue and sprint notifications | Atlassian Jira Cloud Slack App (`receipt-ledger.atlassian.net`) | Real-time on status change |
+| **`#github-builds`** | Automated CI/CD build & APK release alerts | GitHub Actions (`build-and-release.yml` Slack step) | On push to `main` |
+| **`#all-receipt-ledger`**| General team announcements & milestone sign-offs | Manual / PM broadcasts | Ad-hoc |
+
+### Daily Standup Report Format:
+1. *What did I complete yesterday?*
+2. *What will I work on today?*
+3. *Any blockers or impediments?*
+
+* **Sprint Review & Demo:** Held at the conclusion of each sprint to review working software increments.
 * **Scope Protection Rule:** Under the 3-week cadence, if an issue slips past 48 hours, its scope is trimmed immediately rather than pushing back the final delivery deadline.
+
+---
+
+## 4. Live Jira Scrum Board Cross-Reference & Traceability Matrix
+
+The engineering implementation on the live Atlassian Jira board (`https://aunshamsi2005-1791564053187.atlassian.net/jira/software/projects/SCRUM`) decomposes the project into **8 Epics** and **64 tracking issues**.
+
+### 4.1 Epic Structure & Deliverable Scope
+
+| Epic Key | Epic Title | Owner / Lead | Jira Status | Delivered Scope Summary |
+|:---|:---|:---|:---:|:---|
+| **`SCRUM-5`** | `BACKEND AND API` | Muhammad Asad Khan | In Progress | FastAPI core, OpenCV deskewing, dual OCR routing, Gemini 3.5 Flash, Supabase DDL, deduplication |
+| **`SCRUM-6`** | `UI/UX DESIGN` | Aazmeer Sarfaraz Faridy | Done / Baseline | Google Stitch wireframes, Scandinavian botanical design system, mobile screen specs |
+| **`SCRUM-7`** | `Dashboard` | Iman Hussain | In Progress | React 18 + Vite operations console, KPI metric strip, category donut, review triage desk |
+| **`SCRUM-8`** | `Frontend Development` | Muhammad Asad Khan | In Progress | Flutter 3.x cross-platform client, camera capture, sparkline velocity chart, settings |
+| **`SCRUM-10`** | `QA, Integration & Documentation` | Syed Aun Shamsi (PM) | In Progress | 37-test CLI suite, 28-vector adversarial stress test, IEEE 830 documentation suite |
+| **`SCRUM-11`** | `Risk Management and Mitigation` | Arish Ahmed Khan | In Review | PMBOK risk register, OCR degradation fallbacks, zero-cost cloud budget protections |
+| **`SCRUM-33`** | `Receipt Dataset & Ground Truth` | Zainab Hashmi | In Progress | 50+ printed & handwritten Pakistani receipts, ground-truth labels, local item taxonomy |
+| **`SCRUM-46`** | `Project Management And Sprint Tracking`| Syed Aun Shamsi (PM) | In Progress | Jira backlog grooming, sprint burndowns, division of work, Slack integration |
+
+### 4.2 Requirements Traceability Matrix (RTM: SRS Requirements $\rightarrow$ Jira Tickets $\rightarrow$ Implementation)
+
+| Req ID | Requirement Description | Jira Issue Key | Subsystem / File | Status |
+|:---|:---|:---:|:---|:---:|
+| `FR-001` | Mobile camera capture & batch mode | `SCRUM-28`, `SCRUM-66` | `mobile/lib/screens/upload_screen.dart` | ✅ Done |
+| `FR-002` | OpenCV edge detection & perspective deskew | `SCRUM-18`, `SCRUM-59` | `backend/app/services/preprocessor.py` | ✅ Done |
+| `FR-003` | Printed receipt OCR (Cloud Vision / Tesseract) | `SCRUM-18`, `SCRUM-61` | `backend/app/services/ocr_router.py` | ✅ Done |
+| `FR-004` | Handwritten receipt OCR (EasyOCR / Gemini) | `SCRUM-18`, `SCRUM-61` | `backend/app/services/gemini_client.py` | ✅ Done |
+| `FR-005` | Dictionary-based item & unit normalization | `SCRUM-18`, `SCRUM-62` | `backend/app/services/normalizer.py` | ✅ Done |
+| `FR-006` | Rule-based spending classification | `SCRUM-18`, `SCRUM-62` | `backend/app/services/normalizer.py` | ✅ Done |
+| `FR-007` | Deduplication (64-bit pHash + SHA-256) | `SCRUM-19`, `SCRUM-63..65` | `backend/app/services/dedup.py` | ✅ Done |
+| `FR-008` | Monthly spend aggregation & MoM deltas | `SCRUM-23`, `SCRUM-55` | `backend/app/api/analytics.py` | ✅ Done |
+| `FR-009` | Category spend distribution & velocity charts | `SCRUM-24`, `SCRUM-55` | `web/src/features/kpi/KpiMetricsRow.tsx` | ✅ Done |
+| `FR-010` | Searchable historical transaction ledger | `SCRUM-25`, `SCRUM-54` | `web/src/features/audit-ledger/` | ✅ Done |
+| `FR-011` | Human-in-the-loop review queue & crop viewer | `SCRUM-26`, `SCRUM-56` | `web/src/features/review-desk/` | ✅ Done |

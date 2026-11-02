@@ -86,6 +86,7 @@ erDiagram
         decimal total_price
         decimal confidence_score
         boolean is_verified
+        jsonb bbox
     }
 
     REVIEW_QUEUE {
@@ -198,7 +199,8 @@ CREATE TABLE line_items (
     unit_price DECIMAL(10,2) NOT NULL,
     total_price DECIMAL(10,2) NOT NULL,
     confidence_score DECIMAL(4,3) NOT NULL,
-    is_verified BOOLEAN NOT NULL DEFAULT FALSE
+    is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    bbox JSONB DEFAULT NULL
 );
 
 -- Duplicate Hashes Table

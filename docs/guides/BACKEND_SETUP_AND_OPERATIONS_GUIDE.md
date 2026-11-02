@@ -367,6 +367,9 @@ You can run the entire ReceiptLedger stack in production **at zero cost ($0.00/m
 | **Local Handwritten OCR** | EasyOCR + PyTorch | Unlimited (runs on your CPU/GPU) | Python package `easyocr` |
 | **Database & Storage** | Supabase PostgreSQL | 500 MB database + 1 GB storage free | `SUPABASE_URL`, `SUPABASE_ANON_KEY` |
 | **Dev Persist Fallback** | In-Memory Store | Unlimited (zero dependencies) | Default when Supabase keys omitted |
+| **Cloud Hosting (Free)** | Render 1-Click (`render.yaml`) | 512 MB RAM Free Web Service | GitHub OAuth connection |
+| **Testing Tunnels** | Cloudflare / Ngrok / Pinggy | Free Public HTTPS endpoints | `scripts/devops/tunnel_server.py` |
+| **CI/CD & Slack Alerts**| GitHub Actions + Slack Webhook | Unlimited public runner minutes | `SLACK_WEBHOOK_URL` |
 | **Mobile Client** | Flutter 3.x Client | Unlimited (Windows, Web, Android) | `API_BASE_URL` |
 
 ### Step-by-Step Free Setup Checklist:
@@ -382,7 +385,7 @@ You can run the entire ReceiptLedger stack in production **at zero cost ($0.00/m
    - Copy Project URL and `anon` public key to `backend/.env`.
 3. **Local OCR (0 PKR / $0):**
    - Windows: Install Tesseract 5 from UB-Mannheim into `C:\Program Files\Tesseract-OCR` and add to PATH.
-   - Run `python -m app.cli_test` to verify all 32 tests pass.
+   - Run `python -m app.cli_test` to verify all 37 tests pass.
 
 ---
 

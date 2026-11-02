@@ -76,9 +76,9 @@ API Documentation will be live at:
 * Swagger UI: `http://localhost:8000/docs`
 * ReDoc: `http://localhost:8000/redoc`
 
-### 4. Run Comprehensive CLI Test Suite (32 Tests)
+### 4. Run Comprehensive CLI Test Suite (37 Tests)
 
-Test the entire pipeline, all OCR paths, dedup engine, in-memory store, API endpoints, and real sample receipts without running a server or database:
+Test the entire pipeline, all OCR paths, dedup engine, in-memory store, API endpoints, spatial line bounding box crops, and real sample receipts without running a server or database:
 
 ```powershell
 python -m app.cli_test
