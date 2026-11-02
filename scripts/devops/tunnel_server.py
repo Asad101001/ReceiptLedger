@@ -69,8 +69,22 @@ def update_mobile_env(public_url: str):
         print(f"    [-] Could not write to mobile/.env: {e}")
 
 
+def is_backend_running(port: int = 8000) -> bool:
+    """Checks if a backend server is already listening on the target port."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(1.0)
+            return s.connect_ex(("127.0.0.1", port)) == 0
+    except Exception:
+        return False
+
+
 def run_backend_process():
-    """Starts FastAPI uvicorn server in backend directory."""
+    """Starts FastAPI uvicorn server in backend directory if not already running."""
+    if is_backend_running(8000):
+        print("[1/2] FastAPI backend is already active on http://127.0.0.1:8000 (reusing running instance)")
+        return None
+
     print("[1/2] Starting FastAPI backend on http://127.0.0.1:8000 ...")
     python_exe = sys.executable
 
@@ -82,8 +96,13 @@ def run_backend_process():
     env = os.environ.copy()
     env["PYTHONPATH"] = str(BACKEND_DIR)
 
+    tess_path = Path(r"C:\Program Files\Tesseract-OCR")
+    if (tess_path / "tesseract.exe").is_file():
+        env["PATH"] = f"{tess_path};{env.get('PATH', '')}"
+        env["TESSDATA_PREFIX"] = str(tess_path / "tessdata")
+
     proc = subprocess.Popen(
-        [python_exe, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"],
+        [python_exe, "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"],
         cwd=str(BACKEND_DIR),
         env=env,
         stdout=subprocess.DEVNULL,
@@ -217,10 +236,41 @@ def start_pinggy_ssh_tunnel():
     return proc, url_found
 
 
+def start_ngrok_tunnel():
+    """Runs ngrok tunnel with user's permanent static domain."""
+    ngrok_bin = shutil.which("ngrok")
+    if not ngrok_bin:
+        return None, None
+    print("[2/2] Launching Ngrok Tunnel with permanent static domain...")
+    cmd = [ngrok_bin, "http", "8000", "--url", "disagree-slick-record.ngrok-free.dev"]
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        time.sleep(2)
+        # Verify via local inspection API
+        try:
+            import json
+            req = urllib.request.Request("http://127.0.0.1:4040/api/tunnels")
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                for t in data.get("tunnels", []):
+                    if t.get("public_url"):
+                        return proc, t["public_url"]
+        except Exception:
+            pass
+        return proc, "https://disagree-slick-record.ngrok-free.dev"
+    except Exception as e:
+        print(f"      [!] Ngrok could not start: {e}")
+        return None, None
+
+
 def main():
     print("=" * 70)
-    print(" ReceiptLedger Zero-Cost HTTPS Tunnel & Backend")
-    print(" Cost: $0.00 / mo | No Credit Card | No Cloud Accounts Required")
+    print(" ReceiptLedger HTTPS Tunnel & Backend")
+    print(" Permanent Static Domain: https://disagree-slick-record.ngrok-free.dev")
     print("=" * 70)
 
     # 1. Start FastAPI backend
@@ -231,17 +281,21 @@ def main():
     tunnel_proc = None
     public_url = None
 
-    # Priority 1: Cloudflare Tunnel (fast global edge, if reachable)
-    cf_bin = ensure_cloudflared()
-    if cf_bin:
-        tunnel_proc, public_url = start_cloudflare_tunnel(cf_bin)
+    # Priority 1: Ngrok Permanent Static Dev Domain
+    tunnel_proc, public_url = start_ngrok_tunnel()
 
-    # Priority 2: Localtunnel (blazing fast, unblocked fallback via Node/npx)
+    # Priority 2: Cloudflare Tunnel (fast global edge, if reachable)
+    if not public_url:
+        cf_bin = ensure_cloudflared()
+        if cf_bin:
+            tunnel_proc, public_url = start_cloudflare_tunnel(cf_bin)
+
+    # Priority 3: Localtunnel (blazing fast, unblocked fallback via Node/npx)
     if not public_url and shutil.which("npx"):
         print("[*] Switching to Localtunnel fallback...")
         tunnel_proc, public_url = start_localtunnel()
 
-    # Priority 3: Pinggy SSH Tunnel
+    # Priority 4: Pinggy SSH Tunnel
     if not public_url:
         print("[*] Switching to Pinggy SSH fallback...")
         tunnel_proc, public_url = start_pinggy_ssh_tunnel()

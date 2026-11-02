@@ -143,3 +143,4 @@ export const ProjectIcon: React.FC<ProjectIconProps> = ({ name, className = 'w-5
       );
   }
 };
+
