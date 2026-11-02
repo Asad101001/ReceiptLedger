@@ -61,10 +61,13 @@ describe('Phase 2: Frontend Authentication & Login View', () => {
         return {
           access_token: 'fake_jwt_token_for_test',
           token_type: 'bearer',
+          expires_in: 86400,
           user: {
-            id: 'usr_1',
+            user_id: 'usr_1',
             email: 'user@receiptledger.com',
+            full_name: 'Demo Operator',
             role: 'operator',
+            is_authenticated: true,
           },
         };
       }
