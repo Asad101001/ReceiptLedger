@@ -40,7 +40,7 @@ if (Test-Path $UrlFile) {
     $tunnelUrl = (Get-Content $UrlFile -Raw).Trim()
     Write-Host (" Recorded Tunnel URL: {0}" -f $tunnelUrl) -ForegroundColor Green
     try {
-        $tResp = Invoke-RestMethod -Uri "${tunnelUrl}/api/v1/health" -Headers @{'Bypass-Tunnel-Reminder'='true'} -TimeoutSec 5 -ErrorAction Stop
+        $tResp = Invoke-RestMethod -Uri "${tunnelUrl}/api/v1/health" -Headers @{'Bypass-Tunnel-Reminder'='true'; 'ngrok-skip-browser-warning'='true'} -TimeoutSec 5 -ErrorAction Stop
         Write-Host (" [OK] Public Tunnel is UP and reachable from internet ({0})" -f $tResp.status) -ForegroundColor Green
     } catch {
         Write-Host " [!]  Public Tunnel did not respond to health check." -ForegroundColor Yellow

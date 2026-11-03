@@ -36,6 +36,7 @@ import {
 } from '../lib/supabase';
 
 const API_URL_STORAGE_KEY = 'receiptledger_api_base_url';
+export const DEFAULT_STATIC_GATEWAY = 'https://disagree-slick-record.ngrok-free.dev/api/v1';
 
 export const getApiBaseUrl = (): string => {
   if (typeof localStorage !== 'undefined') {
@@ -46,7 +47,14 @@ export const getApiBaseUrl = (): string => {
   }
   const envUrl = import.meta.env.VITE_API_BASE_URL;
   if (envUrl && envUrl.trim()) {
-    return envUrl.trim().replace(/\/+$/, '');
+    const cleaned = envUrl.trim().replace(/\/+$/, '');
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && cleaned.startsWith('http://localhost')) {
+      return DEFAULT_STATIC_GATEWAY;
+    }
+    return cleaned;
+  }
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    return DEFAULT_STATIC_GATEWAY;
   }
   return 'http://localhost:8000/api/v1';
 };
@@ -59,6 +67,30 @@ export const setApiBaseUrl = (url: string | null): void => {
     localStorage.removeItem(API_URL_STORAGE_KEY);
   }
 };
+
+export async function testGatewayHealth(baseUrl: string): Promise<{ ok: boolean; status?: string; message?: string; latencyMs?: number }> {
+  const cleanUrl = baseUrl.trim().replace(/\/+$/, '');
+  const target = cleanUrl + '/health';
+  const start = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  try {
+    const res = await fetch(target, {
+      headers: {
+        Accept: 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+        'Bypass-Tunnel-Reminder': 'true',
+      },
+    });
+    const latencyMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - start);
+    if (!res.ok) {
+      return { ok: false, message: 'HTTP ' + res.status + ': ' + res.statusText, latencyMs };
+    }
+    const data = await res.json();
+    return { ok: data.status === 'ok' || Boolean(data.engines), status: data.status, latencyMs };
+  } catch (err) {
+    const latencyMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - start);
+    return { ok: false, message: err instanceof Error ? err.message : String(err), latencyMs };
+  }
+}
 
 export const API_BASE_URL = getApiBaseUrl();
 
@@ -108,6 +140,8 @@ async function apiRequest<T>(
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
+    'ngrok-skip-browser-warning': 'true',
+    'Bypass-Tunnel-Reminder': 'true',
     ...(options.headers as Record<string, string>),
   };
 

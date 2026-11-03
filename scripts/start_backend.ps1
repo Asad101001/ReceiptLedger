@@ -11,6 +11,7 @@ $LogPath = Join-Path $ScriptDir "tunnel.log"
 $UrlFile = Join-Path $ScriptDir "current_tunnel_url.txt"
 $MobileEnv = Join-Path $ProjectRoot "mobile\.env"
 $LtLog = Join-Path $ScriptDir "localtunnel.log"
+$StaticNgrokUrl = "https://disagree-slick-record.ngrok-free.dev"
 
 # Candidate cloudflared binary paths
 $CloudflaredPath = "C:\Program Files (x86)\cloudflared\cloudflared.exe"
@@ -86,12 +87,12 @@ function Start-BackendServer {
 }
 
 function Ensure-Tunnel {
-    # 1. Verify existing tunnel health
+    # 1. Verify existing public HTTPS tunnel health
     if (Test-Path $UrlFile) {
         $existingUrl = (Get-Content $UrlFile -Raw).Trim()
-        if ($existingUrl) {
+        if ($existingUrl -and $existingUrl -match '^https://') {
             try {
-                $resp = Invoke-RestMethod -Uri "$existingUrl/api/v1/health" -TimeoutSec 3 -ErrorAction Stop
+                $resp = Invoke-RestMethod -Uri "$existingUrl/api/v1/health" -Headers @{'ngrok-skip-browser-warning'='true'; 'Bypass-Tunnel-Reminder'='true'} -TimeoutSec 3 -ErrorAction Stop
                 if ($resp.status -eq "ok") {
                     Sync-Config $existingUrl
                     return $existingUrl
@@ -100,41 +101,76 @@ function Ensure-Tunnel {
         }
     }
 
-    # 2. Check if local ISP DNS resolves trycloudflare.com
-    $canResolveCloudflare = $false
-    try {
-        $dns = Resolve-DnsName -Name "trycloudflare.com" -ErrorAction Stop
-        if ($dns) { $canResolveCloudflare = $true }
-    } catch {
-        $canResolveCloudflare = $false
-    }
-
     $foundUrl = $null
 
-    # Priority A: Cloudflare Quick Tunnel (if DNS resolver permits)
-    if ($canResolveCloudflare -and (Test-Path $CloudflaredPath)) {
-        Get-Process cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Milliseconds 300
-        if (Test-Path $LogPath) { Remove-Item $LogPath -Force }
+    # Priority 1: Ngrok Permanent Static Domain (disagree-slick-record.ngrok-free.dev)
+    $ngrokBin = (Get-Command ngrok.exe -ErrorAction SilentlyContinue).Source
+    if (-not $ngrokBin) { $ngrokBin = (Get-Command ngrok -ErrorAction SilentlyContinue).Source }
+    if (-not $ngrokBin -and (Test-Path "$BackendDir\.venv\Scripts\ngrok.exe")) {
+        $ngrokBin = "$BackendDir\.venv\Scripts\ngrok.exe"
+    }
+    if (-not $ngrokBin -and (Test-Path "$env:LOCALAPPDATA\Microsoft\WinGet\Links\ngrok.exe")) {
+        $ngrokBin = "$env:LOCALAPPDATA\Microsoft\WinGet\Links\ngrok.exe"
+    }
 
-        Start-Process -FilePath $CloudflaredPath -ArgumentList "tunnel --edge-ip-version 4 --url http://127.0.0.1:8000" -RedirectStandardError $LogPath -WindowStyle Hidden
+    if ($ngrokBin) {
+        # Check if already active on cloud gateway
+        try {
+            $resp = Invoke-RestMethod -Uri "$StaticNgrokUrl/api/v1/health" -Headers @{'ngrok-skip-browser-warning'='true'; 'Bypass-Tunnel-Reminder'='true'} -TimeoutSec 3 -ErrorAction Stop
+            if ($resp.status -eq "ok") {
+                Sync-Config $StaticNgrokUrl
+                return $StaticNgrokUrl
+            }
+        } catch {}
+
+        Get-Process ngrok -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 400
+        Start-Process -FilePath $ngrokBin -ArgumentList "http 8000 --url $StaticNgrokUrl" -WindowStyle Hidden
         
         for ($i = 0; $i -lt 10; $i++) {
             Start-Sleep -Seconds 1
-            if (Test-Path $LogPath) {
-                $content = Get-Content $LogPath -Raw -ErrorAction SilentlyContinue
-                if ($content -match "failed to request quick Tunnel" -or $content -match "context deadline exceeded") {
+            try {
+                $resp = Invoke-RestMethod -Uri "$StaticNgrokUrl/api/v1/health" -Headers @{'ngrok-skip-browser-warning'='true'; 'Bypass-Tunnel-Reminder'='true'} -TimeoutSec 3 -ErrorAction Stop
+                if ($resp.status -eq "ok") {
+                    $foundUrl = $StaticNgrokUrl
                     break
                 }
-                if ($content -match "https://[a-zA-Z0-9\-]+\.trycloudflare\.com") {
-                    $foundUrl = $Matches[0]
-                    break
+            } catch {}
+        }
+    }
+
+    # Priority 2: Cloudflare Quick Tunnel (if DNS resolver permits)
+    if (-not $foundUrl) {
+        $canResolveCloudflare = $false
+        try {
+            $dns = Resolve-DnsName -Name "trycloudflare.com" -ErrorAction Stop
+            if ($dns) { $canResolveCloudflare = $true }
+        } catch {}
+
+        if ($canResolveCloudflare -and (Test-Path $CloudflaredPath)) {
+            Get-Process cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 300
+            if (Test-Path $LogPath) { Remove-Item $LogPath -Force }
+
+            Start-Process -FilePath $CloudflaredPath -ArgumentList "tunnel --edge-ip-version 4 --url http://127.0.0.1:8000" -RedirectStandardError $LogPath -WindowStyle Hidden
+            
+            for ($i = 0; $i -lt 10; $i++) {
+                Start-Sleep -Seconds 1
+                if (Test-Path $LogPath) {
+                    $content = Get-Content $LogPath -Raw -ErrorAction SilentlyContinue
+                    if ($content -match "failed to request quick Tunnel" -or $content -match "context deadline exceeded") {
+                        break
+                    }
+                    if ($content -match "https://[a-zA-Z0-9\-]+\.trycloudflare\.com") {
+                        $foundUrl = $Matches[0]
+                        break
+                    }
                 }
             }
         }
     }
 
-    # Priority B: Localtunnel via npx (loca.lt) - bypasses regional ISP DNS filtering
+    # Priority 3: Localtunnel via npx (loca.lt) - bypasses regional ISP DNS filtering
     if (-not $foundUrl) {
         $npxBin = (Get-Command npx.cmd -ErrorAction SilentlyContinue).Source
         if (-not $npxBin) { $npxBin = (Get-Command npx -ErrorAction SilentlyContinue).Source }
@@ -156,7 +192,7 @@ function Ensure-Tunnel {
         }
     }
 
-    # Priority C: High-performance direct LAN Wi-Fi connection
+    # Priority 4: High-performance direct LAN Wi-Fi connection
     if (-not $foundUrl) {
         $foundUrl = "http://${localIp}:8000"
     }
@@ -168,6 +204,7 @@ function Ensure-Tunnel {
 # --- Execution ---
 Write-Host "======================================================================" -ForegroundColor DarkGreen
 Write-Host "       ReceiptLedger Backend & Edge Tunnel Controller" -ForegroundColor Green
+Write-Host "       Permanent Static Domain: $StaticNgrokUrl" -ForegroundColor Cyan
 Write-Host "======================================================================" -ForegroundColor DarkGreen
 
 Start-BackendServer
@@ -188,7 +225,7 @@ Write-Host " [+] Local Loopback:   " -NoNewline; Write-Host "http://127.0.0.1:80
 Write-Host " [+] Local Wi-Fi LAN:  " -NoNewline; Write-Host "http://${localIp}:8000" -ForegroundColor Cyan
 Write-Host " [+] Interactive Docs: " -NoNewline; Write-Host "http://127.0.0.1:8000/docs" -ForegroundColor Gray
 Write-Host " [+] Active URL:       " -NoNewline; Write-Host $activeUrl -ForegroundColor Green
-Write-Host " [+] Synced Config:    " -NoNewline; Write-Host "mobile\.env (API_BASE_URL=$activeUrl)" -ForegroundColor DarkYellow
+Write-Host " [+] Synced Config:    " -NoNewline; Write-Host "mobile\.env & current_tunnel_url.txt" -ForegroundColor DarkYellow
 Write-Host " [+] Engines:          " -NoNewline; Write-Host "Gemini=$geminiStatus | DB=$dbStatus" -ForegroundColor Magenta
 Write-Host "======================================================================" -ForegroundColor DarkGreen
 

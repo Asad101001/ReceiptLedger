@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!web/.env.production
 !mobile/.env
 !mobile/.env.example
 *.pem

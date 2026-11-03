@@ -16,6 +16,8 @@ import { UploadReceiptDrawer } from '../../components/UploadReceiptDrawer';
 import { DuplicateConflictBanner } from '../../components/DuplicateConflictBanner';
 import { NetworkErrorBanner } from '../../components/NetworkErrorBanner';
 import { ProjectIcon } from '../../components/ui/ProjectIcon';
+import { Settings } from 'lucide-react';
+import { GatewaySettingsModal } from '../../components/GatewaySettingsModal';
 import {
   ReviewQueueItem,
   ReviewQueueResolveRequest,
@@ -78,6 +80,7 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
   const [ledgerPage, setLedgerPage] = useState<number>(1);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [trendMonths, setTrendMonths] = useState<number>(6);
+  const [isGatewayModalOpen, setIsGatewayModalOpen] = useState<boolean>(false);
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 
@@ -838,9 +841,15 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
                       OFFLINE FIXTURE TELEMETRY
                     </span>
                   )}
-                  <span className="text-[11px] font-mono text-slate-500 truncate max-w-[280px]">
-                    Gateway: {getApiBaseUrl()}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsGatewayModalOpen(true)}
+                    className="flex items-center gap-1.5 text-[11px] font-mono bg-slate-100 hover:bg-slate-200 border border-[#CBD5E1] text-slate-700 px-2.5 py-1 rounded-lg transition-all duration-150 cursor-pointer hover:shadow-xs"
+                    title="Click to configure or test API Gateway URL & Tunnel"
+                  >
+                    <Settings className="w-3 h-3 text-slate-500" />
+                    <span className="truncate max-w-[240px]">Gateway: {getApiBaseUrl()}</span>
+                  </button>
                 </div>
               </div>
 
@@ -962,6 +971,15 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
         isOpen={isUploadDrawerOpen}
         onClose={closeUploadDrawer}
         onUploadSuccess={() => {
+          queryClient.invalidateQueries();
+        }}
+      />
+
+      {/* ── Gateway Configuration & Tunneling Modal ───────────────────────── */}
+      <GatewaySettingsModal
+        isOpen={isGatewayModalOpen}
+        onClose={() => setIsGatewayModalOpen(false)}
+        onGatewayChanged={() => {
           queryClient.invalidateQueries();
         }}
       />
