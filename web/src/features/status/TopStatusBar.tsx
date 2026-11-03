@@ -31,8 +31,12 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
   const isCloudVisionOk = engines?.cloud_vision ? engines.cloud_vision.startsWith('ok') : false;
   const isGeminiOk = engines?.gemini ? engines.gemini.startsWith('ok') : false;
   const isDbOk = Boolean(engines?.database && !engines.database.includes('error') && !engines.database.includes('unavailable'));
+  const isOcrOk = Boolean(engines?.tesseract && !engines.tesseract.includes('error') && !engines.tesseract.includes('unavailable'));
 
-  const allOperational = isCloudVisionOk && isGeminiOk && isDbOk;
+  // In zero-cost architecture, Gemini Vision (primary) or Cloud Vision or Tesseract handles OCR.
+  // The system is fully operational when AI Vision and Database are active.
+  const isVisionOk = isGeminiOk || isCloudVisionOk || isOcrOk;
+  const allOperational = Boolean(isVisionOk && isDbOk && (!health?.status || health.status === 'ok'));
 
   return (
     <header className="bg-white border-b border-[#CBD5E1] text-slate-900 px-4 sm:px-6 py-3 select-none">
