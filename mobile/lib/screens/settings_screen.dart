@@ -26,8 +26,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     final u = _api.currentUser;
-    _userName = u?.fullName?.isNotEmpty == true ? u!.fullName! : 'Asad';
-    _userEmail = u?.email?.isNotEmpty == true ? u!.email : 'muhammadasadk42@gmail.com';
+    _userName = (u != null && u.fullName.isNotEmpty) ? u.fullName : 'Asad';
+    _userEmail = (u != null && u.email.isNotEmpty) ? u.email : 'muhammadasadk42@gmail.com';
     _checkHealthSilently();
   }
 

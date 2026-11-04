@@ -167,16 +167,18 @@ class AppHeader extends StatelessWidget {
                       valueListenable: ApiService().currentUserNotifier,
                       builder: (context, user, _) {
                         String initials = 'RL';
-                        final name = user?.fullName?.trim() ?? '';
-                        if (name.isNotEmpty) {
-                          final parts = name.split(RegExp(r'\s+'));
-                          if (parts.length >= 2) {
-                            initials = (parts[0][0] + parts[1][0]).toUpperCase();
-                          } else if (parts[0].isNotEmpty) {
-                            initials = parts[0][0].toUpperCase();
+                        if (user != null) {
+                          final name = user.fullName.trim();
+                          if (name.isNotEmpty) {
+                            final parts = name.split(RegExp(r'\s+'));
+                            if (parts.length >= 2) {
+                              initials = (parts[0][0] + parts[1][0]).toUpperCase();
+                            } else {
+                              initials = parts[0][0].toUpperCase();
+                            }
+                          } else if (user.email.isNotEmpty) {
+                            initials = user.email[0].toUpperCase();
                           }
-                        } else if (user?.email.isNotEmpty == true) {
-                          initials = user!.email[0].toUpperCase();
                         }
 
                         return Container(
