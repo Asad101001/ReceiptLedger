@@ -16,6 +16,7 @@ import { PaginatedReceiptsResponse, ReceiptDetail } from '../../types';
 import { api } from '../../api/client';
 import { formatPKR, formatDate } from '../../lib/formatters';
 import { ProjectIcon } from '../../components/ui/ProjectIcon';
+import { useConsoleStore } from '../../store/useConsoleStore';
 
 export type ReceiptTypeFilter = 'ALL' | 'PRINTED' | 'HANDWRITTEN';
 export type ReceiptStatusFilter = 'ALL' | 'PROCESSED' | 'PENDING_REVIEW' | 'FLAGGED' | 'DUPLICATE' | 'FAILED';
@@ -69,6 +70,7 @@ export const AuditLedger: React.FC<AuditLedgerProps> = ({
   onSwitchToMockMode,
   isMockMode = false,
 }) => {
+  const { selectedYear, selectedMonth } = useConsoleStore();
   const [statusFilter, setStatusFilter] = useState<ReceiptStatusFilter>('ALL');
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -199,7 +201,7 @@ export const AuditLedger: React.FC<AuditLedgerProps> = ({
 
         {/* Quick CSV Export */}
         <a
-          href={api.getExportCsvUrl(2026, 10)}
+          href={api.getExportCsvUrl(selectedYear, selectedMonth)}
           download
           className="flex items-center gap-1.5 bg-white hover:bg-slate-100 text-slate-800 font-mono text-xs font-semibold px-2.5 py-1 rounded-lg border border-[#CBD5E1] transition-colors cursor-pointer"
           title="Download streaming CSV ledger export"

@@ -18,9 +18,10 @@ import logging
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 
+from app.core.auth import UserSession, get_current_user
 from app.core.models import (
     MonthlySummaryResponse,
     MonthlyTrendPoint,
@@ -71,11 +72,8 @@ async def get_monthly_summary(
         prev_year, prev_month = year, month - 1
 
     previous = store.get_monthly_summary(prev_year, prev_month)
-    delta = (
-        round(current["total_spend"] - previous["total_spend"], 2)
-        if previous["total_spend"] > 0
-        else None
-    )
+    # Always compute spend delta; when previous month had no spend, delta equals full current spend.
+    delta = round(current["total_spend"] - previous["total_spend"], 2)
 
     return MonthlySummaryResponse(
         period=current["period"],
@@ -180,6 +178,7 @@ async def export_ledger(
         ge=1, le=12,
         description="Filter by calendar month (1-12). Only valid when year is also specified.",
     ),
+    current_user: UserSession = Depends(get_current_user),
 ) -> StreamingResponse:
     """
     Stream the complete receipt ledger as a UTF-8 CSV file.
@@ -235,7 +234,9 @@ async def export_ledger(
         output.seek(0)
         output.truncate(0)
 
-        all_receipts = store.list_receipts(include_items=True)
+        # Filter exports to the authenticated user's receipts only
+        user_id_filter = current_user.user_id if current_user.is_authenticated and current_user.user_id != "anonymous" else None
+        all_receipts = store.list_receipts(user_id=user_id_filter, include_items=True)
 
         # Apply year/month filter
         for receipt in all_receipts:

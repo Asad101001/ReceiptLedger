@@ -1,4 +1,4 @@
-"""
+﻿"""
 ReceiptLedger – Pydantic Data Models (Schemas)
 =================================================
 All request/response schemas and shared domain types used across the API
@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -63,21 +63,11 @@ SEEDED_CATEGORIES: List[Dict[str, str]] = [
 # ── OCR Token (internal pipeline object) ─────────────────────────────────────
 
 class BoundingBox(BaseModel):
+    """Pixel bounding box for an OCR token or line item crop."""
     x_min: int
     y_min: int
     x_max: int
     y_max: int
-
-    def __init__(self, x_min: Optional[int] = None, y_min: Optional[int] = None, x_max: Optional[int] = None, y_max: Optional[int] = None, **data):
-        if x_min is not None and "x_min" not in data:
-            data["x_min"] = x_min
-        if y_min is not None and "y_min" not in data:
-            data["y_min"] = y_min
-        if x_max is not None and "x_max" not in data:
-            data["x_max"] = x_max
-        if y_max is not None and "y_max" not in data:
-            data["y_max"] = y_max
-        super().__init__(**data)
 
     @property
     def x_center(self) -> float:
@@ -168,9 +158,9 @@ class ReceiptDetailResponse(BaseModel):
     merchant_name: Optional[str] = None
     receipt_date: Optional[str] = None
     total_amount: float = 0.0
-    status: str = "PROCESSED"
+    status: ReceiptStatus = ReceiptStatus.PROCESSED
     ocr_confidence: Optional[float] = None
-    receipt_type: Optional[str] = None
+    receipt_type: Optional[ReceiptType] = None
     created_at: Optional[str] = None
     user_id: Optional[str] = None
     line_items: List[Dict[str, Any]] = []
@@ -245,10 +235,13 @@ class ReviewQueueItemDetail(BaseModel):
     model_config = {"extra": "allow"}
 
     def model_post_init(self, __context: Any) -> None:
+        # Ensure queue_id is set (may come from 'id' when fetched from DB)
         if not self.queue_id:
             self.queue_id = self.id
+        # Normalize candidate_name from candidate_text alias
         if not self.candidate_name:
             self.candidate_name = self.candidate_text
+        # Populate raw_text from joined line_item if not supplied directly
         if not self.raw_text and self.line_item:
             self.raw_text = self.line_item.get("raw_text") or self.candidate_text
         elif not self.raw_text:
@@ -316,14 +309,17 @@ class DashboardStatCard(BaseModel):
 class CategorySpendDetail(BaseModel):
     category_name: str
     color_hex: str
-    color: Optional[str] = None
-    name: Optional[str] = None
     description: Optional[str] = None
     total_spend: float
     item_count: int
     percentage_of_total: float
 
+    # Aliases for frontend compatibility (populated in model_post_init)
+    color: Optional[str] = None
+    name: Optional[str] = None
+
     def model_post_init(self, __context: Any) -> None:
+        # Keep alias fields in sync with canonical fields
         if self.color is None:
             self.color = self.color_hex
         if self.name is None:
@@ -358,4 +354,3 @@ class DashboardSeedResponse(BaseModel):
     receipts_count: int
     line_items_count: int
     review_items_count: int
-

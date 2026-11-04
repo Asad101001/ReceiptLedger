@@ -218,6 +218,10 @@ export const api = {
       setAuthToken(res.access_token);
       return res;
     } catch (err) {
+      // In production, require real backend authentication; do not allow client-side password bypass
+      if (!import.meta.env.DEV) {
+        throw err;
+      }
       const cleanEmail = credentials.email.toLowerCase().trim();
       if (
         cleanEmail === 'muhammadasadk42@gmail.com' &&
@@ -271,6 +275,10 @@ export const api = {
       setAuthToken(res.access_token);
       return res;
     } catch (err) {
+      // In production, real registration requires a reachable backend gateway
+      if (!import.meta.env.DEV) {
+        throw err;
+      }
       const mockToken = 'jwt_session_' + Date.now();
       setAuthToken(mockToken);
       return {
@@ -517,15 +525,15 @@ export const api = {
         };
       }
 
-      // Also record receipt in Supabase table
+      // Record receipt in Supabase table as PENDING_REVIEW (no fake amount/processed state)
       await supabase.from('receipts').insert({
         id: fileId,
         merchant_name: file.name.replace(/\.[^/.]+$/, ''),
-        total_amount: 1500,
+        total_amount: 0.0,
         receipt_date: new Date().toISOString().split('T')[0],
         receipt_type: 'PRINTED',
-        status: 'PROCESSED',
-        ocr_confidence: 0.95,
+        status: 'PENDING_REVIEW',
+        ocr_confidence: 0.0,
       });
 
       return {
@@ -533,9 +541,9 @@ export const api = {
         ok: true,
         data: {
           receipt_id: fileId,
-          status: 'PROCESSED',
+          status: 'PENDING_REVIEW',
           path: uploadData?.path,
-          message: 'Receipt uploaded to Supabase Storage bucket successfully.',
+          message: 'Receipt uploaded to Supabase Storage. Awaiting gateway OCR processing.',
         },
       };
     }

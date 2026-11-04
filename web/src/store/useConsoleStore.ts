@@ -93,8 +93,8 @@ export const useConsoleStore = create<ConsoleState>((set) => ({
   conflictAlert: null,
   setConflictAlert: (conflictAlert) => set({ conflictAlert }),
 
-  selectedYear: 2026,
-  selectedMonth: 10,
+  selectedYear: new Date().getFullYear(),
+  selectedMonth: new Date().getMonth() + 1,
   setSelectedPeriod: (year: number, month: number) =>
     set({ selectedYear: year, selectedMonth: month }),
 }));

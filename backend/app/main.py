@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -70,8 +71,9 @@ async def lifespan(app: FastAPI):
             cred_file = Path("credentials/google_vision_key.json")
             cred_file.parent.mkdir(parents=True, exist_ok=True)
             cred_file.write_text(raw_cred_json.strip(), encoding="utf-8")
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(cred_file.resolve())
-            settings.google_application_credentials = str(cred_file.resolve())
+            resolved = str(cred_file.resolve())
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = resolved
+            # Note: settings is read-only after init; we set via os.environ instead
             logger.info("Wrote inline GOOGLE_CREDENTIALS_JSON to %s", cred_file)
         except Exception as exc:
             logger.warning("Could not write inline GOOGLE_CREDENTIALS_JSON: %s", exc)

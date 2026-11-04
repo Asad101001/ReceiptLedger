@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.core.config import settings
 from app.core.models import SEEDED_CATEGORIES
@@ -222,7 +222,7 @@ def insert_receipt(
 
     row = {
         "id": r_id,
-        "user_id": user_id or "anonymous",
+        "user_id": safe_user,
         "merchant_name": merchant_name,
         "receipt_date": r_date,
         "total_amount": float(total_amount),
@@ -236,20 +236,32 @@ def insert_receipt(
     # Persist to Supabase if enabled
     client = get_supabase_client()
     if client:
+        db_payload = {
+            "id": r_id,
+            "user_id": safe_user,
+            "merchant_name": merchant_name,
+            "receipt_date": r_date,
+            "total_amount": float(total_amount),
+            "receipt_type": receipt_type,
+            "status": status,
+            "ocr_confidence": float(ocr_confidence),
+        }
         try:
-            db_payload = {
-                "id": r_id,
-                "user_id": safe_user,
-                "merchant_name": merchant_name,
-                "receipt_date": r_date,
-                "total_amount": float(total_amount),
-                "receipt_type": receipt_type,
-                "status": status,
-                "ocr_confidence": float(ocr_confidence),
-            }
             client.table("receipts").insert(db_payload).execute()
         except Exception as exc:
-            logger.warning("Failed to insert receipt to Supabase (%s), stored in-memory", exc)
+            err_str = str(exc)
+            # If the remote database has not yet been migrated with 'MANUAL' in CHECK constraint,
+            # retry with legacy 'PRINTED' so the parent receipt and line items persist successfully.
+            if ("receipts_receipt_type_check" in err_str or "23514" in err_str) and receipt_type == "MANUAL":
+                try:
+                    fallback_payload = dict(db_payload)
+                    fallback_payload["receipt_type"] = "PRINTED"
+                    client.table("receipts").insert(fallback_payload).execute()
+                    logger.info("Inserted manual receipt %s into Supabase with legacy type fallback 'PRINTED'", r_id)
+                except Exception as retry_exc:
+                    logger.warning("Supabase fallback insert also failed: %s", retry_exc)
+            else:
+                logger.warning("Failed to insert receipt to Supabase (%s), stored in-memory", exc)
 
     return row
 
@@ -496,6 +508,33 @@ def list_receipts(user_id: Optional[str] = None, include_items: bool = False) ->
         return enriched
 
     return sorted_rows
+
+
+def get_recent_receipts(limit: int = 5, user_id: Optional[str] = None) -> List[Dict]:
+    """
+    Efficiently retrieve the N most recent receipts without loading the full table.
+    Uses Supabase .limit() for database-level slicing when available.
+    """
+    client = get_supabase_client()
+    if client:
+        try:
+            q = client.table("receipts").select("*").order("created_at", desc=True).limit(limit)
+            safe_user = _safe_uuid(user_id)
+            if safe_user:
+                q = q.eq("user_id", safe_user)
+            res = q.execute()
+            if res.data is not None:
+                for r in res.data:
+                    _receipts[r["id"]] = r
+                return res.data
+        except Exception as exc:
+            logger.warning("Supabase get_recent_receipts query error: %s", exc)
+
+    # In-memory fallback
+    rows = list(_receipts.values())
+    if user_id and user_id != "anonymous":
+        rows = [r for r in rows if r.get("user_id") == user_id]
+    return sorted(rows, key=lambda r: r.get("created_at", ""), reverse=True)[:limit]
 
 
 def get_paginated_receipts(
@@ -971,8 +1010,13 @@ def resolve_review_queue_item(
         except Exception as exc:
             logger.warning("Supabase resolve_review_queue_item error: %s", exc)
 
-    if line_item_id:
+    # Update the line item if not already done inside the Supabase block,
+    # or if we are running purely in-memory (no Supabase client).
+    if line_item_id and not (client and is_valid_uuid):
         update_line_item(line_item_id, updates)
+
+    # Promote receipt to PROCESSED once all its review items are resolved
+    if line_item_id:
         try:
             li_row = get_line_item(line_item_id)
             if li_row and li_row.get("receipt_id"):
@@ -1014,25 +1058,41 @@ def resolve_receipt_all(receipt_id: str) -> bool:
     update_receipt(receipt_id, {"status": "PROCESSED"})
 
     # 2. Mark all associated line items verified
+    # Fetch from Supabase if available to cover items not yet cached locally
     client = get_supabase_client()
     items = [li for li in _line_items.values() if li.get("receipt_id") == receipt_id]
+    if client and not items:
+        try:
+            li_res = client.table("line_items").select("id, receipt_id").eq("receipt_id", receipt_id).execute()
+            if li_res.data:
+                items = li_res.data
+                for li in items:
+                    _line_items[li["id"]] = li
+        except Exception as exc:
+            logger.warning("resolve_receipt_all: could not fetch line items from Supabase: %s", exc)
     for li in items:
         update_line_item(li["id"], {"is_verified": True})
 
-    # 3. Resolve review queue items for this receipt
-    for q_id, q in list(_review_queue.items()):
-        li_id = q.get("line_item_id")
-        if any(li["id"] == li_id for li in items):
-            q["review_status"] = "ACCEPTED"
-            q["resolved_at"] = now_str
-            if client:
-                try:
+    # 3. Resolve review queue items for this receipt in Supabase
+    item_ids = {li["id"] for li in items}
+    if client and item_ids:
+        try:
+            rq_res = client.table("review_queue").select("id").in_("line_item_id", list(item_ids)).eq("review_status", "UNRESOLVED").execute()
+            if rq_res.data:
+                for rq_row in rq_res.data:
                     client.table("review_queue").update({
                         "review_status": "ACCEPTED",
                         "resolved_at": now_str,
-                    }).eq("id", q_id).execute()
-                except Exception:
-                    pass
+                    }).eq("id", rq_row["id"]).execute()
+        except Exception as exc:
+            logger.warning("resolve_receipt_all: could not resolve Supabase review items: %s", exc)
+
+    # 4. Update in-memory review queue entries
+    for q_id, q in list(_review_queue.items()):
+        li_id = q.get("line_item_id")
+        if li_id in item_ids:
+            q["review_status"] = "ACCEPTED"
+            q["resolved_at"] = now_str
 
     return True
 
@@ -1279,6 +1339,13 @@ def get_dashboard_overview(year: Optional[int] = None, month: Optional[int] = No
     cat_breakdown: List[Dict] = []
     cur_total = current["total_spend"]
 
+    # Build item_count per category from cached line_items (Supabase path caches items on load)
+    _cat_item_counts: Dict[str, int] = {}
+    for li in _line_items.values():
+        cat_name = li.get("category_name") or get_category_name(li.get("category_id", ""))
+        if cat_name:
+            _cat_item_counts[cat_name] = _cat_item_counts.get(cat_name, 0) + 1
+
     for name, spend in current["category_breakdown"].items():
         meta = cat_map.get(name, {"color_hex": "#6B7280", "description": ""})
         pct = round((spend / cur_total * 100.0), 1) if cur_total > 0 else 0.0
@@ -1288,7 +1355,7 @@ def get_dashboard_overview(year: Optional[int] = None, month: Optional[int] = No
             "color_hex": meta["color_hex"],
             "description": meta.get("description", ""),
             "total_spend": spend,
-            "item_count": 0,
+            "item_count": _cat_item_counts.get(name, 0),
             "percentage_of_total": pct,
         })
 
@@ -1307,7 +1374,8 @@ def get_dashboard_overview(year: Optional[int] = None, month: Optional[int] = No
     else:
         verified_items = sum(1 for li in _line_items.values() if li.get("is_verified"))
 
-    recent = list_receipts()[:5]
+    # Fetch only 5 recent receipts; avoids pulling all rows from Supabase
+    recent = get_recent_receipts(limit=5)
 
     stat_cards = [
         {
@@ -1377,8 +1445,14 @@ def seed_demo_data() -> Dict[str, int]:
     from app.core.run_logger import save_run_log
 
     today = date.today()
-    target_period = "2026-10"
-    prev_period = "2026-09"
+    # Use current month dynamically so demo data always reflects the active period
+    target_period = today.strftime("%Y-%m")
+    # Compute previous month correctly (handles January edge case)
+    if today.month == 1:
+        prev_month_date = today.replace(year=today.year - 1, month=12, day=1)
+    else:
+        prev_month_date = today.replace(month=today.month - 1, day=1)
+    prev_period = prev_month_date.strftime("%Y-%m")
     today_period = today.strftime("%Y-%m")
 
     # Sample images directory

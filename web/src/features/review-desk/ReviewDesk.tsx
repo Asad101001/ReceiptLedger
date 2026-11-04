@@ -79,6 +79,9 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({
       setConfirmedUnit(initialUnit);
       setConfirmedUnitPrice(initialUnitPrice);
       setConfirmedTotalPrice(Math.round(initialTotal * 100) / 100);
+      setZoom(1.5);
+      setPan({ x: 0, y: -20 });
+      setBucketImgUrl('');
       setImageError(Boolean(isMockMode && !currentItem.receipt_image_url));
       if (currentItem.receipt_id) {
         getReceiptImageUrlFromBucket(currentItem.receipt_id).then(url => { if (url) { setBucketImgUrl(url); setImageError(false); } });
@@ -205,7 +208,7 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({
   const queueId = currentItem?.queue_id || currentItem?.id;
   const receiptId = currentItem?.receipt_id || currentItem?.line_item?.receipt_id;
   const rawText = currentItem?.raw_text || currentItem?.line_item?.raw_text || '';
-  const merchantName = currentItem?.merchant_name || 'Chaudhry Sabzi & Fruit Store';
+  const merchantName = currentItem?.merchant_name || 'Unknown Merchant';
   const confidenceTier = getConfidenceTier(currentItem?.model_confidence);
 
   // Bounding box snippet positioning

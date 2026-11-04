@@ -27,10 +27,21 @@ ON CONFLICT (name) DO NOTHING;
 -- ── Users (managed by Supabase Auth; mirror table for FK references) ──────────
 CREATE TABLE IF NOT EXISTS users (
     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    email       VARCHAR(255),
+    email       VARCHAR(255) NOT NULL,
     full_name   VARCHAR(255),
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Ensure uniqueness on email (idempotent)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'users_email_key' AND conrelid = 'users'::regclass
+    ) THEN
+        ALTER TABLE users ADD CONSTRAINT users_email_key UNIQUE (email);
+    END IF;
+END $$;
 
 -- ── Receipts ──────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS receipts (
@@ -39,7 +50,7 @@ CREATE TABLE IF NOT EXISTS receipts (
     merchant_name   VARCHAR(255),
     receipt_date    DATE        NOT NULL DEFAULT CURRENT_DATE,
     total_amount    DECIMAL(10,2) NOT NULL,
-    receipt_type    VARCHAR(32) NOT NULL CHECK (receipt_type IN ('PRINTED', 'HANDWRITTEN')),
+    receipt_type    VARCHAR(32) NOT NULL CHECK (receipt_type IN ('PRINTED', 'HANDWRITTEN', 'MANUAL')),
     status          VARCHAR(32) NOT NULL DEFAULT 'PROCESSED'
                     CHECK (status IN ('PROCESSED', 'PENDING_REVIEW', 'DUPLICATE')),
     ocr_confidence  DECIMAL(4,3) NOT NULL CHECK (ocr_confidence BETWEEN 0 AND 1),
@@ -48,6 +59,7 @@ CREATE TABLE IF NOT EXISTS receipts (
 
 CREATE INDEX IF NOT EXISTS idx_receipts_user_date ON receipts(user_id, receipt_date);
 CREATE INDEX IF NOT EXISTS idx_receipts_status    ON receipts(status);
+CREATE INDEX IF NOT EXISTS idx_receipts_created_at ON receipts(created_at DESC);
 
 -- ── Line Items ────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS line_items (
@@ -94,6 +106,7 @@ CREATE TABLE IF NOT EXISTS review_queue (
 CREATE INDEX IF NOT EXISTS idx_review_queue_status ON review_queue(review_status);
 
 -- ── Analytics View ────────────────────────────────────────────────────────────
+-- Includes PROCESSED and PENDING_REVIEW receipts in spend analytics
 CREATE OR REPLACE VIEW view_monthly_category_spend AS
 SELECT
     r.user_id,
@@ -105,9 +118,35 @@ SELECT
 FROM line_items li
 JOIN receipts   r  ON li.receipt_id   = r.id
 JOIN categories c  ON li.category_id  = c.id
-WHERE r.status = 'PROCESSED'
+WHERE r.status IN ('PROCESSED', 'PENDING_REVIEW')
 GROUP BY r.user_id, spend_period, c.name, c.color_hex;
 
 -- ── Migration 1.1: Normalized Bounding Box for Line Items ──────────────────────
 -- Persists normalized bounding boxes (ymin, xmin, ymax, xmax) for pixel-perfect crops
 ALTER TABLE line_items ADD COLUMN IF NOT EXISTS bbox JSONB;
+
+-- ── Migration 1.2: Add MANUAL receipt type to existing databases ───────────────
+-- Run this block against existing Supabase projects that only have PRINTED/HANDWRITTEN.
+DO $$
+BEGIN
+    -- Drop old constraint and re-add with MANUAL included
+    ALTER TABLE receipts DROP CONSTRAINT IF EXISTS receipts_receipt_type_check;
+    ALTER TABLE receipts ADD CONSTRAINT receipts_receipt_type_check
+        CHECK (receipt_type IN ('PRINTED', 'HANDWRITTEN', 'MANUAL'));
+EXCEPTION WHEN others THEN
+    RAISE NOTICE 'Migration 1.2 skipped or already applied: %', SQLERRM;
+END $$;
+
+-- ── Migration 1.3: Harden users table ─────────────────────────────────────────
+-- Make email NOT NULL and add unique constraint for existing databases.
+DO $$
+BEGIN
+    -- Update any NULL emails with a placeholder before adding NOT NULL
+    UPDATE users SET email = 'unknown_' || id::text || '@placeholder.local'
+    WHERE email IS NULL OR email = '';
+
+    ALTER TABLE users ALTER COLUMN email SET NOT NULL;
+    ALTER TABLE users ADD CONSTRAINT users_email_key UNIQUE (email);
+EXCEPTION WHEN others THEN
+    RAISE NOTICE 'Migration 1.3 skipped or already applied: %', SQLERRM;
+END $$;

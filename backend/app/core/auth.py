@@ -122,6 +122,24 @@ _USER_STORE: Dict[str, Dict[str, Any]] = {
 }
 
 
+# ── Role Assignment ─────────────────────────────────────────────────────────────
+
+# Emails that always receive admin role, regardless of registration order
+_ADMIN_EMAILS = {
+    "muhammadasadk42@gmail.com",
+    "user@receiptledger.com",
+}
+
+
+def _get_role_for_email(email: str) -> str:
+    """Return the appropriate role for the given (cleaned) email address."""
+    email_clean = email.strip().lower()
+    # Check seeded store first (may have an explicit role set)
+    if email_clean in _USER_STORE:
+        return _USER_STORE[email_clean].get("role", "user")
+    return "admin" if email_clean in _ADMIN_EMAILS else "user"
+
+
 # ── JWT Utility (Lightweight, pure Python standard library) ───────────────────
 
 def create_access_token(user: UserSession, expires_in: int = 86400) -> str:
@@ -229,7 +247,7 @@ def authenticate_user(email: str, password: str) -> Optional[UserSession]:
                         except Exception:
                             pass
 
-                    role = "admin" if email_clean in ("muhammadasadk42@gmail.com", "user@receiptledger.com") else "user"
+                    role = _get_role_for_email(email_clean)
                     session = UserSession(
                         user_id=user_id,
                         email=email_clean,
@@ -265,9 +283,9 @@ def register_user(email: str, password: str, full_name: Optional[str] = None) ->
     email_clean = email.strip().lower()
     user_uuid: Optional[str] = None
 
-    # Check local store first for duplicate check
-    if email_clean in _USER_STORE and _USER_STORE[email_clean].get("password_hash") != _hash_pw(password):
-        raise ValueError(f"User with email '{email}' already exists.")
+    # Reject any attempt to register an already-registered email
+    if email_clean in _USER_STORE:
+        raise ValueError(f"User with email '{email}' is already registered. Please log in instead.")
 
     # 1. Supabase Persistence
     try:
@@ -334,7 +352,7 @@ def register_user(email: str, password: str, full_name: Optional[str] = None) ->
         "email": email_clean,
         "password_hash": _hash_pw(password),
         "full_name": full_name or "ReceiptLedger User",
-        "role": "admin" if email_clean in ("muhammadasadk42@gmail.com", "user@receiptledger.com") else "user",
+        "role": _get_role_for_email(email_clean),
         "created_at": created_at,
     }
     _USER_STORE[email_clean] = record

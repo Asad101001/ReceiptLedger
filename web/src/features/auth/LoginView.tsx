@@ -6,10 +6,10 @@ import { ProjectIcon } from '../../components/ui/ProjectIcon';
 export const LoginView: React.FC = () => {
   const { login, isLoggingIn, register, isRegistering } = useAuth();
   const [mode, setMode] = useState<'signin' | 'register'>('signin');
-  const [fullName, setFullName] = useState('Asad');
-  const [email, setEmail] = useState('muhammadasadk42@gmail.com');
-  const [password, setPassword] = useState('asad1234');
-  const [confirmPassword, setConfirmPassword] = useState('asad1234');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const isSubmitting = isLoggingIn || isRegistering;
@@ -162,7 +162,7 @@ export const LoginView: React.FC = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="muhammadasadk42@gmail.com"
+                placeholder="operator@receiptledger.com"
                 className="w-full pl-10 pr-3 py-2.5 text-xs font-mono bg-white border border-[#CBD5E1] rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-colors"
               />
             </div>
@@ -252,7 +252,7 @@ export const LoginView: React.FC = () => {
               onClick={handleFillDemo}
               className="p-2 text-left bg-white hover:bg-slate-50 border border-[#CBD5E1] rounded-xl text-[11px] transition-colors cursor-pointer"
             >
-              <div className="font-bold text-slate-900">Demo Account</div>
+              <div className="font-bold text-slate-900">Autofill Demo Account</div>
               <div className="text-[10px] text-slate-500 truncate">user@receiptledger...</div>
               <div className="text-[10px] text-emerald-700 font-semibold mt-0.5">demo1234</div>
             </button>

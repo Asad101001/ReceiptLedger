@@ -20,8 +20,9 @@ from __future__ import annotations
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.core.auth import UserSession, get_current_user
 from app.core.models import (
     CategorySpendDetail,
     DashboardOverviewResponse,
@@ -103,7 +104,7 @@ async def get_dashboard_review_summary() -> DashboardReviewSummary:
     summary="Populate realistic demo receipts for frontend dashboard testing",
     tags=["Dashboard"],
 )
-async def seed_dashboard_demo() -> DashboardSeedResponse:
+async def seed_dashboard_demo(current_user: UserSession = Depends(get_current_user)) -> DashboardSeedResponse:
     """
     Utility endpoint for web developers: populates sample printed and handwritten
     receipts (Iman / Web stream) along with candidate items in the review queue
@@ -126,7 +127,7 @@ async def seed_dashboard_demo() -> DashboardSeedResponse:
     summary="Reset in-memory data store",
     tags=["Dashboard"],
 )
-async def reset_dashboard_data() -> dict:
+async def reset_dashboard_data(current_user: UserSession = Depends(get_current_user)) -> dict:
     """
     Resets the in-memory store to an empty state.
     Allows testing empty/zero states on the dashboard.
