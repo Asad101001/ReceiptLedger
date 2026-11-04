@@ -14,8 +14,8 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final ApiService _api = ApiService();
-  String _userName = 'Asad Khan';
-  String _userEmail = 'user@receiptledger.com';
+  late String _userName;
+  late String _userEmail;
   bool _isDarkMode = false;
   bool _biometricsEnabled = true;
 
@@ -25,7 +25,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+    final u = _api.currentUser;
+    _userName = u?.fullName?.isNotEmpty == true ? u!.fullName! : 'Asad';
+    _userEmail = u?.email?.isNotEmpty == true ? u!.email : 'muhammadasadk42@gmail.com';
     _checkHealthSilently();
+  }
+
+  String _computeInitials(String name, String email) {
+    final cleanName = name.trim();
+    if (cleanName.isNotEmpty) {
+      final parts = cleanName.split(RegExp(r'\s+'));
+      if (parts.length >= 2) {
+        return (parts[0][0] + parts[1][0]).toUpperCase();
+      }
+      return parts[0][0].toUpperCase();
+    }
+    if (email.trim().isNotEmpty) {
+      return email.trim()[0].toUpperCase();
+    }
+    return 'RL';
   }
 
   Future<void> _checkHealthSilently() async {
@@ -344,7 +362,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     child: Row(
                       children: [
-                        // Circle Avatar with initials "AK" (dark green)
+                        // Circle Avatar with initials dynamically computed from profile
                         Container(
                           width: 52,
                           height: 52,
@@ -353,9 +371,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             shape: BoxShape.circle,
                           ),
                           alignment: Alignment.center,
-                          child: const Text(
-                            'AK',
-                            style: TextStyle(
+                          child: Text(
+                            _computeInitials(_userName, _userEmail),
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 18,
                               fontWeight: FontWeight.bold,

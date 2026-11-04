@@ -1985,29 +1985,58 @@ def seed_demo_data() -> Dict[str, int]:
 
 
 def reset_store() -> None:
-    """Clear all receipts, line items, and review items, re-initializing categories."""
+    """
+    Purges all receipts, line items, deduplication hashes, and review items from:
+    1. Supabase database tables (review_queue, receipt_hashes, line_items, receipts)
+    2. Supabase Storage bucket (receipt-images)
+    3. Local filesystem image cache
+    4. In-memory data structures
+    Leaves categories and user accounts intact for a completely clean, zero-receipt slate.
+    """
     global _receipts, _line_items, _review_queue, _categories, _hashes
     _receipts.clear()
     _line_items.clear()
     _review_queue.clear()
-    _categories.clear()
     _hashes.clear()
     _sync_categories()
 
+    # 1. Clear Supabase Database Tables
     client = get_supabase_client()
     if client:
         try:
-            # Delete in dependency order: review_queue → receipt_hashes → line_items → receipts
             client.table("review_queue").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
             client.table("receipt_hashes").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
             client.table("line_items").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
             client.table("receipts").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-            logger.info("Cleared all receipts and related records from Supabase")
+            logger.info("Cleared all receipts, line items, and review records from Supabase PostgreSQL")
         except Exception as exc:
-            logger.warning("Supabase reset_store error: %s", exc)
+            logger.warning("Supabase reset_store database deletion error: %s", exc)
 
+        # 2. Clear Supabase Storage Bucket
+        try:
+            files = client.storage.from_(settings.supabase_storage_bucket).list()
+            if files:
+                file_names = [f["name"] for f in files if f.get("name") and not f.get("name").startswith(".")]
+                if file_names:
+                    client.storage.from_(settings.supabase_storage_bucket).remove(file_names)
+                    logger.info("Deleted %d receipt image assets from Supabase Storage bucket '%s'", len(file_names), settings.supabase_storage_bucket)
+        except Exception as exc:
+            logger.warning("Supabase reset_store storage deletion error: %s", exc)
 
-# ── Image Storage Operations ──────────────────────────────────────────────────
+    # 3. Clear Local Filesystem Image Cache
+    try:
+        local_dir = _image_store_path()
+        if local_dir.exists():
+            purged_count = 0
+            for img_file in local_dir.glob("*.*"):
+                try:
+                    img_file.unlink()
+                    purged_count += 1
+                except Exception:
+                    pass
+            logger.info("Purged %d local receipt images from disk (%s)", purged_count, local_dir)
+    except Exception as exc:
+        logger.warning("Local image store purge error: %s", exc)
 
 def _image_store_path() -> "Path":
     """Return the absolute path to the local image store directory, creating it if needed."""
@@ -2143,23 +2172,4 @@ def get_supabase_image_url(receipt_id: str, expires_in: int = 3600) -> Optional[
 
     return None
 
-
-def reset_store() -> None:
-    """Purges all receipt records, line items, hashes, and review items from Supabase and in-memory."""
-    global _receipts, _line_items, _review_queue, _hashes
-    _receipts.clear()
-    _line_items.clear()
-    _review_queue.clear()
-    _hashes.clear()
-
-    client = get_supabase_client()
-    if client:
-        try:
-            client.table("review_queue").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-            client.table("line_items").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-            client.table("receipt_hashes").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-            client.table("receipts").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-            logger.info("Purged all receipts, line items, and review queue items from Supabase database.")
-        except Exception as e:
-            logger.error("Error purging Supabase tables: %s", e)
 

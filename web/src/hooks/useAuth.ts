@@ -49,7 +49,7 @@ export function useAuth() {
         return null;
       }
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
     retry: false,
   });
 
@@ -57,6 +57,19 @@ export function useAuth() {
     mutationFn: async (credentials: LoginRequest) => {
       setDevMockSession(false); // Clear any mock session on real login attempt
       const res = await api.login(credentials);
+      return res.user;
+    },
+    onSuccess: (user) => {
+      setDevMockSession(false);
+      queryClient.setQueryData(['auth', 'session'], user);
+      queryClient.invalidateQueries();
+    },
+  });
+
+  const registerMutation = useMutation({
+    mutationFn: async (payload: { email: string; password: string; full_name?: string }) => {
+      setDevMockSession(false);
+      const res = await api.register(payload);
       return res.user;
     },
     onSuccess: (user) => {
@@ -113,6 +126,9 @@ export function useAuth() {
     login: loginMutation.mutateAsync,
     isLoggingIn: loginMutation.isPending,
     loginError: loginMutation.error,
+    register: registerMutation.mutateAsync,
+    isRegistering: registerMutation.isPending,
+    registerError: registerMutation.error,
     logout: logoutMutation.mutate,
     enterDevMockMode,
   };

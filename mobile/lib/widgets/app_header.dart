@@ -163,33 +163,51 @@ class AppHeader extends StatelessWidget {
                   GestureDetector(
                     onTap: onAvatarTap,
                     behavior: HitTestBehavior.opaque,
-                    child: Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppTheme.forestPrimary,
-                        border: Border.all(
-                          color: isDark ? const Color(0xFF3B5646) : Colors.white,
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
+                    child: ValueListenableBuilder<UserSession?>(
+                      valueListenable: ApiService().currentUserNotifier,
+                      builder: (context, user, _) {
+                        String initials = 'RL';
+                        final name = user?.fullName?.trim() ?? '';
+                        if (name.isNotEmpty) {
+                          final parts = name.split(RegExp(r'\s+'));
+                          if (parts.length >= 2) {
+                            initials = (parts[0][0] + parts[1][0]).toUpperCase();
+                          } else if (parts[0].isNotEmpty) {
+                            initials = parts[0][0].toUpperCase();
+                          }
+                        } else if (user?.email.isNotEmpty == true) {
+                          initials = user!.email[0].toUpperCase();
+                        }
+
+                        return Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppTheme.forestPrimary,
+                            border: Border.all(
+                              color: isDark ? const Color(0xFF3B5646) : Colors.white,
+                              width: 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.08),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      alignment: Alignment.center,
-                      child: const Text(
-                        'AK',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            initials,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],

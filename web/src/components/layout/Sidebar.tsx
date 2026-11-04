@@ -1,10 +1,11 @@
 import React from 'react';
 import clsx from 'clsx';
-import { Keyboard, LogOut, User, X } from 'lucide-react';
+import { Keyboard, LogOut, X } from 'lucide-react';
 import { useConsoleStore } from '../../store/useConsoleStore';
 import { ProjectIcon, ProjectIconName } from '../ui/ProjectIcon';
 
 interface SidebarProps {
+  userName?: string;
   userEmail?: string;
   onLogout: () => void;
   pendingReviewCount?: number;
@@ -13,6 +14,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
+  userName,
   userEmail = 'user@receiptledger.com',
   onLogout,
   pendingReviewCount = 7,
@@ -20,6 +22,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
 }) => {
   const { activeNav, setActiveNav, toggleShortcutsPanel } = useConsoleStore();
+
+  const displayName = userName || (userEmail?.startsWith('muhammad') ? 'Asad' : 'Operations Manager');
+  const computeInitials = (name: string, email: string) => {
+    const clean = name.trim();
+    if (clean) {
+      const parts = clean.split(/\s+/);
+      if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+      return parts[0][0].toUpperCase();
+    }
+    if (email) return email[0].toUpperCase();
+    return 'OP';
+  };
+  const initials = computeInitials(displayName, userEmail);
 
   const navItems: Array<{
     id: 'overview' | 'review' | 'ledger' | 'health';
@@ -165,12 +180,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* User Card */}
         <div className="bg-white border border-[#CBD5E1] rounded-xl p-3 space-y-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-slate-100 border border-[#CBD5E1] flex items-center justify-center text-slate-700 shrink-0">
-              <User className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+              {initials}
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold text-slate-900 truncate">
-                Operations Manager
+                {displayName}
               </div>
               <div className="text-[10px] font-mono text-slate-500 truncate" title={userEmail}>
                 {userEmail}

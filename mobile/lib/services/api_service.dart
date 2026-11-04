@@ -34,9 +34,9 @@ class UserSession {
   }
 
   static const UserSession demo = UserSession(
-    userId: 'demo-user-1',
-    email: 'user@receiptledger.com',
-    fullName: 'Muhammad Asad Khan',
+    userId: '6dc36ca5-fe30-459b-8e72-715b39800240',
+    email: 'muhammadasadk42@gmail.com',
+    fullName: 'Asad',
     role: 'user',
     token: 'demo-jwt-token-2026',
     isAuthenticated: true,

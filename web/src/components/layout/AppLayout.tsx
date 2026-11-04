@@ -7,6 +7,7 @@ import { getApiBaseUrl } from '../../api/client';
 
 interface AppLayoutProps {
   children: React.ReactNode;
+  userName?: string;
   userEmail?: string;
   onLogout: () => void;
   pendingReviewCount?: number;
@@ -14,6 +15,7 @@ interface AppLayoutProps {
 
 export const AppLayout: React.FC<AppLayoutProps> = ({
   children,
+  userName,
   userEmail,
   onLogout,
   pendingReviewCount = 7,
@@ -72,6 +74,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
       {/* ── Sidebar (Desktop Persistent + Mobile Drawer) ──────────────── */}
       <Sidebar
+        userName={userName}
         userEmail={userEmail}
         onLogout={onLogout}
         pendingReviewCount={pendingReviewCount}

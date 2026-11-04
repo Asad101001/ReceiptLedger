@@ -5,10 +5,10 @@ Provides JWT and Bearer token authentication, user session models, and FastAPI
 dependency injection for securing API endpoints.
 
 Supports:
-1. Supabase Auth JWT verification (when Supabase is configured).
+1. Supabase Auth JWT verification & database persistence in public.users.
 2. Local HMAC-SHA256 JWT sessions (for zero-dependency offline/dev usage).
-3. Pre-seeded demo account for rapid dashboard testing.
-4. Graceful development fallback (auto-assigns dev session if unauthenticated).
+3. Pre-seeded demo and administrator accounts.
+4. Resilient multi-tier auth fallback.
 """
 
 from __future__ import annotations
@@ -80,22 +80,46 @@ class AuthResponse(BaseModel):
     user: UserSession
 
 
-# ── In-Memory User Store (for local / dev sessions) ───────────────────────────
-
-_USER_STORE: Dict[str, Dict[str, Any]] = {
-    "user@receiptledger.com": {
-        "user_id": "usr_demo_7721",
-        "email": "user@receiptledger.com",
-        "password_hash": hashlib.sha256("demo1234".encode()).hexdigest(),
-        "full_name": "Demo Household Manager",
-        "role": "admin",
-        "created_at": "2026-01-01T00:00:00Z",
-    }
-}
-
-
 def _hash_pw(password: str) -> str:
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+
+# ── Seeded User Store (UUIDs matching Supabase PostgreSQL public.users) ────────
+
+_USER_STORE: Dict[str, Dict[str, Any]] = {
+    "muhammadasadk42@gmail.com": {
+        "user_id": "6dc36ca5-fe30-459b-8e72-715b39800240",
+        "email": "muhammadasadk42@gmail.com",
+        "password_hash": _hash_pw("asad1234"),
+        "full_name": "Asad",
+        "role": "admin",
+        "created_at": "2026-11-03T14:26:39Z",
+    },
+    "user@receiptledger.com": {
+        "user_id": "3522f8b8-cb86-45c7-acd4-34aad6336945",
+        "email": "user@receiptledger.com",
+        "password_hash": _hash_pw("demo1234"),
+        "full_name": "Demo Household Manager",
+        "role": "admin",
+        "created_at": "2026-11-03T14:26:59Z",
+    },
+    "operator@receiptledger.com": {
+        "user_id": "81eea267-5a41-4ba1-a95f-3432e0acc333",
+        "email": "operator@receiptledger.com",
+        "password_hash": _hash_pw("demo1234"),
+        "full_name": "Operations Lead",
+        "role": "operator",
+        "created_at": "2026-11-03T14:26:59Z",
+    },
+    "auditor@receiptledger.com": {
+        "user_id": "0a14f29b-f5d3-4fc4-9b03-14c6c8bb3d1b",
+        "email": "auditor@receiptledger.com",
+        "password_hash": _hash_pw("demo1234"),
+        "full_name": "Compliance Auditor",
+        "role": "auditor",
+        "created_at": "2026-11-03T14:27:00Z",
+    },
+}
 
 
 # ── JWT Utility (Lightweight, pure Python standard library) ───────────────────
@@ -165,48 +189,161 @@ def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
 # ── User Account Operations ───────────────────────────────────────────────────
 
 def authenticate_user(email: str, password: str) -> Optional[UserSession]:
-    """Verify user credentials and return a UserSession, or None if invalid."""
+    """
+    Verify user credentials and return a UserSession, or None if invalid.
+    1. Checks local / pre-seeded memory store first for sub-millisecond response.
+    2. Falls back to Supabase Auth verification if not present locally.
+    """
     email_clean = email.strip().lower()
+
+    # 1. Local / pre-seeded store (<1ms zero latency)
     user_record = _USER_STORE.get(email_clean)
-    if not user_record:
+    if user_record:
+        if user_record["password_hash"] == _hash_pw(password):
+            return UserSession(
+                user_id=user_record["user_id"],
+                email=user_record["email"],
+                full_name=user_record.get("full_name"),
+                role=user_record.get("role", "user"),
+                is_authenticated=True,
+                created_at=user_record.get("created_at"),
+            )
         return None
 
-    if user_record["password_hash"] != _hash_pw(password):
-        return None
+    # 2. Check Supabase Auth
+    try:
+        from app.services.store import get_supabase_client
+        client = get_supabase_client()
+        if client:
+            try:
+                auth_res = client.auth.sign_in_with_password({"email": email_clean, "password": password})
+                if auth_res and auth_res.user:
+                    user_id = auth_res.user.id
+                    meta = auth_res.user.user_metadata or {}
+                    name = meta.get("full_name") or meta.get("name")
+                    if not name:
+                        try:
+                            rows = client.table("users").select("full_name").eq("id", user_id).execute().data
+                            if rows and rows[0].get("full_name"):
+                                name = rows[0]["full_name"]
+                        except Exception:
+                            pass
 
-    return UserSession(
-        user_id=user_record["user_id"],
-        email=user_record["email"],
-        full_name=user_record.get("full_name"),
-        role=user_record.get("role", "user"),
-        is_authenticated=True,
-        created_at=user_record.get("created_at"),
-    )
+                    role = "admin" if email_clean in ("muhammadasadk42@gmail.com", "user@receiptledger.com") else "user"
+                    session = UserSession(
+                        user_id=user_id,
+                        email=email_clean,
+                        full_name=name or "ReceiptLedger User",
+                        role=role,
+                        is_authenticated=True,
+                        created_at=auth_res.user.created_at,
+                    )
+                    _USER_STORE[email_clean] = {
+                        "user_id": user_id,
+                        "email": email_clean,
+                        "password_hash": _hash_pw(password),
+                        "full_name": session.full_name,
+                        "role": role,
+                        "created_at": auth_res.user.created_at,
+                    }
+                    return session
+            except Exception as auth_err:
+                logger.debug("Supabase auth sign-in check: %s", auth_err)
+    except Exception as exc:
+        logger.debug("Supabase client check: %s", exc)
+
+    return None
 
 
 def register_user(email: str, password: str, full_name: Optional[str] = None) -> UserSession:
-    """Register a new user account in the local store."""
+    """
+    Register a new user account:
+    1. Creates the user in Supabase Auth (if configured)
+    2. Inserts into Supabase public.users table (for relational FKs and table viewing)
+    3. Caches in local memory store for zero-latency lookups
+    """
     email_clean = email.strip().lower()
-    if email_clean in _USER_STORE:
+    user_uuid: Optional[str] = None
+
+    # Check local store first for duplicate check
+    if email_clean in _USER_STORE and _USER_STORE[email_clean].get("password_hash") != _hash_pw(password):
         raise ValueError(f"User with email '{email}' already exists.")
 
-    user_id = f"usr_{uuid.uuid4().hex[:8]}"
+    # 1. Supabase Persistence
+    try:
+        from app.services.store import get_supabase_client
+        client = get_supabase_client()
+        if client:
+            try:
+                auth_res = client.auth.admin.create_user({
+                    "email": email_clean,
+                    "password": password,
+                    "email_confirm": True,
+                    "user_metadata": {"full_name": full_name or "ReceiptLedger User"},
+                })
+                user_uuid = auth_res.user.id
+                logger.info("Created Supabase Auth user: %s (%s)", email_clean, user_uuid)
+            except Exception as auth_err:
+                err_msg = str(auth_err).lower()
+                if "already" in err_msg or "unique" in err_msg or "exists" in err_msg:
+                    # User exists in Supabase Auth, verify password or fetch id
+                    try:
+                        login_res = client.auth.sign_in_with_password({"email": email_clean, "password": password})
+                        if login_res and login_res.user:
+                            user_uuid = login_res.user.id
+                    except Exception:
+                        pass
+                logger.debug("Supabase auth create note: %s", auth_err)
+
+            if not user_uuid:
+                # Query public.users to see if UUID exists
+                try:
+                    existing = client.table("users").select("id").eq("email", email_clean).execute().data
+                    if existing:
+                        user_uuid = existing[0]["id"]
+                except Exception:
+                    pass
+
+            if not user_uuid:
+                user_uuid = str(uuid.uuid4())
+
+            # Sync into public.users mirror table
+            try:
+                existing_rows = client.table("users").select("id").eq("email", email_clean).execute().data
+                if existing_rows:
+                    user_uuid = existing_rows[0]["id"]
+                    client.table("users").update({"full_name": full_name or "ReceiptLedger User"}).eq("id", user_uuid).execute()
+                else:
+                    client.table("users").insert({
+                        "id": user_uuid,
+                        "email": email_clean,
+                        "full_name": full_name or "ReceiptLedger User",
+                    }).execute()
+                logger.info("Synchronized user in Supabase public.users table: %s (%s)", email_clean, user_uuid)
+            except Exception as db_err:
+                logger.warning("Failed to sync to public.users: %s", db_err)
+    except Exception as exc:
+        logger.warning("Supabase registration sync error: %s", exc)
+
+    if not user_uuid:
+        user_uuid = str(uuid.uuid4())
+
     created_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     record = {
-        "user_id": user_id,
+        "user_id": user_uuid,
         "email": email_clean,
         "password_hash": _hash_pw(password),
         "full_name": full_name or "ReceiptLedger User",
-        "role": "user",
+        "role": "admin" if email_clean in ("muhammadasadk42@gmail.com", "user@receiptledger.com") else "user",
         "created_at": created_at,
     }
     _USER_STORE[email_clean] = record
 
     return UserSession(
-        user_id=user_id,
+        user_id=user_uuid,
         email=email_clean,
         full_name=record["full_name"],
-        role="user",
+        role=record["role"],
         is_authenticated=True,
         created_at=created_at,
     )
@@ -219,29 +356,30 @@ async def get_current_user(
 ) -> UserSession:
     """
     Dependency that resolves the current user session.
-
-    - If an Authorization Bearer token is provided: decodes and authenticates.
-    - If unauthenticated in development mode: yields a default development session
-      so CLI tools, automated evaluations, and quick tests continue working without friction.
+    - If a Bearer token is provided: decodes and authenticates.
+    - If unauthenticated in development mode: defaults to a development session
+      only when needed.
     """
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization[7:].strip()
         payload = decode_access_token(token)
         if payload:
+            sub = payload.get("sub", "")
+            email = payload.get("email", "")
             return UserSession(
-                user_id=payload.get("sub", "unknown"),
-                email=payload.get("email", ""),
+                user_id=sub or str(uuid.uuid4()),
+                email=email,
                 full_name=payload.get("name", "User"),
                 role=payload.get("role", "user"),
                 is_authenticated=True,
             )
 
-    # In development mode, provide a friendly default user session
+    # In development mode, provide default user session
     if settings.is_development:
         return UserSession(
-            user_id="usr_demo_7721",
-            email="user@receiptledger.com",
-            full_name="Demo Household Manager (Dev)",
+            user_id="6dc36ca5-fe30-459b-8e72-715b39800240",
+            email="muhammadasadk42@gmail.com",
+            full_name="Asad",
             role="admin",
             is_authenticated=True,
         )

@@ -11,6 +11,7 @@ export interface TopStatusBarProps {
   onResetLedger: () => Promise<void>;
   isSeeding: boolean;
   isResetting: boolean;
+  userName?: string;
   userEmail?: string;
   onLogout: () => void;
   isMockMode?: boolean;
@@ -21,6 +22,7 @@ export interface TopStatusBarProps {
 export const TopStatusBar: React.FC<TopStatusBarProps> = ({
   health,
   isHealthLoading,
+  userName,
   userEmail,
   onLogout,
   isMockMode = false,
@@ -119,7 +121,7 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
               <User className="w-3 h-3" />
             </div>
             <span className="hidden md:inline text-slate-700 truncate max-w-[130px] font-medium" title={userEmail}>
-              {userEmail || 'operator'}
+              {userName || userEmail || 'operator'}
             </span>
             <button
               type="button"

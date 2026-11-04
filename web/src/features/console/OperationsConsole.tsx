@@ -32,6 +32,7 @@ import {
 } from '../../lib/mockData';
 
 interface OperationsConsoleProps {
+  userName?: string;
   userEmail?: string;
   onLogout: () => void;
   isMockMode?: boolean;
@@ -39,6 +40,7 @@ interface OperationsConsoleProps {
 }
 
 export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
+  userName,
   userEmail,
   onLogout,
   isMockMode = false,
@@ -336,6 +338,7 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
     mutationFn: () => api.seedDemoData(),
     onSuccess: () => {
       setErrorMessage(null);
+      queryClient.resetQueries();
       queryClient.invalidateQueries();
     },
     onError: (err) => {
@@ -349,6 +352,7 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
       setErrorMessage(null);
       setActiveQueueIndex(0);
       setSelectedReceiptRowIndex(0);
+      queryClient.resetQueries();
       queryClient.invalidateQueries();
     },
     onError: (err) => {
@@ -456,6 +460,7 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
 
   return (
     <AppLayout
+      userName={userName}
       userEmail={userEmail}
       onLogout={onLogout}
       pendingReviewCount={queueItems.length}
@@ -481,7 +486,8 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
         }}
         isSeeding={!isMockMode && seedMutation.isPending}
         isResetting={!isMockMode && resetMutation.isPending}
-        userEmail={userEmail}
+        userName={userName}
+      userEmail={userEmail}
         onLogout={onLogout}
         isMockMode={isMockMode}
         onEnterDevMockMode={handleSwitchToMockMode}
@@ -581,7 +587,8 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
           <NetworkErrorBanner
             message="Gateway connection issue. Verify backend is running on http://localhost:8000."
             onRetry={() => {
-              queryClient.invalidateQueries();
+              queryClient.resetQueries();
+      queryClient.invalidateQueries();
             }}
             isRetrying={overviewQuery.isFetching}
             onSwitchToMockMode={handleSwitchToMockMode}
@@ -971,7 +978,8 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
         isOpen={isUploadDrawerOpen}
         onClose={closeUploadDrawer}
         onUploadSuccess={() => {
-          queryClient.invalidateQueries();
+          queryClient.resetQueries();
+      queryClient.invalidateQueries();
         }}
       />
 
@@ -980,7 +988,8 @@ export const OperationsConsole: React.FC<OperationsConsoleProps> = ({
         isOpen={isGatewayModalOpen}
         onClose={() => setIsGatewayModalOpen(false)}
         onGatewayChanged={() => {
-          queryClient.invalidateQueries();
+          queryClient.resetQueries();
+      queryClient.invalidateQueries();
         }}
       />
       

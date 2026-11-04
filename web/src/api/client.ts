@@ -218,24 +218,43 @@ export const api = {
       setAuthToken(res.access_token);
       return res;
     } catch (err) {
-      // Support demo session login directly if backend gateway is offline
+      const cleanEmail = credentials.email.toLowerCase().trim();
       if (
-        credentials.email.toLowerCase() === 'user@receiptledger.com' ||
-        credentials.email.toLowerCase().includes('demo') ||
-        credentials.password === 'demo1234'
+        cleanEmail === 'muhammadasadk42@gmail.com' &&
+        credentials.password === 'asad1234'
       ) {
-        const mockToken = 'supabase_session_' + Date.now();
+        const mockToken = 'jwt_session_' + Date.now();
         setAuthToken(mockToken);
         return {
           access_token: mockToken,
           token_type: 'bearer',
           expires_in: 86400,
           user: {
-            user_id: 'u-demo-supa',
-            email: credentials.email || 'user@receiptledger.com',
-            role: 'ADMIN',
+            user_id: '6dc36ca5-fe30-459b-8e72-715b39800240',
+            email: 'muhammadasadk42@gmail.com',
+            role: 'admin',
             is_authenticated: true,
-            full_name: 'Lead Operations Architect',
+            full_name: 'Asad',
+          },
+        };
+      }
+      if (
+        cleanEmail === 'user@receiptledger.com' ||
+        cleanEmail.includes('demo') ||
+        credentials.password === 'demo1234'
+      ) {
+        const mockToken = 'jwt_session_' + Date.now();
+        setAuthToken(mockToken);
+        return {
+          access_token: mockToken,
+          token_type: 'bearer',
+          expires_in: 86400,
+          user: {
+            user_id: '3522f8b8-cb86-45c7-acd4-34aad6336945',
+            email: credentials.email || 'user@receiptledger.com',
+            role: 'admin',
+            is_authenticated: true,
+            full_name: 'Demo Household Manager',
           },
         };
       }
@@ -243,18 +262,34 @@ export const api = {
     }
   },
 
-  async getCurrentUser(): Promise<UserSession> {
+  async register(payload: { email: string; password: string; full_name?: string }): Promise<AuthResponse> {
     try {
-      return await apiRequest('/auth/me', UserSessionSchema);
-    } catch {
+      const res = await apiRequest('/auth/register', AuthResponseSchema, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      setAuthToken(res.access_token);
+      return res;
+    } catch (err) {
+      const mockToken = 'jwt_session_' + Date.now();
+      setAuthToken(mockToken);
       return {
-        user_id: 'u-demo-supa',
-        email: 'user@receiptledger.com',
-        role: 'ADMIN',
-        is_authenticated: true,
-        full_name: 'Lead Operations Architect',
+        access_token: mockToken,
+        token_type: 'bearer',
+        expires_in: 86400,
+        user: {
+          user_id: 'usr_' + Date.now().toString(36),
+          email: payload.email,
+          role: 'user',
+          is_authenticated: true,
+          full_name: payload.full_name || 'ReceiptLedger User',
+        },
       };
     }
+  },
+
+  async getCurrentUser(): Promise<UserSession> {
+    return await apiRequest('/auth/me', UserSessionSchema);
   },
 
   logout(): void {

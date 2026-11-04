@@ -31,6 +31,7 @@ export const AppContent: React.FC = () => {
 
   return (
     <OperationsConsole
+      userName={user?.full_name || undefined}
       userEmail={user?.email}
       onLogout={logout}
       isMockMode={isMockMode}
